@@ -1,0 +1,722 @@
+Linux* Base Driver for Intel(R) Network Connection
+==================================================
+
+June 18, 2007
+
+
+Contents
+========
+
+- In This Release
+- Identifying Your Adapter
+- Building and Installation
+- Command Line Parameters
+- Speed and Duplex Configuration
+- Additional Configurations
+- Known Issues
+- Support
+
+
+In This Release
+===============
+
+This file describes the Linux* Base Driver for the Intel 82575 Gigabit
+Family of Adapters.  This driver supports kernel versions 2.4.21 and newer,
+including 2.6.x.
+
+This driver is only supported as a loadable module at this time.  Intel is
+not supplying patches against the kernel source to allow for static linking
+of the driver.  For questions related to hardware requirements, refer to the
+documentation supplied with your Intel Gigabit adapter.  All hardware
+requirements listed apply to use with Linux.
+
+This release includes support for Intel(R) I/O Acceleration Technology,
+Intel(R) I/OAT.  This is supported on systems using the Intel(R) 5000 Series
+Chipsets Integrated Device - 1A38.  You can find additional information
+on Intel I/OAT at http://www.intel.com/technology/ioacceleration/index.htm.
+
+The following features are now available in supported kernels:
+ - Native VLANs
+ - Channel Bonding (teaming)
+ - SNMP
+
+Channel Bonding documentation can be found in the Linux kernel source:
+/Documentation/networking/bonding.txt
+
+The driver information previously displayed in the /proc filesystem is not
+supported in this release.  Alternatively, you can use ethtool (version 1.6
+or later), lspci, and ifconfig to obtain the same information.
+
+Instructions on updating ethtool can be found in the section "Additional
+Configurations" later in this document.
+
+Identifying Your Adapter
+========================
+
+For more information on how to identify your adapter, go to the Adapter &
+Driver ID Guide at:
+
+    http://support.intel.com/support/go/network/adapter/idguide.htm
+
+For the latest Intel network drivers for Linux, refer to the following
+website.  In the search field, enter your adapter name or type, or use the
+networking link on the left to search for your adapter:
+
+    http://downloadcenter.intel.com/scripts-df-external/Support_Intel.aspx
+
+
+Building and Installation
+=========================
+
+To build a binary RPM* package of this driver, run 'rpmbuild -tb
+<filename.tar.gz>'.  Replace <filename.tar.gz> with the specific filename
+of the driver.
+
+NOTE: For the build to work properly, the currently running kernel MUST
+      match the version and configuration of the installed kernel sources.
+      If you have just recompiled the kernel reboot the system now.
+
+      RPM functionality has only been tested in Red Hat distributions.
+
+1. Move the base driver tar file to the directory of your choice.  For
+   example, use /home/username/igb or /usr/local/src/igb.
+
+2. Untar/unzip archive:
+
+     tar zxf igb-x.x.x.tar.gz
+
+3. Change to the driver src directory:
+
+     cd igb-x.x.x/src/
+
+4. Compile the driver module:
+
+     make install
+
+   The binary will be installed as:
+
+     /lib/modules/<KERNEL VERSION>/kernel/drivers/net/igb/igb.[k]o
+
+   The install locations listed above are the default locations.  They
+   might not be correct for certain Linux distributions.  For more
+   information, see the ldistrib.txt file included in the driver tar.
+
+5. Load the module using either the insmod or modprobe command:
+
+     modprobe igb
+
+     insmod igb
+
+   Note that for 2.6 kernels the insmod command can be used if the full
+   path to the driver module is specified.  For example:
+
+     insmod /lib/modules/<KERNEL VERSION>/kernel/drivers/net/igb/igb.ko
+
+   With 2.6 based kernels also make sure that older igb drivers are
+   removed from the kernel, before loading the new module:
+
+     rmmod igb; modprobe igb
+
+
+6. Assign an IP address to the interface by entering the following, where
+   x is the interface number:
+
+     ifconfig ethx <IP_address>
+
+7. Verify that the interface works.  Enter the following, where <IP_address>
+   is the IP address for another machine on the same subnet as the
+   interface that is being tested:
+
+     ping  <IP_address>
+
+
+To build igb driver with DCA:
+------------------------------
+ 
+This example assumes the ioatdma and igb sources are in /usr/src
+ 
+1. # unpack the ioatdma source, build and install
+
+     cd /usr/src
+     tar zxf ioatdma-<ioat version>.tar.gz
+     cd ioatdma-<ioat version>
+     make
+     make install
+ 
+2. # unpack with igb driver, build with DCA support and install
+     
+     cd /usr/src
+     tar zxf igb-<igb version>.tar.gz
+     cd igb-<igb-version>/src
+     make CFLAGS_EXTRA="-DIGB_DCA -I/usr/src/ioatdma-<ioat version>/include"
+     make install
+
+
+Command Line Parameters
+=======================
+
+If the driver is built as a module, the  following optional parameters
+are used by entering them on the command line with the modprobe command
+using this syntax:
+
+     modprobe igb [<option>=<VAL1>,<VAL2>,...]
+
+For example, with a single two-port adapter, entering:
+
+     modprobe igb TxDescriptors=80,128
+
+loads the igb driver with 80 TX descriptors for the first port and
+128 TX descriptors for the second port.
+
+The default value for each parameter is generally the recommended setting,
+unless otherwise noted.
+
+NOTES:  For more information about the AutoNeg, Duplex, and Speed
+        parameters, see the "Speed and Duplex Configuration" section in
+        this document.
+
+        For more information about the InterruptThrottleRate,
+        parameter, see the application note at:
+        http://www.intel.com/design/network/applnots/ap450.htm
+
+        A descriptor describes a data buffer and attributes related to
+        the data buffer.  This information is accessed by the hardware.
+
+
+AutoNeg
+-------
+(Supported only on adapters with copper connections)
+Valid Range:   0x01-0x0F, 0x20-0x2F
+Default Value: 0x2F
+
+This parameter is a bit-mask that specifies the speed and duplex settings
+advertised by the adapter.  When this parameter is used, the Speed and
+Duplex parameters must not be specified.
+
+NOTE:  Refer to the Speed and Duplex section of this readme for more
+       information on the AutoNeg parameter.
+
+
+Duplex
+------
+(Supported only on adapters with copper connections)
+Valid Range:   0-2 (0=auto-negotiate, 1=half, 2=full)
+Default Value: 0
+
+This defines the direction in which data is allowed to flow.  Can be
+either one or two-directional.  If both Duplex and the link partner are
+set to auto-negotiate, the board auto-detects the correct duplex.  If the
+link partner is forced (either full or half), Duplex defaults to half-
+duplex.
+
+
+FlowControl
+-----------
+Valid Range:   0-3 (0=none, 1=Rx only, 2=Tx only, 3=Rx&Tx)
+Default Value: Reads flow control settings from the EEPROM
+
+This parameter controls the automatic generation(Tx) and response(Rx)
+to Ethernet PAUSE frames.
+
+
+InterruptThrottleRate
+---------------------
+Valid Range:   0,1,3,100-100000 (0=off, 1=dynamic, 3=dynamic conservative)
+Default Value: 3
+
+The driver can limit the amount of interrupts per second that the adapter
+will generate for incoming packets. It does this by writing a value to the 
+adapter that is based on the maximum amount of interrupts that the adapter 
+will generate per second.
+
+Setting InterruptThrottleRate to a value greater or equal to 100
+will program the adapter to send out a maximum of that many interrupts
+per second, even if more packets have come in. This reduces interrupt
+load on the system and can lower CPU utilization under heavy load,
+but will increase latency as packets are not processed as quickly.
+
+The default behaviour of the driver previously assumed a static 
+InterruptThrottleRate value of 8000, providing a good fallback value for 
+all traffic types,but lacking in small packet performance and latency. 
+The hardware can handle many more small packets per second however, and 
+for this reason an adaptive interrupt moderation algorithm was implemented.
+
+The driver has two adaptive modes (setting 1 or 3) in which it dynamically
+adjusts the InterruptThrottleRate value based on the traffic that it receives.
+After determining the type of incoming traffic in the last timeframe, it will
+adjust the InterruptThrottleRate to an appropriate value for that traffic.
+
+The algorithm classifies the incoming traffic every interval into
+classes.  Once the class is determined, the InterruptThrottleRate value is 
+adjusted to suit that traffic type the best. There are three classes defined: 
+"Bulk traffic", for large amounts of packets of normal size; "Low latency",
+for small amounts of traffic and/or a significant percentage of small
+packets; and "Lowest latency", for almost completely small packets or 
+minimal traffic.
+
+In dynamic conservative mode, the InterruptThrottleRate value is set to 4000 
+for traffic that falls in class "Bulk traffic". If traffic falls in the "Low 
+latency" or "Lowest latency" class, the InterruptThrottleRate is increased 
+stepwise to 20000. This default mode is suitable for most applications.
+
+For situations where low latency is vital such as cluster or
+grid computing, the algorithm can reduce latency even more when
+InterruptThrottleRate is set to mode 1. In this mode, which operates
+the same as mode 3, the InterruptThrottleRate will be increased stepwise to 
+70000 for traffic in class "Lowest latency".
+
+Setting InterruptThrottleRate to 0 turns off any interrupt moderation
+and may improve small packet latency, but is generally not suitable
+for bulk throughput traffic.
+
+NOTE:  Dynamic interrupt throttling is only applicable to adapters
+       operating in MSI or Legacy interrupt mode, using a single
+       receive queue.
+
+NOTE:  When igb is loaded with default settings and multiple adapters
+       are in use simultaneously, the CPU utilization may increase non-
+       linearly.  In order to limit the CPU utilization without impacting
+       the overall throughput, we recommend that you load the driver as
+       follows:
+
+           modprobe igb InterruptThrottleRate=3000,3000,3000
+
+       This sets the InterruptThrottleRate to 3000 interrupts/sec for
+       the first, second, and third instances of the driver.  The range
+       of 2000 to 3000 interrupts per second works on a majority of
+       systems and is a good starting point, but the optimal value will
+       be platform-specific.  If CPU utilization is not a concern, use
+       default driver settings.
+
+
+RxDescriptors
+-------------
+Valid Range:   80-4096
+Default Value: 256
+
+This value specifies the number of receive buffer descriptors allocated
+by the driver.  Increasing this value allows the driver to buffer more
+incoming packets, at the expense of increased system memory utilization.
+
+Each descriptor is 16 bytes.  A receive buffer is also allocated for each
+descriptor and will be a maximum of 4096 bytes, depending on the MTU setting.
+For MTU settings larger than 4096, each received packet will consume 2 or
+more descriptors.  The maximum MTU size is 9216 bytes.
+
+NOTE:  MTU designates the frame size.  It only needs to be set for Jumbo 
+       Frames.  Depending on the available system resources, the request 
+       for a higher number of receive descriptors may be denied.  In this 
+       case, use a lower number.
+
+
+Speed
+-----
+(This parameter is supported only on adapters with copper connections.)
+Valid Settings: 0, 10, 100, 1000
+Default Value:  0 (auto-negotiate at all supported speeds)
+
+Speed forces the line speed to the specified value in megabits per second
+(Mbps).  If this parameter is not specified or is set to 0 and the link
+partner is set to auto-negotiate, the board will auto-detect the correct
+speed.  Duplex should also be set when Speed is set to either 10 or 100.
+
+
+TxDescriptors
+-------------
+Valid Range:   80-4096
+Default Value: 256
+
+This value is the number of transmit descriptors allocated by the driver.
+Increasing this value allows the driver to queue more transmits.  Each
+descriptor is 16 bytes.
+
+NOTE:  Depending on the available system resources, the request for a
+       higher number of transmit descriptors may be denied.  In this case,
+       use a lower number.
+
+
+XsumRX
+------
+Valid Range:   0-1
+Default Value: 1
+
+A value of '1' indicates that the driver should enable IP checksum
+offload for received packets (both UDP and TCP) to the adapter hardware.
+
+
+LLIPort
+-------
+Valid Range:   0-1
+Default Value: 0 (disabled)
+
+  LLI is configured with the LLIPort command-line parameter, which specifies 
+  which TCP should general Low Latency Interrupts.
+
+  For example, using LLIPort=80 would cause the board to generate an 
+  immediate interrupt upon receipt of any packet sent to TCP port 80 on the 
+  local machine.
+
+
+LLIPush
+-------
+Valid Range:   0-1
+Default Value: 0 (disabled)
+
+  LLIPush can be set to be enabled or disabled (default). It is most 
+  effective in an environment with many small transactions.
+  NOTE: Enabling LLIPush may allow a denial of service attack.
+
+
+LLISize
+-------
+Valid Range:   0-1500
+Default Value: 0 (disabled)
+
+  LLISize causes an immediate interrupt if the board receives a packet smaller 
+  than the specified size.
+
+
+Speed and Duplex Configuration
+==============================
+
+Three keywords are used to control the speed and duplex configuration.
+These keywords are Speed, Duplex, and AutoNeg.
+
+If the board uses a fiber interface, these keywords are ignored, and the
+fiber interface board only links at 1000 Mbps full-duplex.
+
+For copper-based boards, the keywords interact as follows:
+
+  The default operation is auto-negotiate.  The board advertises all
+  supported speed and duplex combinations, and it links at the highest
+  common speed and duplex mode IF the link partner is set to auto-negotiate.
+
+  If Speed = 1000, limited auto-negotiation is enabled and only 1000 Mbps
+  is advertised (The 1000BaseT spec requires auto-negotiation.)
+
+  If Speed = 10 or 100, then both Speed and Duplex should be set.  Auto-
+  negotiation is disabled, and the AutoNeg parameter is ignored.  Partner
+  SHOULD also be forced.
+
+The AutoNeg parameter is used when more control is required over the
+auto-negotiation process.  It should be used when you wish to control which
+speed and duplex combinations are advertised during the auto-negotiation
+process.
+
+The parameter may be specified as either a decimal or hexadecimal value as
+determined by the bitmap below.
+
+Bit position   7      6      5       4       3      2      1       0
+Decimal Value  128    64     32      16      8      4      2       1
+Hex value      80     40     20      10      8      4      2       1
+Speed (Mbps)   N/A    N/A    1000    N/A     100    100    10      10
+Duplex                       Full            Full   Half   Full    Half
+
+Some examples of using AutoNeg:
+
+  modprobe igb AutoNeg=0x01 (Restricts autonegotiation to 10 Half)
+  modprobe igb AutoNeg=1 (Same as above)
+  modprobe igb AutoNeg=0x02 (Restricts autonegotiation to 10 Full)
+  modprobe igb AutoNeg=0x03 (Restricts autonegotiation to 10 Half or 10 Full)
+  modprobe igb AutoNeg=0x04 (Restricts autonegotiation to 100 Half)
+  modprobe igb AutoNeg=0x05 (Restricts autonegotiation to 10 Half or 100
+  Half)
+  modprobe igb AutoNeg=0x020 (Restricts autonegotiation to 1000 Full)
+  modprobe igb AutoNeg=32 (Same as above)
+
+Note that when this parameter is used, Speed and Duplex must not be specified.
+
+If the link partner is forced to a specific speed and duplex, then this
+parameter should not be used.  Instead, use the Speed and Duplex parameters
+previously mentioned to force the adapter to the same speed and duplex.
+
+
+Additional Configurations
+=========================
+
+
+  Configuring the Driver on Different Distributions
+  -------------------------------------------------
+  Configuring a network driver to load properly when the system is started
+  is distribution dependent.  Typically, the configuration process involves
+  adding an alias line to /etc/modules.conf or /etc/modprobe.conf as well
+  as editing other system startup scripts and/or configuration files.  Many
+  popular Linux distributions ship with tools to make these changes for you.
+  To learn the proper way to configure a network device for your system,
+  refer to your distribution documentation.  If during this process you are
+  asked for the driver or module name, the name for the Linux Base Driver
+  for the Gigabit Family of Adapters is igb.
+
+  As an example, if you install the igb driver for two Gigabit adapters
+  (eth0 and eth1) and set the speed and duplex to 10full and 100half, add
+  the following to modules.conf or or modprobe.conf:
+
+       alias eth0 igb
+       alias eth1 igb
+       options igb Speed=10,100 Duplex=2,1
+
+
+  Viewing Link Messages
+  ---------------------
+  Link messages will not be displayed to the console if the distribution is
+  restricting system messages.  In order to see network driver link messages
+  on your console, set dmesg to eight by entering the following:
+
+       dmesg -n 8
+
+  NOTE: This setting is not saved across reboots.
+
+
+  Jumbo Frames
+  ------------
+  Jumbo Frames support is enabled by changing the MTU to a value larger than
+  the default of 1500.  Use the ifconfig command to increase the MTU size.
+  For example:
+
+       ifconfig eth<x> mtu 9000 up
+
+  This setting is not saved across reboots.  It can be made permanent if
+  you add:
+
+       MTU=9000
+
+   to the file /etc/sysconfig/network-scripts/ifcfg-eth<x>.  This example
+   applies to the Red Hat distributions; other distributions may store this
+   setting in a different location.
+
+  Notes:
+
+  - To enable Jumbo Frames, increase the MTU size on the interface beyond
+    1500.
+
+  - The maximum MTU setting for Jumbo Frames is 9216.  This value coincides
+    with the maximum Jumbo Frames size of 9234 bytes.
+
+  - Using Jumbo Frames at 10 or 100 Mbps may result in poor performance or
+    loss of link.
+
+
+  Ethtool
+  -------
+  The driver utilizes the ethtool interface for driver configuration and
+  diagnostics, as well as displaying statistical information.  Ethtool
+  version 1.6 or later is required for this functionality.
+
+  The latest release of ethtool can be found from
+  http://sourceforge.net/projects/gkernel.
+
+  NOTE: Ethtool 1.6 only supports a limited set of ethtool options.  Support
+  for a more complete ethtool feature set can be enabled by upgrading
+  to the latest version.
+
+
+  Enabling Wake on LAN* (WoL)
+  ---------------------------
+  WoL is configured through the Ethtool* utility.  Ethtool is included with
+  all versions of Red Hat after Red Hat 7.2.  For other Linux distributions,
+  download and install Ethtool from the following website:
+  http://sourceforge.net/projects/gkernel.
+
+  For instructions on enabling WoL with Ethtool, refer to the website listed
+  above.
+
+  WoL will be enabled on the system during the next shut down or reboot.
+  For this driver version, in order to enable WoL, the igb driver must be
+  loaded when shutting down or rebooting the system.
+
+  Wake On LAN is only supported on port A of multi-port adapters.
+
+  Wake On LAN is not supported for the Intel(R) Gigabit VT Quad Port Server 
+  Adapter.
+
+
+  Multiqueue
+  ----------
+  In this mode, a separate MSI-X vector is allocated for each queue and one
+  for "other" interrupts such as link status change and errors.  All 
+  interrupts are throttled via interrupt moderation.  Interrupt moderation 
+  must be used to avoid interrupt storms while the driver is processing one 
+  interrupt.  The moderation value should be at least as large as the expected
+  time for the driver to process an interrupt. Multiqueue is off by default.
+  
+  MSI-X support is required for Multiqueue. If MSI-X is not found, the system 
+  will fallback to MSI or to Legacy interrupts.
+  NOTE: Do not use MSI-X with the 2.6.19 or 2.6.20 kernels. We recommend the
+  2.6.21 or later kernel.
+
+  Multiqueue can be enabled with a compile flag: 
+  # make CFLAGS_EXTRA=-DCONFIG_IGB_MQ_RX
+  This will give you up to four rx queues without AIM (but using a simple 
+  adaptive algorithm for dynamic interrupt moderation).  We have found that 
+  this provides acceptable throughput but uses a lot more CPU than single-queue 
+  mode due to more interrupts.  This mode might be useful if you are handling 
+  multiple connections using a lot of small packets and you aren't concerned 
+  about CPU utilization. Note that tx cleanups are handled during rx 
+  processing.
+
+  With this option you can get up to five MSI-X vectors - one per RX queue and
+  one for link.  You will never get more queues than CPUs, so if you have a 
+  dual-proc server you'll only get two RX queues.
+
+  To enable a separate vector for TX, use: 
+  # make CFLAGS_EXTRA=-DCONFIG_IGB_SEPARATE_TX_HANDLER
+  This will allocate a separate handler for tx cleanups. This might be useful 
+  if you have a lot of CPU cores under heavy load and want to spread the 
+  processing load around.  
+ 
+  With this option, you would get three MSI-X vectors: one for TX, one for RX, 
+  and one for link.
+
+  The previous two options can be combined:
+  # make CFLAGS_EXTRA="-DCONFIG_IGB_RX_MQ -DCONFIG_IGB_SEPARATE_TX_HANDLER"
+  (quotes are required).  This will disable AIM, and give you up to six MSI-X 
+  vectors: one for each RX queue (up to four), one for TX cleanups, and one 
+  for link.
+ 
+  Currently there is no kernel support for multiple TX queues.
+
+
+Known Issues
+============
+
+NOTE: For distribution-specific information, see the ldistrib.txt file
+      included in the driver tar.
+
+Using the igb driver on 2.4 or older 2.6 based kernels
+------------------------------------------------------
+Due to limited support for PCI-Express in 2.4 kernels and older 2.6 kernels,
+the igb driver may run into interrupt related problems on some systems, 
+such as no link or hang when bringing up the device.
+
+We recommend the newer 2.6 based kernels, as these kernels correctly
+configure the PCI-Express configuration space of the adapter and all
+intervening bridges. If you are required to use a 2.4 kernel, use a 2.4 kernel 
+newer than 2.4.30. For 2.6 kernels we recommend using the 2.6.21 kernel or 
+newer.
+
+Alternatively, on 2.6 kernels you may disable MSI support in the kernel by 
+booting with the "pci=nomsi" option or permanently disable MSI support in 
+your kernel by configuring your kernel with CONFIG_PCI_MSI unset.
+
+Intel(R) Active Management Technology 2.0, 2.1, 2.5 not supported in 
+conjunction with Linux driver
+---------------------------------------------------------------------
+
+Driver Compilation
+------------------
+When trying to compile the driver by running make install, the following
+error may occur:
+
+    "Linux kernel source not configured - missing version.h"
+
+To solve this issue, create the version.h file by going to the Linux source
+tree and entering:
+
+    make include/linux/version.h.
+
+Performance Degradation with Jumbo Frames
+-----------------------------------------
+Degradation in throughput performance may be observed in some Jumbo frames
+environments.  If this is observed, increasing the application's socket
+buffer size and/or increasing the /proc/sys/net/ipv4/tcp_*mem entry values
+may help.  See the specific application manual and
+/usr/src/linux*/Documentation/
+networking/ip-sysctl.txt for more details.
+
+Jumbo Frames on Foundry BigIron 8000 switch
+-------------------------------------------
+There is a known issue using Jumbo frames when connected to a Foundry
+BigIron 8000 switch.  This is a 3rd party limitation.  If you experience
+loss of packets, lower the MTU size.
+
+Multiple Interfaces on Same Ethernet Broadcast Network
+------------------------------------------------------
+Due to the default ARP behavior on Linux, it is not possible to have
+one system on two IP networks in the same Ethernet broadcast domain
+(non-partitioned switch) behave as expected.  All Ethernet interfaces
+will respond to IP traffic for any IP address assigned to the system.
+This results in unbalanced receive traffic.
+
+If you have multiple interfaces in a server, either turn on ARP
+filtering by entering:
+
+    echo 1 > /proc/sys/net/ipv4/conf/all/arp_filter
+(this only works if your kernel's version is higher than 2.4.5),
+
+NOTE: This setting is not saved across reboots.  The configuration
+change can be made permanent by adding the line:
+    net.ipv4.conf.all.arp_filter = 1
+to the file /etc/sysctl.conf
+
+      or,
+
+install the interfaces in separate broadcast domains (either in
+different switches or in a switch partitioned to VLANs).
+
+Disable rx flow control with ethtool
+------------------------------------
+In order to disable receive flow control using ethtool, you must turn
+off auto-negotiation on the same command line.
+
+For example:
+
+   ethtool -A eth? autoneg off rx off
+
+Unplugging network cable while ethtool -p is running
+----------------------------------------------------
+In kernel versions 2.5.50 and later (including 2.6 kernel), unplugging 
+the network cable while ethtool -p is running will cause the system to 
+become unresponsive to keyboard commands, except for control-alt-delete.  
+Restarting the system appears to be the only remedy.
+
+
+
+Support
+=======
+
+For general information, go to the Intel support website at:
+
+    http://support.intel.com
+
+or the Intel Wired Networking project hosted by Sourceforge at:
+
+    http://sourceforge.net/projects/igb
+
+If an issue is identified with the released source code on the supported
+kernel with a supported adapter, email the specific information related
+to the issue to igb-devel@lists.sf.net
+
+
+
+License
+=======
+
+Intel Gigabit Linux driver.
+Copyright(c) 1999 - 2006 Intel Corporation.
+
+This program is free software; you can redistribute it and/or modify it
+under the terms and conditions of the GNU General Public License,
+version 2, as published by the Free Software Foundation.
+
+This program is distributed in the hope it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc.,
+51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+
+The full GNU General Public License is included in this distribution in
+the file called "COPYING".
+
+
+
+Trademarks
+==========
+
+Intel, Itanium, and Pentium are trademarks or registered trademarks of
+Intel Corporation or its subsidiaries in the United States and other
+countries.
+
+* Other names and brands may be claimed as the property of others.

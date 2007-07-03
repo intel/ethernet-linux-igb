@@ -1,0 +1,15 @@
+# updates for the system pci.ids file
+#
+# IMPORTANT!  Entries in this list must be sorted as they
+#             would appear in the system pci.ids file.  Entries
+#             are sorted by ven, dev, subven, subdev
+#             (numerical order).
+#
+8086  Intel Corp.
+	10a7  82575EB Gigabit Network Connection
+		8086 10a8  82575EB Gigabit Riser Card
+	10a9  82575EB Gigabit Backplane Connection
+	10d6  82575GB Gigabit Network Connection
+		8086 10d6  Gigabit VT Quad Port Server Adapter
+		8086 145a  Gigabit VT Quad Port Server Adapter
+
