@@ -4,7 +4,7 @@
 .\"
 .\" * Other names and brands may be claimed as the property of others.
 .\"
-.TH igb 1 "March 5, 2007"
+.TH igb 1 "August 14, 2007"
 
 .SH NAME
 igb \-This file describes the Linux* Base Driver for the Gigabit Family of Adapters.
@@ -18,55 +18,17 @@ modprobe igb [<option>=<VAL1>,<VAL2>,...]
 This driver is intended for \fB2.4.x\fR and \fB2.6.x\fR kernels.  This driver includes support for Intel(R) Itanium(R)2-based systems.
 .LP
 
-This driver is only supported as a loadable module at this time.  Intel is not supplying patches against the kernel source to allow for static linking of the driver.  For questions related to hardware requirements, refer to the documentation supplied with your Intel adapter.  All hardware requirements listed apply to use with Linux.
+This driver is only supported as a loadable module at this time.  Intel is not supplying patches against the kernel source toallow for static linking of the driver.  For questions related to hardware requirements, refer to the documentation supplied with your Intel adapter.  All hardware requirements listed apply to use with Linux.
 
 
 .SH OPTIONS
 The following optional parameters are used by entering them on the command line with the modprobe command.  
-For example, with two Gigabit PCI adapters, entering:
+For example:
 .IP
-.B modprobe igb TxDescriptors=80,128
-.LP
-This loads the igb driver with 80 TX descriptors for the first adapter and 128 TX descriptors for the second adapter.
+.B modprobe igb InterruptThrottleRate=16000,16000
 .PP
 .LP
 
-.B AutoNeg
-.IP
-.B Valid Range: 
-0x01-0x0F, 0x20-0x2F
-.br
-.B Default Value: 
-0x2F
-.IP
-This is the bit-mask that specifies the speed and duplex settings advertised by the adapter.  When AutoNeg is not set to the default, the Speed and Duplex parameters must not be specified.  This parameter only applies to adapters using copper connections.
-.IP
-See the section "Speed and Duplex Configuration" in Readme.
-.LP
-
-.B Duplex
-.IP
-.B Valid Range: 
-0-2 (0=auto-negotiate, 1=half, 2=full)
-.br
-.B Default Value: 
-0
-.IP
-This defines the direction in which data is allowed to flow.  Can be either one or two-directional.  If both Duplex and the link partner are set to auto-negotiate, the board auto-detects the correct duplex.  If the link partner is forced (either full or half), Duplex defaults to half-duplex.  This parameter only applies to adapters using copper connections.
-.IP
-See the section "Speed and Duplex Configuration" in Readme.
-.LP
-
-.B FlowControl
-.IP
-.B Valid Range: 
-0-3 (0 = none, 1 = Rx only, 2 = Tx only, 3 = Rx and Tx)
-.br
-.B Default Value: 
-Read flow control settings from the EEPROM
-.IP
-This controls the automatic generation(Tx) and response(Rx) to Ethernet PAUSE frames.
-.LP
 
 .B InterruptThrottleRate
 .IP
@@ -91,142 +53,16 @@ InterruptThrottleRate takes precedence over the TxAbsIntDelay and RxAbsIntDelay 
 See the section "InterruptThrottleRate" in Readme.
 .LP
 
-.B RxDescriptors
-.IP
-.B Valid Range: 
-80-256 for 82542 and 82543-based adapters, 80-4096 for all other supported adapters
-.br
-.B Default Value: 
-256
-.IP
-This value specifies the number of receive buffer descriptors allocated by the driver.  Increasing this value allows the driver to buffer more incoming packets, at the expense of increased system memory utilization.  
-.br
-.br
-Each descriptor is 16 bytes.  A receive buffer is also allocated for each
-descriptor and can be either 2048, 4096, 8192, or 16384 bytes, depending 
-on the MTU setting. The maximum MTU size is 16110.
-.br
-.br
-.B NOTE:  
-MTU designates the frame size.  It only needs to be set for Jumbo 
-Frames.  Depending on the available system resources, the request 
-for a higher number of receive descriptors may be denied.  In this 
-case, use a lower number.
-.LP
-
-.B RxIntDelay
-.IP
-.B Valid Range: 
-0-65535 (0=off)
-.br
-.B Default Value: 
-0
-.IP
-This sets the delay of the generation of receive interrupts, in units of 1.024 microseconds.  Receive interrupt reduction can improve CPU efficiency if properly tuned for specific network traffic.  Increasing this value adds extra latency to frame reception and can end up decreasing the throughput of TCP traffic.  If the system is reporting dropped receives, this value may be set too high, causing the driver to run out of available receive descriptors.
-.IP
-CAUTION: When setting RxIntDelay to a value other than 0, adapters may hang (stop transmitting) under certain network conditions.  If this occurs a NETDEV WATCHDOG message is logged in the system event log.  In addition, the controller is automatically reset, restoring the network connection.  To eliminate the potential for the hang ensure that RxIntDelay is set to zero.
-.LP
-
-.B RxAbsIntDelay 
-(82540, 82545, and later adapters only)
-.IP
-.B Valid Range: 
-0-65535 (0=off)
-.br
-.B Default Value: 
-128
-.IP
-This limits the delay in which a receive interrupt is generated (in units of 1.024 microseconds).  Useful only if RxIntDelay is non-zero, this value ensures that an interrupt is generated after the initial packet is received within the set amount of time.  Proper tuning, along with RxIntDelay, may improve traffic throughput in specific network conditions.
-.LP
-
-.B Speed
-.IP
-.B Valid Settings: 
-0, 10, 100, 1000
-.br
-.B Default Value: 
-0 (auto-negotiate at all supported speeds)
-.IP
-This forces the line speed to the specified value in megabits per second (Mbps).  If this parameter is not specified or is set to 0 and the link partner is set to auto-negotiate, the board auto-detects the correct speed.  Duplex must also be set when Speed is set to either 10 or 100.  This parameter only applies to adapters using copper connections.
-.IP
-See the section "Speed and Duplex Configuration" in Readme.
-.LP
-
-.B TxIntDelay
-.IP
-.B Valid Range: 
-0-65535 (0=off)
-.br
-.B Default Value: 
-64
-.IP
-This sets the delay of the generation of transmit interrupts, in units of 1.024 microseconds.  Transmit interrupt reduction can improve CPU efficiency if properly tuned for specific network traffic.  If the system is reporting dropped transmits, this value may be set too high causing the driver to run out of available transmit descriptors.
-.LP
-
-.B TxAbsIntDelay 
-(82540, 82545, and later adapters only)
-.IP
-.B Valid Range: 
-0-65535 (0=off)
-.br
-.B Default Value: 
-64
-.IP
-This limits the delay in which a transmit interrupt is generated (in units of 1.024 microseconds).  Useful only if TxIntDelay is non-zero, this value ensures that an interrupt is generated after the initial packet is sent on the wire within the set amount of time.  Proper tuning, along with TxIntDelay, may improve traffic throughput in specific network conditions.
-.LP
-
-.B TxDescriptors
-.IP
-.B Valid Range: 
-80-256 for 82542 and 82543-based adapters, 80-4096 for all other supported adapters
-.br
-.B Default Value: 
-256
-.IP
-This is the number of transmit descriptors allocated by the driver.  Increasing this value allows the driver to queue more transmits.  Each descriptor is 16 bytes.
-.IP
-.B NOTE: 
-Depending on the available system resources, the request for a higher number of transmit descriptors may be denied.  In this case, use a lower number.
-.LP
-
-.B XsumRX
-.IP
-.B Valid Range: 
-0-1
-.br
-.B Default Value: 
-1
-.IP
-This enables IP checksum offload for received packets (both UDP and TCP) to the adapter hardware when set to 1.  This parameter is not available on the 82542-based adapter.
-.LP
-
-.B Copybreak
-.IP
-.B Valid Range:   
-0-xxxxxxx (0=off)
-.br
-.B Default Value: 
-256
-.IP
-.B Usage: 
-insmod igb.ko copybreak=128
-.IP
-Driver copies all packets below or equaling this size to a fresh rx buffer before handing it up the stack.
-.IP
-This parameter is different than other parameters, in that it is a single (not 1,1,1 etc.) parameter applied to all driver instances and
-it is also available during runtime at /sys/module/igb/parameters/copybreak.
-.LP
 
 .B LLIPort
 .IP
 .B Valid Range:
-0-1 (0=off)
+0-65535 (0=off)
 .br
 .B Default Value:
 0
 .IP
-.B Usage:
-LLI is configured with the LLIPort command-line parameter, which specifies which TCP should general Low Latency Interrupts.
+LLI is configured with the LLIPort command-line parameter, which specifies which TCP port should generate Low Latency Interrupts.
 .IP
 For example, using LLIPort=80 would cause the board to generate an immediate interrupt upon receipt of any packet sent to TCPport 80 on the local machine.
 .LP
@@ -239,8 +75,7 @@ For example, using LLIPort=80 would cause the board to generate an immediate int
 .B Default Value:
 0
 .IP
-.B Usage
-LLIPush can be set to be enabled or disabled (default). It is most effective in an environment with many small transactions.
+Can be set to be enabled or disabled (default). It is most effective in an environment with many small transactions.
 .IP
 NOTE: Enabling LLIPush may allow a denial of service attack.
 .LP
@@ -253,28 +88,8 @@ NOTE: Enabling LLIPush may allow a denial of service attack.
 .B Default Value:
 0
 .IP
-.B Usage
-LLISize causes an immediate interrupt if the board receives a packet smaller than the specified size. 
+Causes an immediate interrupt if the board receives a packet smaller than the specified size. 
 .LP
-
-.SH SPEED AND DUPLEX SETTINGS
-.LP
-Three keywords are used to control the speed and duplex configuration.  
-These keywords are Speed, Duplex, and AutoNeg.
-.LP
-If the board uses a fiber interface, these keywords are ignored, and the fiber interface board only links at 1000 Mbps full-duplex.
-.LP
-For copper-based boards, the keywords interact as follows:
-.IP
-  The default operation is auto-negotiate.  The board advertises all supported speed and duplex combinations, and it links at the highest common speed and duplex mode IF the link partner is set to auto-negotiate.
-.IP
-  If Speed = 1000, limited auto-negotiation is enabled and only 1000 Mbps is advertised (The 1000BaseT spec requires auto-negotiation.)
-.IP
-  If Speed = 10 or 100, then both Speed and Duplex should be set.  Auto-negotiation is disabled, and the AutoNeg parameter is ignored.  Partner SHOULD also be forced.
-.LP
-The AutoNeg parameter is used when more control is required over the auto-negotiation process.  It should be used when you wish to control which speed and duplex combinations are advertised during the auto-negotiation process.  
-.LP
-See the section "Speed and Duplex Settings" in Readme.
 
 
 .SH JUMBO FRAMES
@@ -286,9 +101,7 @@ ifconfig ethx mtu 9000 up
 .B NOTE: 
 Jumbo Frames are supported at 1000 Mbps only.  Using Jumbo Frames at 10 or 100 Mbps may result in poor performance or loss of link.
 .LP
-Some Intel gigabit adapters that support Jumbo Frames have a frame size limit of 9238 bytes, with a corresponding MTU size limit of 9216 bytes.  Adapters with this limitation are based on the Intel(R) 82571EB, 82573L and 80003ES2LAN controller.
-.LP
-Adapters based on the Intel(R) 82542 and 82573V/E controllers do not support Jumbo Frames.
+Some Intel gigabit adapters that support Jumbo Frames have a frame size limit of 9238 bytes, with a corresponding MTU size limit of 9216 bytes. 
 .LP
 See the section "Jumbo Frames" in Readme.
 

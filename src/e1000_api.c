@@ -43,7 +43,7 @@ s32 e1000_init_mac_params(struct e1000_hw *hw)
 {
 	s32 ret_val = E1000_SUCCESS;
 
-	if (hw->func.init_mac_params != NULL) {
+	if (hw->func.init_mac_params) {
 		ret_val = hw->func.init_mac_params(hw);
 		if (ret_val) {
 			DEBUGOUT("MAC Initialization Error\n");
@@ -69,7 +69,7 @@ s32 e1000_init_nvm_params(struct e1000_hw *hw)
 {
 	s32 ret_val = E1000_SUCCESS;
 
-	if (hw->func.init_nvm_params != NULL) {
+	if (hw->func.init_nvm_params) {
 		ret_val = hw->func.init_nvm_params(hw);
 		if (ret_val) {
 			DEBUGOUT("NVM Initialization Error\n");
@@ -95,7 +95,7 @@ s32 e1000_init_phy_params(struct e1000_hw *hw)
 {
 	s32 ret_val = E1000_SUCCESS;
 
-	if (hw->func.init_phy_params != NULL) {
+	if (hw->func.init_phy_params) {
 		ret_val = hw->func.init_phy_params(hw);
 		if (ret_val) {
 			DEBUGOUT("PHY Initialization Error\n");
@@ -153,12 +153,11 @@ s32 e1000_set_mac_type(struct e1000_hw *hw)
  *  This function must be called by a driver in order to use the rest
  *  of the 'shared' code files. Called by drivers only.
  **/
-s32 e1000_setup_init_funcs(struct e1000_hw *hw, boolean_t init_device)
+s32 e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device)
 {
 	s32 ret_val;
 
-	/* Can't do much good without knowing the MAC type.
-	 */
+	/* Can't do much good without knowing the MAC type. */
 	ret_val = e1000_set_mac_type(hw);
 	if (ret_val) {
 		DEBUGOUT("ERROR: MAC type could not be set properly.\n");
@@ -171,7 +170,8 @@ s32 e1000_setup_init_funcs(struct e1000_hw *hw, boolean_t init_device)
 		goto out;
 	}
 
-	/* Init some generic function pointers that are currently all pointing
+	/*
+	 * Init some generic function pointers that are currently all pointing
 	 * to generic implementations. We do this first allowing a driver
 	 * module to override it afterwards.
 	 */
@@ -184,7 +184,8 @@ s32 e1000_setup_init_funcs(struct e1000_hw *hw, boolean_t init_device)
 	hw->func.wait_autoneg = e1000_wait_autoneg_generic;
 	hw->func.reload_nvm = e1000_reload_nvm_generic;
 
-	/* Set up the init function pointers. These are functions within the
+	/*
+	 * Set up the init function pointers. These are functions within the
 	 * adapter family file that sets up function pointers for the rest of
 	 * the functions in that family.
 	 */
@@ -198,10 +199,11 @@ s32 e1000_setup_init_funcs(struct e1000_hw *hw, boolean_t init_device)
 		break;
 	}
 
-	/* Initialize the rest of the function pointers. These require some
+	/*
+	 * Initialize the rest of the function pointers. These require some
 	 * register reads/writes in some cases.
 	 */
-	if ((ret_val == E1000_SUCCESS) && (init_device == TRUE)) {
+	if (!(ret_val) && init_device) {
 		ret_val = e1000_init_mac_params(hw);
 		if (ret_val)
 			goto out;
@@ -229,7 +231,7 @@ out:
  **/
 void e1000_remove_device(struct e1000_hw *hw)
 {
-	if (hw->func.remove_device != NULL)
+	if (hw->func.remove_device)
 		hw->func.remove_device(hw);
 }
 
@@ -243,10 +245,10 @@ void e1000_remove_device(struct e1000_hw *hw)
  **/
 s32 e1000_get_bus_info(struct e1000_hw *hw)
 {
-	if (hw->func.get_bus_info != NULL)
+	if (hw->func.get_bus_info)
 		return hw->func.get_bus_info(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -258,7 +260,7 @@ s32 e1000_get_bus_info(struct e1000_hw *hw)
  **/
 void e1000_clear_vfta(struct e1000_hw *hw)
 {
-	if (hw->func.clear_vfta != NULL)
+	if (hw->func.clear_vfta)
 		hw->func.clear_vfta (hw);
 }
 
@@ -273,12 +275,12 @@ void e1000_clear_vfta(struct e1000_hw *hw)
  **/
 void e1000_write_vfta(struct e1000_hw *hw, u32 offset, u32 value)
 {
-	if (hw->func.write_vfta != NULL)
+	if (hw->func.write_vfta)
 		hw->func.write_vfta(hw, offset, value);
 }
 
 /**
- *  e1000_mc_addr_list_update - Update Multicast addresses
+ *  e1000_update_mc_addr_list - Update Multicast addresses
  *  @hw: pointer to the HW structure
  *  @mc_addr_list: array of multicast addresses to program
  *  @mc_addr_count: number of multicast addresses to program
@@ -292,12 +294,12 @@ void e1000_write_vfta(struct e1000_hw *hw, u32 offset, u32 value)
  *  exists and all implementations are handled in the generic version of this
  *  function.
  **/
-void e1000_mc_addr_list_update(struct e1000_hw *hw, u8 *mc_addr_list,
+void e1000_update_mc_addr_list(struct e1000_hw *hw, u8 *mc_addr_list,
                                u32 mc_addr_count, u32 rar_used_count,
                                u32 rar_count)
 {
-	if (hw->func.mc_addr_list_update != NULL)
-		hw->func.mc_addr_list_update(hw,
+	if (hw->func.update_mc_addr_list)
+		hw->func.update_mc_addr_list(hw,
 		                             mc_addr_list,
 		                             mc_addr_count,
 		                             rar_used_count,
@@ -327,10 +329,10 @@ s32 e1000_force_mac_fc(struct e1000_hw *hw)
  **/
 s32 e1000_check_for_link(struct e1000_hw *hw)
 {
-	if (hw->func.check_for_link != NULL)
+	if (hw->func.check_for_link)
 		return hw->func.check_for_link(hw);
-	else
-		return -E1000_ERR_CONFIG;
+
+	return -E1000_ERR_CONFIG;
 }
 
 /**
@@ -340,12 +342,12 @@ s32 e1000_check_for_link(struct e1000_hw *hw)
  *  This checks if the adapter has manageability enabled.
  *  This is a function pointer entry point called by drivers.
  **/
-boolean_t e1000_check_mng_mode(struct e1000_hw *hw)
+bool e1000_check_mng_mode(struct e1000_hw *hw)
 {
-	if (hw->func.check_mng_mode != NULL)
+	if (hw->func.check_mng_mode)
 		return hw->func.check_mng_mode(hw);
-	else
-		return FALSE;
+
+	return FALSE;
 }
 
 /**
@@ -370,10 +372,10 @@ s32 e1000_mng_write_dhcp_info(struct e1000_hw *hw, u8 *buffer, u16 length)
  **/
 s32 e1000_reset_hw(struct e1000_hw *hw)
 {
-	if (hw->func.reset_hw != NULL)
+	if (hw->func.reset_hw)
 		return hw->func.reset_hw(hw);
-	else
-		return -E1000_ERR_CONFIG;
+
+	return -E1000_ERR_CONFIG;
 }
 
 /**
@@ -385,10 +387,10 @@ s32 e1000_reset_hw(struct e1000_hw *hw)
  **/
 s32 e1000_init_hw(struct e1000_hw *hw)
 {
-	if (hw->func.init_hw != NULL)
+	if (hw->func.init_hw)
 		return hw->func.init_hw(hw);
-	else
-		return -E1000_ERR_CONFIG;
+
+	return -E1000_ERR_CONFIG;
 }
 
 /**
@@ -401,10 +403,10 @@ s32 e1000_init_hw(struct e1000_hw *hw)
  **/
 s32 e1000_setup_link(struct e1000_hw *hw)
 {
-	if (hw->func.setup_link != NULL)
+	if (hw->func.setup_link)
 		return hw->func.setup_link(hw);
-	else
-		return -E1000_ERR_CONFIG;
+
+	return -E1000_ERR_CONFIG;
 }
 
 /**
@@ -419,10 +421,10 @@ s32 e1000_setup_link(struct e1000_hw *hw)
  **/
 s32 e1000_get_speed_and_duplex(struct e1000_hw *hw, u16 *speed, u16 *duplex)
 {
-	if (hw->func.get_link_up_info != NULL)
+	if (hw->func.get_link_up_info)
 		return hw->func.get_link_up_info(hw, speed, duplex);
-	else
-		return -E1000_ERR_CONFIG;
+
+	return -E1000_ERR_CONFIG;
 }
 
 /**
@@ -435,10 +437,10 @@ s32 e1000_get_speed_and_duplex(struct e1000_hw *hw, u16 *speed, u16 *duplex)
  **/
 s32 e1000_setup_led(struct e1000_hw *hw)
 {
-	if (hw->func.setup_led != NULL)
+	if (hw->func.setup_led)
 		return hw->func.setup_led(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -450,10 +452,10 @@ s32 e1000_setup_led(struct e1000_hw *hw)
  **/
 s32 e1000_cleanup_led(struct e1000_hw *hw)
 {
-	if (hw->func.cleanup_led != NULL)
+	if (hw->func.cleanup_led)
 		return hw->func.cleanup_led(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -466,10 +468,10 @@ s32 e1000_cleanup_led(struct e1000_hw *hw)
  **/
 s32 e1000_blink_led(struct e1000_hw *hw)
 {
-	if (hw->func.blink_led != NULL)
+	if (hw->func.blink_led)
 		return hw->func.blink_led(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -481,10 +483,10 @@ s32 e1000_blink_led(struct e1000_hw *hw)
  **/
 s32 e1000_led_on(struct e1000_hw *hw)
 {
-	if (hw->func.led_on != NULL)
+	if (hw->func.led_on)
 		return hw->func.led_on(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -496,10 +498,10 @@ s32 e1000_led_on(struct e1000_hw *hw)
  **/
 s32 e1000_led_off(struct e1000_hw *hw)
 {
-	if (hw->func.led_off != NULL)
+	if (hw->func.led_off)
 		return hw->func.led_off(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -548,7 +550,7 @@ s32 e1000_disable_pcie_master(struct e1000_hw *hw)
  **/
 void e1000_config_collision_dist(struct e1000_hw *hw)
 {
-	if (hw->func.config_collision_dist != NULL)
+	if (hw->func.config_collision_dist)
 		hw->func.config_collision_dist(hw);
 }
 
@@ -562,7 +564,7 @@ void e1000_config_collision_dist(struct e1000_hw *hw)
  **/
 void e1000_rar_set(struct e1000_hw *hw, u8 *addr, u32 index)
 {
-	if (hw->func.rar_set != NULL)
+	if (hw->func.rar_set)
 		hw->func.rar_set(hw, addr, index);
 }
 
@@ -574,10 +576,10 @@ void e1000_rar_set(struct e1000_hw *hw, u8 *addr, u32 index)
  **/
 s32 e1000_validate_mdi_setting(struct e1000_hw *hw)
 {
-	if (hw->func.validate_mdi_setting != NULL)
+	if (hw->func.validate_mdi_setting)
 		return hw->func.validate_mdi_setting(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -590,7 +592,7 @@ s32 e1000_validate_mdi_setting(struct e1000_hw *hw)
  **/
 void e1000_mta_set(struct e1000_hw *hw, u32 hash_value)
 {
-	if (hw->func.mta_set != NULL)
+	if (hw->func.mta_set)
 		hw->func.mta_set(hw, hash_value);
 }
 
@@ -617,7 +619,7 @@ u32 e1000_hash_mc_addr(struct e1000_hw *hw, u8 *mc_addr)
  *  Currently no func pointer exists and all implementations are handled in the
  *  generic version of this function.
  **/
-boolean_t e1000_enable_tx_pkt_filtering(struct e1000_hw *hw)
+bool e1000_enable_tx_pkt_filtering(struct e1000_hw *hw)
 {
 	return e1000_enable_tx_pkt_filtering_generic(hw);
 }
@@ -637,11 +639,11 @@ boolean_t e1000_enable_tx_pkt_filtering(struct e1000_hw *hw)
 s32 e1000_mng_host_if_write(struct e1000_hw * hw, u8 *buffer, u16 length,
                             u16 offset, u8 *sum)
 {
-	if (hw->func.mng_host_if_write != NULL)
+	if (hw->func.mng_host_if_write)
 		return hw->func.mng_host_if_write(hw, buffer, length, offset,
 		                                  sum);
-	else
-		return E1000_NOT_IMPLEMENTED;
+
+	return E1000_NOT_IMPLEMENTED;
 }
 
 /**
@@ -654,10 +656,10 @@ s32 e1000_mng_host_if_write(struct e1000_hw * hw, u8 *buffer, u16 length,
 s32 e1000_mng_write_cmd_header(struct e1000_hw *hw,
                                struct e1000_host_mng_command_header *hdr)
 {
-	if (hw->func.mng_write_cmd_header != NULL)
+	if (hw->func.mng_write_cmd_header)
 		return hw->func.mng_write_cmd_header(hw, hdr);
-	else
-		return E1000_NOT_IMPLEMENTED;
+
+	return E1000_NOT_IMPLEMENTED;
 }
 
 /**
@@ -672,10 +674,10 @@ s32 e1000_mng_write_cmd_header(struct e1000_hw *hw,
  **/
 s32 e1000_mng_enable_host_if(struct e1000_hw * hw)
 {
-	if (hw->func.mng_enable_host_if != NULL)
+	if (hw->func.mng_enable_host_if)
 		return hw->func.mng_enable_host_if(hw);
-	else
-		return E1000_NOT_IMPLEMENTED;
+
+	return E1000_NOT_IMPLEMENTED;
 }
 
 /**
@@ -687,10 +689,10 @@ s32 e1000_mng_enable_host_if(struct e1000_hw * hw)
  **/
 s32 e1000_wait_autoneg(struct e1000_hw *hw)
 {
-	if (hw->func.wait_autoneg != NULL)
+	if (hw->func.wait_autoneg)
 		return hw->func.wait_autoneg(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -702,10 +704,10 @@ s32 e1000_wait_autoneg(struct e1000_hw *hw)
  **/
 s32 e1000_check_reset_block(struct e1000_hw *hw)
 {
-	if (hw->func.check_reset_block != NULL)
+	if (hw->func.check_reset_block)
 		return hw->func.check_reset_block(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -719,10 +721,10 @@ s32 e1000_check_reset_block(struct e1000_hw *hw)
  **/
 s32 e1000_read_phy_reg(struct e1000_hw *hw, u32 offset, u16 *data)
 {
-	if (hw->func.read_phy_reg != NULL)
+	if (hw->func.read_phy_reg)
 		return hw->func.read_phy_reg(hw, offset, data);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -736,10 +738,10 @@ s32 e1000_read_phy_reg(struct e1000_hw *hw, u32 offset, u16 *data)
  **/
 s32 e1000_write_phy_reg(struct e1000_hw *hw, u32 offset, u16 data)
 {
-	if (hw->func.write_phy_reg != NULL)
+	if (hw->func.write_phy_reg)
 		return hw->func.write_phy_reg(hw, offset, data);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -782,10 +784,10 @@ s32 e1000_write_kmrn_reg(struct e1000_hw *hw, u32 offset, u16 data)
  **/
 s32 e1000_get_cable_length(struct e1000_hw *hw)
 {
-	if (hw->func.get_cable_length != NULL)
+	if (hw->func.get_cable_length)
 		return hw->func.get_cable_length(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -798,10 +800,10 @@ s32 e1000_get_cable_length(struct e1000_hw *hw)
  **/
 s32 e1000_get_phy_info(struct e1000_hw *hw)
 {
-	if (hw->func.get_phy_info != NULL)
+	if (hw->func.get_phy_info)
 		return hw->func.get_phy_info(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -813,10 +815,10 @@ s32 e1000_get_phy_info(struct e1000_hw *hw)
  **/
 s32 e1000_phy_hw_reset(struct e1000_hw *hw)
 {
-	if (hw->func.reset_phy != NULL)
+	if (hw->func.reset_phy)
 		return hw->func.reset_phy(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -828,10 +830,10 @@ s32 e1000_phy_hw_reset(struct e1000_hw *hw)
  **/
 s32 e1000_phy_commit(struct e1000_hw *hw)
 {
-	if (hw->func.commit_phy != NULL)
+	if (hw->func.commit_phy)
 		return hw->func.commit_phy(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -848,12 +850,12 @@ s32 e1000_phy_commit(struct e1000_hw *hw)
  *  During driver activity, SmartSpeed should be enabled so performance is
  *  maintained.  This is a function pointer entry point called by drivers.
  **/
-s32 e1000_set_d0_lplu_state(struct e1000_hw *hw, boolean_t active)
+s32 e1000_set_d0_lplu_state(struct e1000_hw *hw, bool active)
 {
-	if (hw->func.set_d0_lplu_state != NULL)
+	if (hw->func.set_d0_lplu_state)
 		return hw->func.set_d0_lplu_state(hw, active);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -870,12 +872,12 @@ s32 e1000_set_d0_lplu_state(struct e1000_hw *hw, boolean_t active)
  *  During driver activity, SmartSpeed should be enabled so performance is
  *  maintained.  This is a function pointer entry point called by drivers.
  **/
-s32 e1000_set_d3_lplu_state(struct e1000_hw *hw, boolean_t active)
+s32 e1000_set_d3_lplu_state(struct e1000_hw *hw, bool active)
 {
-	if (hw->func.set_d3_lplu_state != NULL)
+	if (hw->func.set_d3_lplu_state)
 		return hw->func.set_d3_lplu_state(hw, active);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -888,6 +890,9 @@ s32 e1000_set_d3_lplu_state(struct e1000_hw *hw, boolean_t active)
  **/
 s32 e1000_read_mac_addr(struct e1000_hw *hw)
 {
+	if (hw->func.read_mac_addr)
+		return hw->func.read_mac_addr(hw);
+
 	return e1000_read_mac_addr_generic(hw);
 }
 
@@ -915,10 +920,10 @@ s32 e1000_read_part_num(struct e1000_hw *hw, u32 *part_num)
  **/
 s32 e1000_validate_nvm_checksum(struct e1000_hw *hw)
 {
-	if (hw->func.validate_nvm != NULL)
+	if (hw->func.validate_nvm)
 		return hw->func.validate_nvm(hw);
-	else
-		return -E1000_ERR_CONFIG;
+
+	return -E1000_ERR_CONFIG;
 }
 
 /**
@@ -930,10 +935,10 @@ s32 e1000_validate_nvm_checksum(struct e1000_hw *hw)
  **/
 s32 e1000_update_nvm_checksum(struct e1000_hw *hw)
 {
-	if (hw->func.update_nvm != NULL)
+	if (hw->func.update_nvm)
 		return hw->func.update_nvm(hw);
-	else
-		return -E1000_ERR_CONFIG;
+
+	return -E1000_ERR_CONFIG;
 }
 
 /**
@@ -945,7 +950,7 @@ s32 e1000_update_nvm_checksum(struct e1000_hw *hw)
  **/
 void e1000_reload_nvm(struct e1000_hw *hw)
 {
-	if (hw->func.reload_nvm != NULL)
+	if (hw->func.reload_nvm)
 		hw->func.reload_nvm(hw);
 }
 
@@ -961,10 +966,10 @@ void e1000_reload_nvm(struct e1000_hw *hw)
  **/
 s32 e1000_read_nvm(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 {
-	if (hw->func.read_nvm != NULL)
+	if (hw->func.read_nvm)
 		return hw->func.read_nvm(hw, offset, words, data);
-	else
-		return -E1000_ERR_CONFIG;
+
+	return -E1000_ERR_CONFIG;
 }
 
 /**
@@ -979,10 +984,10 @@ s32 e1000_read_nvm(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
  **/
 s32 e1000_write_nvm(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 {
-	if (hw->func.write_nvm != NULL)
+	if (hw->func.write_nvm)
 		return hw->func.write_nvm(hw, offset, words, data);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**

@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Network Connection
 ==================================================
 
-June 18, 2007
+October 9, 2007
 
 
 Contents
@@ -13,16 +13,21 @@ Contents
 - Command Line Parameters
 - Speed and Duplex Configuration
 - Additional Configurations
-- Known Issues
+- Known Issues/Troubleshooting
 - Support
 
 
 In This Release
 ===============
 
-This file describes the Linux* Base Driver for the Intel 82575 Gigabit
-Family of Adapters.  This driver supports kernel versions 2.4.21 and newer,
-including 2.6.x.
+NOTE: This release includes two Linux* Base Drivers for Intel® Network 
+Connection. These drivers are named e1000 and igb. The igb driver 
+must be installed to support any 82575-based network connections. All 
+other network connections require the e1000 driver.
+
+This file describes the igb Linux* Base Driver for Intel Network Connection.  
+This driver supports kernel versions 2.4.x and 2.6.x. This driver supports
+kernel versions 2.4.21 and newer, including 2.6.x.
 
 This driver is only supported as a loadable module at this time.  Intel is
 not supplying patches against the kernel source to allow for static linking
@@ -31,9 +36,8 @@ documentation supplied with your Intel Gigabit adapter.  All hardware
 requirements listed apply to use with Linux.
 
 This release includes support for Intel(R) I/O Acceleration Technology,
-Intel(R) I/OAT.  This is supported on systems using the Intel(R) 5000 Series
-Chipsets Integrated Device - 1A38.  You can find additional information
-on Intel I/OAT at http://www.intel.com/technology/ioacceleration/index.htm.
+Intel(R) I/OAT.  You can find additional information on Intel I/OAT at 
+http://www.intel.com/technology/ioacceleration/index.htm.
 
 The following features are now available in supported kernels:
  - Native VLANs
@@ -98,8 +102,7 @@ NOTE: For the build to work properly, the currently running kernel MUST
      /lib/modules/<KERNEL VERSION>/kernel/drivers/net/igb/igb.[k]o
 
    The install locations listed above are the default locations.  They
-   might not be correct for certain Linux distributions.  For more
-   information, see the ldistrib.txt file included in the driver tar.
+   might not be correct for certain Linux distributions.  
 
 5. Load the module using either the insmod or modprobe command:
 
@@ -161,12 +164,10 @@ using this syntax:
 
      modprobe igb [<option>=<VAL1>,<VAL2>,...]
 
-For example, with a single two-port adapter, entering:
+For example:
 
-     modprobe igb TxDescriptors=80,128
+     modprobe igb InterruptThrottleRate=16000,16000
 
-loads the igb driver with 80 TX descriptors for the first port and
-128 TX descriptors for the second port.
 
 The default value for each parameter is generally the recommended setting,
 unless otherwise noted.
@@ -181,42 +182,6 @@ NOTES:  For more information about the AutoNeg, Duplex, and Speed
 
         A descriptor describes a data buffer and attributes related to
         the data buffer.  This information is accessed by the hardware.
-
-
-AutoNeg
--------
-(Supported only on adapters with copper connections)
-Valid Range:   0x01-0x0F, 0x20-0x2F
-Default Value: 0x2F
-
-This parameter is a bit-mask that specifies the speed and duplex settings
-advertised by the adapter.  When this parameter is used, the Speed and
-Duplex parameters must not be specified.
-
-NOTE:  Refer to the Speed and Duplex section of this readme for more
-       information on the AutoNeg parameter.
-
-
-Duplex
-------
-(Supported only on adapters with copper connections)
-Valid Range:   0-2 (0=auto-negotiate, 1=half, 2=full)
-Default Value: 0
-
-This defines the direction in which data is allowed to flow.  Can be
-either one or two-directional.  If both Duplex and the link partner are
-set to auto-negotiate, the board auto-detects the correct duplex.  If the
-link partner is forced (either full or half), Duplex defaults to half-
-duplex.
-
-
-FlowControl
------------
-Valid Range:   0-3 (0=none, 1=Rx only, 2=Tx only, 3=Rx&Tx)
-Default Value: Reads flow control settings from the EEPROM
-
-This parameter controls the automatic generation(Tx) and response(Rx)
-to Ethernet PAUSE frames.
 
 
 InterruptThrottleRate
@@ -289,72 +254,21 @@ NOTE:  When igb is loaded with default settings and multiple adapters
        default driver settings.
 
 
-RxDescriptors
--------------
-Valid Range:   80-4096
-Default Value: 256
-
-This value specifies the number of receive buffer descriptors allocated
-by the driver.  Increasing this value allows the driver to buffer more
-incoming packets, at the expense of increased system memory utilization.
-
-Each descriptor is 16 bytes.  A receive buffer is also allocated for each
-descriptor and will be a maximum of 4096 bytes, depending on the MTU setting.
-For MTU settings larger than 4096, each received packet will consume 2 or
-more descriptors.  The maximum MTU size is 9216 bytes.
-
-NOTE:  MTU designates the frame size.  It only needs to be set for Jumbo 
-       Frames.  Depending on the available system resources, the request 
-       for a higher number of receive descriptors may be denied.  In this 
-       case, use a lower number.
-
-
-Speed
------
-(This parameter is supported only on adapters with copper connections.)
-Valid Settings: 0, 10, 100, 1000
-Default Value:  0 (auto-negotiate at all supported speeds)
-
-Speed forces the line speed to the specified value in megabits per second
-(Mbps).  If this parameter is not specified or is set to 0 and the link
-partner is set to auto-negotiate, the board will auto-detect the correct
-speed.  Duplex should also be set when Speed is set to either 10 or 100.
-
-
-TxDescriptors
--------------
-Valid Range:   80-4096
-Default Value: 256
-
-This value is the number of transmit descriptors allocated by the driver.
-Increasing this value allows the driver to queue more transmits.  Each
-descriptor is 16 bytes.
-
-NOTE:  Depending on the available system resources, the request for a
-       higher number of transmit descriptors may be denied.  In this case,
-       use a lower number.
-
-
-XsumRX
-------
-Valid Range:   0-1
-Default Value: 1
-
-A value of '1' indicates that the driver should enable IP checksum
-offload for received packets (both UDP and TCP) to the adapter hardware.
-
-
 LLIPort
 -------
-Valid Range:   0-1
+Valid Range:   0-65535
 Default Value: 0 (disabled)
 
-  LLI is configured with the LLIPort command-line parameter, which specifies 
-  which TCP should general Low Latency Interrupts.
+LLI is configured with the LLIPort command-line parameter, which specifies 
+which TCP port should generate Low Latency Interrupts.
 
-  For example, using LLIPort=80 would cause the board to generate an 
-  immediate interrupt upon receipt of any packet sent to TCP port 80 on the 
-  local machine.
+For example, using LLIPort=80 would cause the board to generate an 
+immediate interrupt upon receipt of any packet sent to TCP port 80 on the 
+local machine.
+
+WARNING: Enabling LLI can result in an excessive number of interrupts/second 
+that may cause problems with the system and in some cases may cause a kernel 
+panic. 
 
 
 LLIPush
@@ -362,9 +276,9 @@ LLIPush
 Valid Range:   0-1
 Default Value: 0 (disabled)
 
-  LLIPush can be set to be enabled or disabled (default). It is most 
-  effective in an environment with many small transactions.
-  NOTE: Enabling LLIPush may allow a denial of service attack.
+Can be set to be enabled or disabled (default). It is most 
+effective in an environment with many small transactions.
+NOTE: Enabling LLIPush may allow a denial of service attack.
 
 
 LLISize
@@ -372,63 +286,8 @@ LLISize
 Valid Range:   0-1500
 Default Value: 0 (disabled)
 
-  LLISize causes an immediate interrupt if the board receives a packet smaller 
-  than the specified size.
-
-
-Speed and Duplex Configuration
-==============================
-
-Three keywords are used to control the speed and duplex configuration.
-These keywords are Speed, Duplex, and AutoNeg.
-
-If the board uses a fiber interface, these keywords are ignored, and the
-fiber interface board only links at 1000 Mbps full-duplex.
-
-For copper-based boards, the keywords interact as follows:
-
-  The default operation is auto-negotiate.  The board advertises all
-  supported speed and duplex combinations, and it links at the highest
-  common speed and duplex mode IF the link partner is set to auto-negotiate.
-
-  If Speed = 1000, limited auto-negotiation is enabled and only 1000 Mbps
-  is advertised (The 1000BaseT spec requires auto-negotiation.)
-
-  If Speed = 10 or 100, then both Speed and Duplex should be set.  Auto-
-  negotiation is disabled, and the AutoNeg parameter is ignored.  Partner
-  SHOULD also be forced.
-
-The AutoNeg parameter is used when more control is required over the
-auto-negotiation process.  It should be used when you wish to control which
-speed and duplex combinations are advertised during the auto-negotiation
-process.
-
-The parameter may be specified as either a decimal or hexadecimal value as
-determined by the bitmap below.
-
-Bit position   7      6      5       4       3      2      1       0
-Decimal Value  128    64     32      16      8      4      2       1
-Hex value      80     40     20      10      8      4      2       1
-Speed (Mbps)   N/A    N/A    1000    N/A     100    100    10      10
-Duplex                       Full            Full   Half   Full    Half
-
-Some examples of using AutoNeg:
-
-  modprobe igb AutoNeg=0x01 (Restricts autonegotiation to 10 Half)
-  modprobe igb AutoNeg=1 (Same as above)
-  modprobe igb AutoNeg=0x02 (Restricts autonegotiation to 10 Full)
-  modprobe igb AutoNeg=0x03 (Restricts autonegotiation to 10 Half or 10 Full)
-  modprobe igb AutoNeg=0x04 (Restricts autonegotiation to 100 Half)
-  modprobe igb AutoNeg=0x05 (Restricts autonegotiation to 10 Half or 100
-  Half)
-  modprobe igb AutoNeg=0x020 (Restricts autonegotiation to 1000 Full)
-  modprobe igb AutoNeg=32 (Same as above)
-
-Note that when this parameter is used, Speed and Duplex must not be specified.
-
-If the link partner is forced to a specific speed and duplex, then this
-parameter should not be used.  Instead, use the Speed and Duplex parameters
-previously mentioned to force the adapter to the same speed and duplex.
+Causes an immediate interrupt if the board receives a packet smaller 
+than the specified size.
 
 
 Additional Configurations
@@ -500,15 +359,11 @@ Additional Configurations
   -------
   The driver utilizes the ethtool interface for driver configuration and
   diagnostics, as well as displaying statistical information.  Ethtool
-  version 1.6 or later is required for this functionality.
+  version 3.0 or later is required for this functionality, although we 
+  strongly recommend downloading the latest version at:
 
-  The latest release of ethtool can be found from
   http://sourceforge.net/projects/gkernel.
-
-  NOTE: Ethtool 1.6 only supports a limited set of ethtool options.  Support
-  for a more complete ethtool feature set can be enabled by upgrading
-  to the latest version.
-
+  
 
   Enabling Wake on LAN* (WoL)
   ---------------------------
@@ -543,6 +398,8 @@ Additional Configurations
   will fallback to MSI or to Legacy interrupts.
   NOTE: Do not use MSI-X with the 2.6.19 or 2.6.20 kernels. We recommend the
   2.6.21 or later kernel.
+  NOTE: On some kernels a reboot is required to switch between a single queue 
+  mode and multiqueue modes, or vice-versa.
 
   Multiqueue can be enabled with a compile flag: 
   # make CFLAGS_EXTRA=-DCONFIG_IGB_MQ_RX
@@ -576,11 +433,12 @@ Additional Configurations
   Currently there is no kernel support for multiple TX queues.
 
 
-Known Issues
-============
+Known Issues/Troubleshooting
+============================
 
-NOTE: For distribution-specific information, see the ldistrib.txt file
-      included in the driver tar.
+  NOTE: After installing the driver, if your Intel Network Connection is not 
+  working, verify in the "In This Release" section of the readme that you have 
+  installed the correct driver.
 
 Using the igb driver on 2.4 or older 2.6 based kernels
 ------------------------------------------------------

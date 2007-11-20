@@ -43,7 +43,7 @@
 
 #define usec_delay(x) udelay(x)
 #ifndef msec_delay
-#define msec_delay(x)	do { if(in_interrupt()) { \
+#define msec_delay(x)	do { if (in_interrupt()) { \
 				/* Don't mdelay in interrupt context! */ \
 	                	BUG(); \
 			} else { \
@@ -85,7 +85,7 @@ typedef enum {
 #define E1000_REGISTER(a, reg) reg
 
 #define E1000_TRANSLATE_REG(a, reg) \
-    (a->hw.mac.type == e1000_kawela ? e1000_translate_register_kawela(reg) : \
+    (a->hw.mac.type == e1000_82576 ? e1000_translate_register_82576(reg) : \
         reg)
 
 #define E1000_WRITE_REG(a, reg, value) ( \
@@ -116,7 +116,7 @@ typedef enum {
 
 #define E1000_WRITE_REG_IO(a, reg, offset) do { \
     outl(reg, ((a)->io_base));                  \
-    outl(offset, ((a)->io_base + 4));      } while(0)
+    outl(offset, ((a)->io_base + 4));      } while (0)
 
 #define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, E1000_STATUS)
 

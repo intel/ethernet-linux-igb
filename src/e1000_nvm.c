@@ -329,10 +329,12 @@ static s32 e1000_ready_nvm_eeprom(struct e1000_hw *hw)
 		usec_delay(1);
 		timeout = NVM_MAX_RETRY_SPI;
 
-		/* Read "Status Register" repeatedly until the LSB is cleared.
+		/*
+		 * Read "Status Register" repeatedly until the LSB is cleared.
 		 * The EEPROM will signal that the command has been completed
 		 * by clearing bit 0 of the internal status register.  If it's
-		 * not cleared within 'timeout', then error out. */
+		 * not cleared within 'timeout', then error out.
+		 */
 		while (timeout) {
 			e1000_shift_out_eec_bits(hw, NVM_RDSR_OPCODE_SPI,
 			                         hw->nvm.opcode_bits);
@@ -375,8 +377,10 @@ s32 e1000_read_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 
 	DEBUGFUNC("e1000_read_nvm_spi");
 
-	/* A check for invalid values:  offset too large, too many words,
-	 * and not enough words. */
+	/*
+	 * A check for invalid values:  offset too large, too many words,
+	 * and not enough words.
+	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
 		DEBUGOUT("nvm parameter(s) out of bounds\n");
@@ -401,9 +405,11 @@ s32 e1000_read_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 	e1000_shift_out_eec_bits(hw, read_opcode, nvm->opcode_bits);
 	e1000_shift_out_eec_bits(hw, (u16)(offset*2), nvm->address_bits);
 
-	/* Read the data.  SPI NVMs increment the address with each byte
+	/*
+	 * Read the data.  SPI NVMs increment the address with each byte
 	 * read and will roll over if reading beyond the end.  This allows
-	 * us to read the whole NVM from any offset */
+	 * us to read the whole NVM from any offset
+	 */
 	for (i = 0; i < words; i++) {
 		word_in = e1000_shift_in_eec_bits(hw, 16);
 		data[i] = (word_in >> 8) | (word_in << 8);
@@ -435,8 +441,10 @@ s32 e1000_read_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
 
 	DEBUGFUNC("e1000_read_nvm_microwire");
 
-	/* A check for invalid values:  offset too large, too many words,
-	 * and not enough words. */
+	/*
+	 * A check for invalid values:  offset too large, too many words,
+	 * and not enough words.
+	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
 		DEBUGOUT("nvm parameter(s) out of bounds\n");
@@ -458,8 +466,10 @@ s32 e1000_read_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
 		e1000_shift_out_eec_bits(hw, (u16)(offset + i),
 					nvm->address_bits);
 
-		/* Read the data.  For microwire, each word requires the
-		 * overhead of setup and tear-down. */
+		/*
+		 * Read the data.  For microwire, each word requires the
+		 * overhead of setup and tear-down.
+		 */
 		data[i] = e1000_shift_in_eec_bits(hw, 16);
 		e1000_standby_nvm(hw);
 	}
@@ -488,8 +498,10 @@ s32 e1000_read_nvm_eerd(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 
 	DEBUGFUNC("e1000_read_nvm_eerd");
 
-	/* A check for invalid values:  offset too large, too many words,
-	 * and not enough words. */
+	/*
+	 * A check for invalid values:  offset too large, too many words,
+	 * and not enough words.
+	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
 		DEBUGOUT("nvm parameter(s) out of bounds\n");
@@ -534,8 +546,10 @@ s32 e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 
 	DEBUGFUNC("e1000_write_nvm_spi");
 
-	/* A check for invalid values:  offset too large, too many words,
-	 * and not enough words. */
+	/*
+	 * A check for invalid values:  offset too large, too many words,
+	 * and not enough words.
+	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
 		DEBUGOUT("nvm parameter(s) out of bounds\n");
@@ -564,8 +578,10 @@ s32 e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 
 		e1000_standby_nvm(hw);
 
-		/* Some SPI eeproms use the 8th address bit embedded in the
-		 * opcode */
+		/*
+		 * Some SPI eeproms use the 8th address bit embedded in the
+		 * opcode
+		 */
 		if ((nvm->address_bits == 8) && (offset >= 128))
 			write_opcode |= NVM_A8_OPCODE_SPI;
 
@@ -619,8 +635,10 @@ s32 e1000_write_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
 
 	DEBUGFUNC("e1000_write_nvm_microwire");
 
-	/* A check for invalid values:  offset too large, too many words,
-	 * and not enough words. */
+	/*
+	 * A check for invalid values:  offset too large, too many words,
+	 * and not enough words.
+	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
 		DEBUGOUT("nvm parameter(s) out of bounds\n");
@@ -853,10 +871,10 @@ void e1000_reload_nvm_generic(struct e1000_hw *hw)
  **/
 s32 e1000_acquire_nvm(struct e1000_hw *hw)
 {
-	if (hw->func.acquire_nvm != NULL)
+	if (hw->func.acquire_nvm)
 		return hw->func.acquire_nvm(hw);
-	else
-		return E1000_SUCCESS;
+
+	return E1000_SUCCESS;
 }
 
 /**
@@ -868,7 +886,7 @@ s32 e1000_acquire_nvm(struct e1000_hw *hw)
  **/
 void e1000_release_nvm(struct e1000_hw *hw)
 {
-	if (hw->func.release_nvm != NULL)
+	if (hw->func.release_nvm)
 		hw->func.release_nvm(hw);
 }
 

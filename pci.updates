@@ -5,7 +5,7 @@
 #             are sorted by ven, dev, subven, subdev
 #             (numerical order).
 #
-8086  Intel Corp.
+8086  Intel Corporation
 	10a7  82575EB Gigabit Network Connection
 		8086 10a8  82575EB Gigabit Riser Card
 	10a9  82575EB Gigabit Backplane Connection

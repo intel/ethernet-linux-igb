@@ -142,96 +142,71 @@ struct igb_adapter;
 struct igb_buffer {
 	struct sk_buff *skb;
 	dma_addr_t dma;
-	unsigned long time_stamp;
-	u32 length;
+	union {
+		/* TX */
+		struct {
+			unsigned long time_stamp;
+			u32 length;
+		};
+		/* RX */
+		struct {
+			struct page *page;
+			u64 page_dma;
+		};
+	};
 };
 
-struct igb_rx_buffer {
-	struct sk_buff *skb;
-	dma_addr_t dma;
-	struct page *page;
-	u64 page_dma;
-};
-	
 struct igb_queue_stats {
 	u64 packets;
 	u64 bytes;
 };
 
-struct igb_tx_ring {
-	/* backlink */
-	struct igb_adapter *adapter;
-	/* pointer to the descriptor ring memory */
-	void *desc;
-	/* physical address of the descriptor ring */
-	dma_addr_t dma;
-	/* length of descriptor ring in bytes */
-	unsigned int size;
-	/* number of descriptors in the ring */
-	unsigned int count;
-	/* next descriptor to associate a buffer with */
-	unsigned int next_to_use;
-	/* next descriptor to check for DD status bit */
-	unsigned int next_to_clean;
-	/* array of buffer information structs */
-	struct igb_buffer *buffer_info;
+struct igb_ring {
+	struct igb_adapter *adapter; /* backlink */
+	void *desc;                  /* descriptor ring memory */
+	dma_addr_t dma;              /* phys address of the ring */
+	unsigned int size;           /* length of desc. ring in bytes */
+	unsigned int count;          /* number of desc. in the ring */
+	u16 next_to_use;
+	u16 next_to_clean;
+	u16 head;
+	u16 tail;
+	struct igb_buffer *buffer_info; /* array of buffer info structs */
 
-	spinlock_t tx_clean_lock;
+	u32 eims_value;
+	u32 itr_val;
+	u16 itr_register;
+	u16 cpu;
+
+	unsigned int total_bytes;
+	unsigned int total_packets;
+
+	union {
+		/* TX */
+		struct {
+			spinlock_t tx_clean_lock;
 #ifdef NETIF_F_LLTX
-	spinlock_t tx_lock;
+			spinlock_t tx_lock;
 #endif
-	boolean_t detect_tx_hung;
-	u16 tdh;
-	u16 tdt;
-	unsigned int total_tx_bytes;
-	unsigned int total_tx_packets;
-	u32 eims_value;
-	u16 itr_register;
-	u32 itr_val;
-	char name[IFNAMSIZ + 5];
-	int cpu;
-};
-
-struct igb_rx_ring {
-	/* backlink */
-	struct igb_adapter *adapter;
-	/* pointer to the descriptor ring memory */
-	void *desc;
-	/* physical address of the descriptor ring */
-	dma_addr_t dma;
-	/* length of descriptor ring in bytes */
-	unsigned int size;
-	/* number of descriptors in the ring */
-	unsigned int count;
-	/* next descriptor to associate a buffer with */
-	unsigned int next_to_use;
-	/* next descriptor to check for DD status bit */
-	unsigned int next_to_clean;
-	/* array of buffer information structs */
-	struct igb_rx_buffer *buffer_info;
-	/* arrays of page information for packet split */
-	struct sk_buff *pending_skb;
-	int pending_skb_page;
+			bool detect_tx_hung;
+			char name[IFNAMSIZ + 5];
+		};
+		/* RX */
+		struct {
+			/* arrays of page information for packet split */
+			struct sk_buff *pending_skb;
+			int pending_skb_page;
 #ifdef CONFIG_IGB_MQ_RX
-	int no_itr_adjust;
+			int no_itr_adjust;
+			struct igb_queue_stats rx_stats;
 #endif
-	/* cpu for rx queue */
-	int cpu;
 
-	u16 rdh;
-	u16 rdt;
-#ifdef CONFIG_IGB_MQ_RX
-	struct igb_queue_stats rx_stats;
-#endif
-	struct net_device netdev;
-	u32 eims_value;
-	unsigned int total_rx_bytes;
-	unsigned int total_rx_packets;
-	u32 itr_val;
-	u16 itr_register;
 #ifndef CONFIG_IGB_SEPARATE_TX_HANDLER
-	struct igb_tx_ring *buddy;
+			struct igb_ring *buddy;
 #endif
+			struct net_device *netdev;
+		};
+	};
 };
 
 #define IGB_DESC_UNUSED(R) \
@@ -275,7 +250,7 @@ struct igb_adapter {
 
 	struct work_struct reset_task;
 	struct work_struct watchdog_task;
-	u8 fc_autoneg;
+	bool fc_autoneg;
 	u8  tx_timeout_factor;
 #ifdef ETHTOOL_PHYS_ID
 	struct timer_list blink_timer;
@@ -283,18 +258,18 @@ struct igb_adapter {
 #endif
 
 	/* TX */
-	struct igb_tx_ring *tx_ring;      /* One per active queue */
+	struct igb_ring *tx_ring;      /* One per active queue */
 	unsigned int restart_queue;
 	unsigned long tx_queue_len;
 	u32 txd_cmd;
-	u32 gotcl;
-	u64 gotcl_old;
+	u32 gotc;
+	u64 gotc_old;
 	u64 tpt_old;
 	u64 colc_old;
 	u32 tx_timeout_count;
 
 	/* RX */
-	struct igb_rx_ring *rx_ring;      /* One per active queue */
+	struct igb_ring *rx_ring;      /* One per active queue */
 	int num_tx_queues;
 	int num_rx_queues;
 
@@ -303,9 +278,11 @@ struct igb_adapter {
 	u64 rx_hdr_split;
 	u32 alloc_rx_buff_failed;
 	boolean_t rx_csum;
-	u32 gorcl;
-	u64 gorcl_old;
+	u32 gorc;
+	u64 gorc_old;
 	u16 rx_ps_hdr_size;
+	u32 max_frame_size;
+	u32 min_frame_size;
 
 
 	/* OS defined structs */
@@ -321,8 +298,8 @@ struct igb_adapter {
 
 #ifdef ETHTOOL_TEST
 	u32 test_icr;
-	struct igb_tx_ring test_tx_ring;
-	struct igb_rx_ring test_rx_ring;
+	struct igb_ring test_tx_ring;
+	struct igb_ring test_rx_ring;
 #endif
 
 
@@ -341,6 +318,7 @@ struct igb_adapter {
 		unsigned int dca_enabled:1;
 		unsigned int lli_push:1;
 		unsigned int in_netpoll:1;
+		unsigned int quad_port_a:1;
 	} flags;
 	u32 eeprom_wol;
 	u32 *config_space;

@@ -67,27 +67,12 @@
 #define NAPI
 #endif
 
-#ifdef _IXGB_H_
-#ifdef CONFIG_IXGB_NAPI
-#define NAPI
-#endif
-#ifdef IXGB_NAPI
-#undef NAPI
-#define NAPI
-#endif
-#ifdef IXGB_NO_NAPI
-#undef NAPI
-#endif
-#endif
 
 
 /* and finally set defines so that the code sees the changes */
 #ifdef NAPI
 #ifndef CONFIG_E1000_NAPI
 #define CONFIG_E1000_NAPI
-#endif
-#ifndef CONFIG_IXGB_NAPI
-#define CONFIG_IXGB_NAPI
 #endif
 #else
 #undef CONFIG_E1000_NAPI
@@ -768,6 +753,13 @@ extern void _kc_pci_unmap_page(struct pci_dev *dev, u64 dma_addr, size_t size, i
 #endif
 
 /*****************************************************************************/
+/* 2.4.22 => 2.4.17 */
+
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,22) )
+#endif
+
+/*****************************************************************************/
+/*****************************************************************************/
 /* 2.4.23 => 2.4.22 */
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,23) )
 /*****************************************************************************/
@@ -851,6 +843,77 @@ static inline u32 _kc_netif_msg_init(int debug_value, int default_msg_enable_bit
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0) )
 #undef pci_register_driver
 #define pci_register_driver pci_module_init
+
+#define dev_err(__unused_dev, format, arg...)            \
+	printk(KERN_ERR "%s: " format, pci_name(pdev) , ## arg)
+
+/* MSI fakes */
+#ifndef CONFIG_PCI_MSI
+static inline int pci_enable_msi(struct pci_dev *dev) {return -1;}
+static inline void pci_disable_msi(struct pci_dev *dev) {}
+#endif
+
+/* hlist_* code - double linked lists */
+struct hlist_head {
+	struct hlist_node *first;
+};
+
+struct hlist_node {
+	struct hlist_node *next, **pprev;
+};
+
+static inline void __hlist_del(struct hlist_node *n)
+{
+	struct hlist_node *next = n->next;
+	struct hlist_node **pprev = n->pprev;
+	*pprev = next;
+	if (next)
+	next->pprev = pprev;
+}
+
+static inline void hlist_del(struct hlist_node *n)
+{
+	__hlist_del(n);
+	n->next = NULL;
+	n->pprev = NULL;
+}
+
+static inline void hlist_add_head(struct hlist_node *n, struct hlist_head *h)
+{
+	struct hlist_node *first = h->first;
+	n->next = first;
+	if (first)
+		first->pprev = &n->next;
+	h->first = n;
+	n->pprev = &h->first;
+}
+
+static inline int hlist_empty(const struct hlist_head *h)
+{
+	return !h->first;
+}
+#define HLIST_HEAD_INIT { .first = NULL }
+#define HLIST_HEAD(name) struct hlist_head name = {  .first = NULL }
+#define INIT_HLIST_HEAD(ptr) ((ptr)->first = NULL)
+static inline void INIT_HLIST_NODE(struct hlist_node *h)
+{
+	h->next = NULL;
+	h->pprev = NULL;
+}
+#define hlist_entry(ptr, type, member) container_of(ptr,type,member)
+
+#define hlist_for_each_entry(tpos, pos, head, member)                    \
+	for (pos = (head)->first;                                        \
+	     pos && ({ prefetch(pos->next); 1;}) &&                      \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = pos->next)
+
+#define hlist_for_each_entry_safe(tpos, pos, n, head, member)            \
+	for (pos = (head)->first;                                        \
+	     pos && ({ n = pos->next; 1; }) &&                           \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = n)
+
 #endif /* <= 2.5.0 */
 
 /*****************************************************************************/
@@ -938,6 +1001,7 @@ static inline struct mii_ioctl_data *_kc_if_mii(struct ifreq *rq)
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9))
+#include <net/dsfield.h>
 #define __iomem
 
 #ifndef kcalloc
@@ -1097,6 +1161,10 @@ extern void *_kc_kzalloc(size_t size, int flags);
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
+#ifndef DIV_ROUND_UP
+#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
+#endif
+
 #ifndef netdev_alloc_skb
 #define netdev_alloc_skb _kc_netdev_alloc_skb
 extern struct sk_buff *_kc_netdev_alloc_skb(struct net_device *dev,
@@ -1116,13 +1184,27 @@ static inline int _kc_skb_is_gso(const struct sk_buff *skb)
 #endif /* < 2.6.18 */
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19) )
+#ifdef GCC_VERSION
+#if ( GCC_VERSION < 3000 )
+#define _Bool u8
+#endif
+#endif
+#undef true
+#undef false
+enum {
+	false = 0,
+	true = 1
+};
 typedef _Bool bool;
 
 #if ( LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0) )
-#ifndef RHEL_VERSION
-#define RHEL_VERSION 0
+#ifndef RHEL_RELEASE_CODE
+#define RHEL_RELEASE_CODE 0
 #endif
-#if (!(( RHEL_VERSION == 4 ) && ( RHEL_UPDATE >= 5 )))
+#ifndef RHEL_RELEASE_VERSION
+#define RHEL_RELEASE_VERSION(a,b) 0
+#endif
+#if (!(( RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(4,4) ) && ( RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(5,0) ) || ( RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(5,0) ))) 
 typedef irqreturn_t (*irq_handler_t)(int, void*, struct pt_regs *);
 #endif
 typedef irqreturn_t (*new_handler_t)(int, void*);
@@ -1234,12 +1316,18 @@ do { \
                                  memcpy(skb->data + offset, from, len)
 #define skb_network_header_len(skb) (skb->h.raw - skb->nh.raw)
 #define pci_register_driver pci_module_init
+#define skb_mac_header(skb) skb->mac.raw
 
 
 #ifndef ETH_FCS_LEN
 #define ETH_FCS_LEN 4
 #endif
 #endif /* < 2.6.22 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE > KERNEL_VERSION(2,6,22) )
+#undef ETHTOOL_GPERMADDR
+#endif /* > 2.6.22 */
 
 #endif /* _KCOMPAT_H_ */
 
