@@ -76,6 +76,11 @@ s32  e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
                                 u32 usec_interval, bool *success);
 s32  e1000_phy_init_script_igp3(struct e1000_hw *hw);
 e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id);
+void e1000_power_up_phy_copper(struct e1000_hw *hw);
+void e1000_power_down_phy_copper(struct e1000_hw *hw);
+s32 e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data);
+s32 e1000_write_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 data);
+
 #define E1000_MAX_PHY_ADDR                4
 
 /* IGP01E1000 Specific Registers */
@@ -87,17 +92,10 @@ e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id);
 #define IGP01E1000_PHY_CHANNEL_QUALITY    0x15 /* PHY Channel Quality */
 #define IGP02E1000_PHY_POWER_MGMT         0x19 /* Power Management */
 #define IGP01E1000_PHY_PAGE_SELECT        0x1F /* Page Select */
-#define BM_PHY_PAGE_SELECT                22   /* Page Select for IGP 4 */
+#define BM_PHY_PAGE_SELECT                22   /* Page Select for BM */
 #define IGP_PAGE_SHIFT                    5
 #define PHY_REG_MASK                      0x1F
 
-#define BM_WUC_PAGE                       800
-#define BM_WUC_ADDRESS_OPCODE             0x11
-#define BM_WUC_DATA_OPCODE                0x12
-#define BM_WUC_ENABLE_PAGE                769
-#define BM_WUC_ENABLE_REG                 17
-#define BM_WUC_ENABLE_BIT                 (1 << 2)
-#define BM_WUC_HOST_WU_BIT                (1 << 4)
 
 #define IGP01E1000_PHY_PCS_INIT_REG       0x00B4
 #define IGP01E1000_PHY_POLARITY_MASK      0x0078

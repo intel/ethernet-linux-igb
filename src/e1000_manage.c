@@ -155,8 +155,8 @@ bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 	offset = E1000_MNG_DHCP_COOKIE_OFFSET >> 2;
 	for (i = 0; i < len; i++) {
 		*(buffer + i) = E1000_READ_REG_ARRAY_DWORD(hw,
-							   E1000_HOST_IF,
-							   offset + i);
+		                                           E1000_HOST_IF,
+		                                           offset + i);
 	}
 	hdr_csum = hdr->checksum;
 	hdr->checksum = 0;
@@ -236,7 +236,7 @@ out:
  *  Writes the command header after does the checksum calculation.
  **/
 s32 e1000_mng_write_cmd_header_generic(struct e1000_hw * hw,
-                                       struct e1000_host_mng_command_header * hdr)
+                                    struct e1000_host_mng_command_header * hdr)
 {
 	u16 i, length = sizeof(struct e1000_host_mng_command_header);
 
@@ -258,7 +258,7 @@ s32 e1000_mng_write_cmd_header_generic(struct e1000_hw * hw,
 }
 
 /**
- *  e1000_mng_host_if_write_generic - Writes to the manageability host interface
+ *  e1000_mng_host_if_write_generic - Write to the manageability host interface
  *  @hw: pointer to the HW structure
  *  @buffer: pointer to the host interface buffer
  *  @length: size of the buffer

@@ -67,13 +67,6 @@
 #endif
 
 
-typedef enum {
-#undef FALSE
-    FALSE = 0,
-#undef TRUE
-    TRUE = 1
-} boolean_t;
-
 #define DEBUGOUT(S)
 #define DEBUGOUT1(S, A...)
 
@@ -83,10 +76,6 @@ typedef enum {
 #define DEBUGOUT7 DEBUGOUT3
 
 #define E1000_REGISTER(a, reg) reg
-
-#define E1000_TRANSLATE_REG(a, reg) \
-    (a->hw.mac.type == e1000_82576 ? e1000_translate_register_82576(reg) : \
-        reg)
 
 #define E1000_WRITE_REG(a, reg, value) ( \
     writel((value), ((a)->hw_addr + E1000_REGISTER(a, reg))))

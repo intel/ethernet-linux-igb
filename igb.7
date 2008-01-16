@@ -91,6 +91,23 @@ NOTE: Enabling LLIPush may allow a denial of service attack.
 Causes an immediate interrupt if the board receives a packet smaller than the specified size. 
 .LP
 
+.B IntMode
+.IP
+.B Valid Range:    
+0-3
+.br
+.B Default Value:
+2
+.IP
+0 - Legacy Interrupts, single queue
+1 - MSI interrupts, single queue
+2 - MSI-X interrupts, single queue (default)
+3 - MSI-X interrupts, multiple queues
+.IP
+Allows changing interrupt mode and MQ status at load time, without requiring
+a recompile. If the driver fails to enable a specific interrupt mode, it will
+fail back to lesser capabilities.
+.LP
 
 .SH JUMBO FRAMES
 .LP

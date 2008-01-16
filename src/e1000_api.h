@@ -30,6 +30,8 @@
 
 #include "e1000_hw.h"
 
+extern void    e1000_init_function_pointers_82575(struct e1000_hw *hw);
+
 s32  e1000_set_mac_type(struct e1000_hw *hw);
 s32  e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device);
 s32  e1000_init_mac_params(struct e1000_hw *hw);
@@ -71,8 +73,10 @@ s32  e1000_write_8bit_ctrl_reg(struct e1000_hw *hw, u32 reg,
 s32  e1000_get_phy_info(struct e1000_hw *hw);
 s32  e1000_phy_hw_reset(struct e1000_hw *hw);
 s32  e1000_phy_commit(struct e1000_hw *hw);
+void e1000_power_up_phy(struct e1000_hw *hw);
+void e1000_power_down_phy(struct e1000_hw *hw);
 s32  e1000_read_mac_addr(struct e1000_hw *hw);
-s32  e1000_read_part_num(struct e1000_hw *hw, u32 *part_num);
+s32  e1000_read_pba_num(struct e1000_hw *hw, u32 *part_num);
 void e1000_reload_nvm(struct e1000_hw *hw);
 s32  e1000_update_nvm_checksum(struct e1000_hw *hw);
 s32  e1000_validate_nvm_checksum(struct e1000_hw *hw);
@@ -101,9 +105,9 @@ s32  e1000_mng_write_dhcp_info(struct e1000_hw * hw,
  *
  * This macro requires:
  *      adapter = a pointer to struct e1000_hw
- *      status = the 8 bit status field of the RX descriptor with EOP set
- *      error = the 8 bit error field of the RX descriptor with EOP set
- *      length = the sum of all the length fields of the RX descriptors that
+ *      status = the 8 bit status field of the Rx descriptor with EOP set
+ *      error = the 8 bit error field of the Rx descriptor with EOP set
+ *      length = the sum of all the length fields of the Rx descriptors that
  *               make up the current frame
  *      last_byte = the last byte of the frame DMAed by the hardware
  *      max_frame_length = the maximum frame length we want to accept.

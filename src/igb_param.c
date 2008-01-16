@@ -64,7 +64,7 @@
 #else
 #define IGB_PARAM(X, desc) \
 	static int __devinitdata X[IGB_MAX_NIC+1] = IGB_PARAM_INIT; \
-	static int num_##X = 0; \
+	static unsigned int num_##X = 0; \
 	module_param_array_named(X, X, int, &num_##X, 0); \
 	MODULE_PARM_DESC(X, desc);
 #endif
@@ -77,6 +77,17 @@ IGB_PARAM(InterruptThrottleRate, "Interrupt Throttling Rate");
 #define DEFAULT_ITR                    3
 #define MAX_ITR                   100000
 #define MIN_ITR                      100
+/* IntMode (Interrupt Mode)
+ *
+ * Valid Range: 0 - 3
+ *
+ * Default Value: 2 (MSI-X single queue)
+ */
+IGB_PARAM(IntMode, "Interrupt Mode");
+
+#define DEFAULT_INTMODE                2
+#define MAX_INTMODE                    3
+#define MIN_INTMODE                    0
 
 /* LLIPort (Low Latency Interrupt TCP Port)
  *
@@ -116,9 +127,9 @@ IGB_PARAM(LLISize, "Low Latency Interrupt on Packet Size");
 
 struct igb_option {
 	enum { enable_option, range_option, list_option } type;
-	char *name;
-	char *err;
-	int  def;
+	const char *name;
+	const char *err;
+	int def;
 	union {
 		struct { /* range_option info */
 			int min;
@@ -131,7 +142,8 @@ struct igb_option {
 	} arg;
 };
 
-static int __devinit igb_validate_option(int *value, struct igb_option *opt,
+static int __devinit igb_validate_option(unsigned int *value,
+                                         struct igb_option *opt,
                                          struct igb_adapter *adapter)
 {
 	if (*value == OPTION_UNSET) {
@@ -153,7 +165,7 @@ static int __devinit igb_validate_option(int *value, struct igb_option *opt,
 	case range_option:
 		if (*value >= opt->arg.r.min && *value <= opt->arg.r.max) {
 			DPRINTK(PROBE, INFO,
-					"%s set to %i\n", opt->name, *value);
+					"%s set to %d\n", opt->name, *value);
 			return 0;
 		}
 		break;
@@ -175,7 +187,7 @@ static int __devinit igb_validate_option(int *value, struct igb_option *opt,
 		BUG();
 	}
 
-	DPRINTK(PROBE, INFO, "Invalid %s value specified (%i) %s\n",
+	DPRINTK(PROBE, INFO, "Invalid %s value specified (%d) %s\n",
 	       opt->name, *value, opt->err);
 	*value = opt->def;
 	return -1;
@@ -197,7 +209,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 
 	if (bd >= IGB_MAX_NIC) {
 		DPRINTK(PROBE, NOTICE,
-		       "Warning: no configuration for board #%i\n", bd);
+		       "Warning: no configuration for board #%d\n", bd);
 		DPRINTK(PROBE, NOTICE, "Using defaults for all values\n");
 #ifndef module_param_array
 		bd = IGB_MAX_NIC;
@@ -240,9 +252,16 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 				igb_validate_option(&adapter->itr, &opt,
 				        adapter);
 				/* save the setting, because the dynamic bits change itr */
-				/* clear the lower two bits because they are
+				/* in case of invalid user value, default to conservative mode,
+ 				 * else need to clear the lower two bits because they are
 				 * used as control */
-				adapter->itr_setting = adapter->itr & ~3;
+				if (adapter->itr == 3) {
+					adapter->itr_setting = adapter->itr;
+					adapter->itr = IGB_START_ITR;
+				} 
+				else {
+					adapter->itr_setting = adapter->itr & ~3;
+				}
 				break;
 			}
 #ifdef module_param_array
@@ -252,7 +271,29 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 		}
 #endif
 	}
-	{ /* Low Latency Interrupt TCP Port*/
+	{ /* Interrupt Mode */
+		struct igb_option opt = {
+			.type = range_option,
+			.name = "Interrupt Mode",
+			.err  = "defaulting to 2 (MSI-X single queue)",
+			.def  = IGB_INT_MODE_MSIX_1Q,
+			.arg  = { .r = { .min = MIN_INTMODE,
+					 .max = MAX_INTMODE }}
+		};
+
+#ifdef module_param_array
+		if (num_IntMode > bd) {
+#endif
+			unsigned int int_mode = IntMode[bd];
+			igb_validate_option(&int_mode, &opt, adapter);
+			adapter->int_mode = int_mode;
+#ifdef module_param_array
+		} else {
+			adapter->int_mode = opt.def;
+		}
+#endif
+	}
+	{ /* Low Latency Interrupt TCP Port */
 		struct igb_option opt = {
 			.type = range_option,
 			.name = "Low Latency Interrupt TCP Port",
@@ -306,7 +347,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 		}
 #endif
 	}
-	{ /*Low Latency Interrupt on TCP Push flag*/
+	{ /* Low Latency Interrupt on TCP Push flag */
 		struct igb_option opt = {
 			.type = enable_option,
 			.name = "Low Latency Interrupt on TCP Push flag",
@@ -317,9 +358,9 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 #ifdef module_param_array
 		if (num_LLIPush > bd) {
 #endif
-			int lli_push = LLIPush[bd];
+			unsigned int lli_push = LLIPush[bd];
 			igb_validate_option(&lli_push, &opt, adapter);
-			adapter->flags.lli_push = lli_push;
+			adapter->flags |= lli_push ? IGB_FLAG_LLI_PUSH : 0;
 #ifdef module_param_array
 		} else {
 			adapter->lli_port = opt.def;

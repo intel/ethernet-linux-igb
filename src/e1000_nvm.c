@@ -500,7 +500,7 @@ s32 e1000_read_nvm_eerd(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 
 	/*
 	 * A check for invalid values:  offset too large, too many words,
-	 * and not enough words.
+	 * too many words for the offset, and not enough words.
 	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
@@ -703,33 +703,33 @@ out:
 }
 
 /**
- *  e1000_read_part_num_generic - Read device part number
+ *  e1000_read_pba_num_generic - Read device part number
  *  @hw: pointer to the HW structure
- *  @part_num: pointer to device part number
+ *  @pba_num: pointer to device part number
  *
  *  Reads the product board assembly (PBA) number from the EEPROM and stores
- *  the value in part_num.
+ *  the value in pba_num.
  **/
-s32 e1000_read_part_num_generic(struct e1000_hw *hw, u32 *part_num)
+s32 e1000_read_pba_num_generic(struct e1000_hw *hw, u32 *pba_num)
 {
 	s32  ret_val;
 	u16 nvm_data;
 
-	DEBUGFUNC("e1000_read_part_num_generic");
+	DEBUGFUNC("e1000_read_pba_num_generic");
 
 	ret_val = e1000_read_nvm(hw, NVM_PBA_OFFSET_0, 1, &nvm_data);
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");
 		goto out;
 	}
-	*part_num = (u32)(nvm_data << 16);
+	*pba_num = (u32)(nvm_data << 16);
 
 	ret_val = e1000_read_nvm(hw, NVM_PBA_OFFSET_1, 1, &nvm_data);
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");
 		goto out;
 	}
-	*part_num |= nvm_data;
+	*pba_num |= nvm_data;
 
 out:
 	return ret_val;

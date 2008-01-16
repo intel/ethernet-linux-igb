@@ -1,4 +1,0 @@
-This file would normally have information in it about using this driver
-with different linux distributions. This is a placeholder file, if you're
-reading this you got a pre-pre-alpha copy of a driver tarball.
-==============================================

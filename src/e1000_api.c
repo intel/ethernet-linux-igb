@@ -30,8 +30,6 @@
 #include "e1000_nvm.h"
 #include "e1000_phy.h"
 
-extern void    e1000_init_function_pointers_82575(struct e1000_hw *hw);
-
 /**
  *  e1000_init_mac_params - Initialize MAC function pointers
  *  @hw: pointer to the HW structure
@@ -897,18 +895,18 @@ s32 e1000_read_mac_addr(struct e1000_hw *hw)
 }
 
 /**
- *  e1000_read_part_num - Read device part number
+ *  e1000_read_pba_num - Read device part number
  *  @hw: pointer to the HW structure
- *  @part_num: pointer to device part number
+ *  @pba_num: pointer to device part number
  *
  *  Reads the product board assembly (PBA) number from the EEPROM and stores
- *  the value in part_num.
+ *  the value in pba_num.
  *  Currently no func pointer exists and all implementations are handled in the
  *  generic version of this function.
  **/
-s32 e1000_read_part_num(struct e1000_hw *hw, u32 *part_num)
+s32 e1000_read_pba_num(struct e1000_hw *hw, u32 *pba_num)
 {
-	return e1000_read_part_num_generic(hw, part_num);
+	return e1000_read_pba_num_generic(hw, pba_num);
 }
 
 /**
@@ -1000,7 +998,37 @@ s32 e1000_write_nvm(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
  *  Writes the PHY register at offset with the value in data.
  *  This is a function pointer entry point called by drivers.
  **/
-s32 e1000_write_8bit_ctrl_reg(struct e1000_hw *hw, u32 reg, u32 offset, u8 data)
+s32 e1000_write_8bit_ctrl_reg(struct e1000_hw *hw, u32 reg, u32 offset,
+                              u8 data)
 {
 	return e1000_write_8bit_ctrl_reg_generic(hw, reg, offset, data);
 }
+
+/**
+ * e1000_power_up_phy - Restores link in case of PHY power down
+ * @hw: pointer to the HW structure
+ *
+ * The phy may be powered down to save power, to turn off link when the
+ * driver is unloaded, or wake on lan is not enabled (among others).
+ **/
+void e1000_power_up_phy(struct e1000_hw *hw)
+{
+	if (hw->func.power_up_phy)
+		hw->func.power_up_phy(hw);
+
+	e1000_setup_link(hw);
+}
+
+/**
+ * e1000_power_down_phy - Power down PHY
+ * @hw: pointer to the HW structure
+ *
+ * The phy may be powered down to save power, to turn off link when the
+ * driver is unloaded, or wake on lan is not enabled (among others).
+ **/
+void e1000_power_down_phy(struct e1000_hw *hw)
+{
+	if (hw->func.power_down_phy)
+		hw->func.power_down_phy(hw);
+}
+

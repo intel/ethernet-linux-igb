@@ -65,7 +65,10 @@ ifeq (,$(KSRC))
 endif
 
 ifeq (,$(KSRC))
-  $(error Linux kernel source not found)
+  $(warning *** Linux kernel source not found in any of these locations:)
+  $(warning $(KSP))
+  $(warning *** Install the appropriate kernel development package, e.g.)
+  $(error kernel-devel, for building kernel modules and try again)
 else
 ifeq (/lib/modules/$(shell uname -r)/source, $(KSRC))
   KOBJ :=  /lib/modules/$(shell uname -r)/build
@@ -78,7 +81,7 @@ endif
 ifneq (,$(wildcard /boot/vmlinuz.version.h))
   VERSION_FILE := /boot/vmlinuz.version.h
   CONFIG_FILE  := /boot/vmlinuz.autoconf.h
-  KVER := $(shell $(CC) $(CFLAGS) -E -dM $(VERSION_FILE) | \
+  KVER := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(VERSION_FILE) | \
           grep UTS_RELEASE | awk '{ print $$3 }' | sed 's/\"//g')
   ifeq ($(KVER),$(shell uname -r))
     # set up include path to override headers from kernel source
@@ -86,7 +89,7 @@ ifneq (,$(wildcard /boot/vmlinuz.version.h))
     x:=$(shell mkdir -p include/linux)
     x:=$(shell cp /boot/vmlinuz.version.h include/linux/version.h)
     x:=$(shell cp /boot/vmlinuz.autoconf.h include/linux/autoconf.h)
-    CFLAGS += -I./include
+    EXTRA_CFLAGS += -I./include
   else
     ifneq (,$(wildcard $(KOBJ)/include/linux/utsrelease.h))
       VERSION_FILE := $(KOBJ)/include/linux/utsrelease.h
@@ -129,16 +132,16 @@ endif
 # some additional features are only built on Intel platforms
 ARCH := $(shell uname -m | sed 's/i.86/i386/')
 ifeq ($(ARCH),alpha)
-  CFLAGS += -ffixed-8 -mno-fp-regs
+  EXTRA_CFLAGS += -ffixed-8 -mno-fp-regs
 endif
 ifeq ($(ARCH),x86_64)
-  CFLAGS += -mcmodel=kernel -mno-red-zone
+  EXTRA_CFLAGS += -mcmodel=kernel -mno-red-zone
 endif
 ifeq ($(ARCH),ppc)
-  CFLAGS += -msoft-float
+  EXTRA_CFLAGS += -msoft-float
 endif
 ifeq ($(ARCH),ppc64)
-  CFLAGS += -m64 -msoft-float
+  EXTRA_CFLAGS += -m64 -msoft-float
   LDFLAGS += -melf64ppc
 endif
 ifneq (,$(findstring NO_82542_SUPPORT, $(CFLAGS_EXTRA)))
@@ -146,24 +149,24 @@ ifneq (,$(findstring NO_82542_SUPPORT, $(CFLAGS_EXTRA)))
 endif
 
 # standard flags for module builds
-CFLAGS += -DLINUX -D__KERNEL__ -DMODULE -O2 -pipe -Wall
-CFLAGS += -I$(KSRC)/include -I.
-CFLAGS += $(shell [ -f $(KSRC)/include/linux/modversions.h ] && \
+EXTRA_CFLAGS += -DLINUX -D__KERNEL__ -DMODULE -O2 -pipe -Wall
+EXTRA_CFLAGS += -I$(KSRC)/include -I.
+EXTRA_CFLAGS += $(shell [ -f $(KSRC)/include/linux/modversions.h ] && \
             echo "-DMODVERSIONS -DEXPORT_SYMTAB \
                   -include $(KSRC)/include/linux/modversions.h")
 
-CFLAGS += $(CFLAGS_EXTRA)
+EXTRA_CFLAGS += $(CFLAGS_EXTRA)
 
 RHC := $(KSRC)/include/linux/rhconfig.h
 ifneq (,$(wildcard $(RHC)))
   # 7.3 typo in rhconfig.h
-  ifneq (,$(shell $(CC) $(CFLAGS) -E -dM $(RHC) | grep __module__bigmem))
-	CFLAGS += -D__module_bigmem
+  ifneq (,$(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(RHC) | grep __module__bigmem))
+	EXTRA_CFLAGS += -D__module_bigmem
   endif
 endif
 
 # get the kernel version - we use this to find the correct install path
-KVER := $(shell $(CC) $(CFLAGS) -E -dM $(VERSION_FILE) | grep UTS_RELEASE | \
+KVER := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(VERSION_FILE) | grep UTS_RELEASE | \
         awk '{ print $$3 }' | sed 's/\"//g')
 
 # assume source symlink is the same as build, otherwise adjust KOBJ
@@ -184,7 +187,7 @@ endif
 INSTDIR := /lib/modules/$(KVER)/kernel/drivers/net/igb
 
 # look for SMP in config.h
-SMP := $(shell $(CC) $(CFLAGS) -E -dM $(CONFIG_FILE) | \
+SMP := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(CONFIG_FILE) | \
          grep -w CONFIG_SMP | awk '{ print $$3 }')
 ifneq ($(SMP),1)
   SMP := 0
@@ -205,7 +208,7 @@ ifneq ($(SMP),$(shell uname -a | grep SMP > /dev/null 2>&1 && echo 1 || echo 0))
 endif
 
 ifeq ($(SMP),1)
-  CFLAGS += -D__SMP__
+  EXTRA_CFLAGS += -D__SMP__
 endif
 
 ###########################################################################
@@ -246,13 +249,15 @@ MANFILE = $(TARGET:.o=.$(MANSECTION))
 
 # Get rid of compile warnings in kernel header files from SuSE
 ifneq (,$(wildcard /etc/SuSE-release))
-  CFLAGS += -Wno-sign-compare -fno-strict-aliasing
+  EXTRA_CFLAGS += -Wno-sign-compare -fno-strict-aliasing
 endif
 
 # Get rid of compile warnings in kernel header files from fedora
 ifneq (,$(wildcard /etc/fedora-release))
-  CFLAGS += -fno-strict-aliasing
+  EXTRA_CFLAGS += -fno-strict-aliasing
 endif
+
+CFLAGS += $(EXTRA_CFLAGS)
 
 .SILENT: $(TARGET)
 $(TARGET): $(filter-out $(TARGET), $(CFILES:.c=.o))

@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Network Connection
 ==================================================
 
-October 9, 2007
+October 29, 2007
 
 
 Contents
@@ -254,6 +254,14 @@ NOTE:  When igb is loaded with default settings and multiple adapters
        default driver settings.
 
 
+LLI (Low Latency Interrupts)
+---------------------------- 
+LLI allows for immediate generation of an interrupt upon processing receive 
+packets that match certain criteria as set by the parameters described below. 
+LLI parameters are not enabled when Legacy interrupts are used. You must be 
+using MSI or MSI-X (see cat /proc/interrupts) to successfully use LLI.
+
+
 LLIPort
 -------
 Valid Range:   0-65535
@@ -288,6 +296,20 @@ Default Value: 0 (disabled)
 
 Causes an immediate interrupt if the board receives a packet smaller 
 than the specified size.
+
+
+IntMode
+-------
+Valid Range:    0-3
+Default Value:  2
+0 - Legacy Interrupts, single queue
+1 - MSI interrupts, single queue
+2 - MSI-X interrupts, single queue (default)
+3 - MSI-X interrupts, multiple queues
+
+Allows changing interrupt mode and MQ status at load time, without requiring
+a recompile. If the driver fails to enable a specific interrupt mode, it will
+fail back to lesser capabilities.
 
 
 Additional Configurations
@@ -401,20 +423,6 @@ Additional Configurations
   NOTE: On some kernels a reboot is required to switch between a single queue 
   mode and multiqueue modes, or vice-versa.
 
-  Multiqueue can be enabled with a compile flag: 
-  # make CFLAGS_EXTRA=-DCONFIG_IGB_MQ_RX
-  This will give you up to four rx queues without AIM (but using a simple 
-  adaptive algorithm for dynamic interrupt moderation).  We have found that 
-  this provides acceptable throughput but uses a lot more CPU than single-queue 
-  mode due to more interrupts.  This mode might be useful if you are handling 
-  multiple connections using a lot of small packets and you aren't concerned 
-  about CPU utilization. Note that tx cleanups are handled during rx 
-  processing.
-
-  With this option you can get up to five MSI-X vectors - one per RX queue and
-  one for link.  You will never get more queues than CPUs, so if you have a 
-  dual-proc server you'll only get two RX queues.
-
   To enable a separate vector for TX, use: 
   # make CFLAGS_EXTRA=-DCONFIG_IGB_SEPARATE_TX_HANDLER
   This will allocate a separate handler for tx cleanups. This might be useful 
@@ -423,12 +431,6 @@ Additional Configurations
  
   With this option, you would get three MSI-X vectors: one for TX, one for RX, 
   and one for link.
-
-  The previous two options can be combined:
-  # make CFLAGS_EXTRA="-DCONFIG_IGB_RX_MQ -DCONFIG_IGB_SEPARATE_TX_HANDLER"
-  (quotes are required).  This will disable AIM, and give you up to six MSI-X 
-  vectors: one for each RX queue (up to four), one for TX cleanups, and one 
-  for link.
  
   Currently there is no kernel support for multiple TX queues.
 
@@ -526,7 +528,6 @@ In kernel versions 2.5.50 and later (including 2.6 kernel), unplugging
 the network cable while ethtool -p is running will cause the system to 
 become unresponsive to keyboard commands, except for control-alt-delete.  
 Restarting the system appears to be the only remedy.
-
 
 
 Support

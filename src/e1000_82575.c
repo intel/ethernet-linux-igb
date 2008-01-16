@@ -32,8 +32,6 @@
 #include "e1000_api.h"
 #include "e1000_82575.h"
 
-void e1000_init_function_pointers_82575(struct e1000_hw *hw);
-
 static s32  e1000_init_phy_params_82575(struct e1000_hw *hw);
 static s32  e1000_init_nvm_params_82575(struct e1000_hw *hw);
 static s32  e1000_init_mac_params_82575(struct e1000_hw *hw);
@@ -67,6 +65,7 @@ static void e1000_release_swfw_sync_82575(struct e1000_hw *hw, u16 mask);
 static bool e1000_sgmii_active_82575(struct e1000_hw *hw);
 static s32  e1000_reset_init_script_82575(struct e1000_hw *hw);
 static s32  e1000_read_mac_addr_82575(struct e1000_hw *hw);
+static void e1000_power_down_phy_copper_82575(struct e1000_hw *hw);
 
 
 struct e1000_dev_spec_82575 {
@@ -90,6 +89,9 @@ static s32 e1000_init_phy_params_82575(struct e1000_hw *hw)
 	if (hw->phy.media_type != e1000_media_type_copper) {
 		phy->type = e1000_phy_none;
 		goto out;
+	} else {
+		func->power_up_phy      = e1000_power_up_phy_copper;
+		func->power_down_phy    = e1000_power_down_phy_copper_82575;
 	}
 
 	phy->autoneg_mask        = AUTONEG_ADVERTISE_SPEED_DEFAULT;
@@ -183,6 +185,10 @@ static s32 e1000_init_nvm_params_82575(struct e1000_hw *hw)
 	 * for setting word_size.
 	 */
 	size += NVM_WORD_SIZE_BASE_SHIFT;
+
+	/* EEPROM access above 16k is unsupported */
+	if (size > 14)
+		size = 14;
 	nvm->word_size	= 1 << size;
 
 	/* Function Pointers */
@@ -874,8 +880,8 @@ static s32 e1000_check_for_link_82575(struct e1000_hw *hw)
  *  Using the physical coding sub-layer (PCS), retreive the current speed and
  *  duplex, then store the values in the pointers provided.
  **/
-static s32 e1000_get_pcs_speed_and_duplex_82575(struct e1000_hw *hw, u16 *speed,
-                                                u16 *duplex)
+static s32 e1000_get_pcs_speed_and_duplex_82575(struct e1000_hw *hw,
+                                                u16 *speed, u16 *duplex)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	u32 pcs;
@@ -931,7 +937,7 @@ static s32 e1000_get_pcs_speed_and_duplex_82575(struct e1000_hw *hw, u16 *speed,
  *  Sets the receive address array register at index to the address passed
  *  in by addr.
  **/
-void e1000_rar_set_82575(struct e1000_hw *hw, u8 *addr, u32 index)
+static void e1000_rar_set_82575(struct e1000_hw *hw, u8 *addr, u32 index)
 {
 	DEBUGFUNC("e1000_rar_set_82575");
 
@@ -1349,6 +1355,22 @@ static s32 e1000_read_mac_addr_82575(struct e1000_hw *hw)
 		ret_val = e1000_read_mac_addr_generic(hw);
 
 	return ret_val;
+}
+
+/**
+ * e1000_power_down_phy_copper_82575 - Remove link during PHY power down
+ * @hw: pointer to the HW structure
+ *
+ * In the case of a PHY power down to save power, or to turn off link during a
+ * driver unload, or wake on lan is not enabled, remove the link.
+ **/
+static void e1000_power_down_phy_copper_82575(struct e1000_hw *hw)
+{
+	/* If the management interface is not enabled, then power down */
+	if (!(e1000_check_mng_mode(hw) || e1000_check_reset_block(hw)))
+		e1000_power_down_phy_copper(hw);
+
+	return;
 }
 
 /**

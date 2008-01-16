@@ -85,11 +85,23 @@
 #define CONFIG_E1000_DISABLE_PACKET_SPLIT
 #endif
 
-/* general compatibility flags unclassified per kernel */
+/* MSI compatibility code for all kernels and drivers */
 #ifdef DISABLE_PCI_MSI
 #undef CONFIG_PCI_MSI
 #endif
-
+#ifndef CONFIG_PCI_MSI
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8) )
+struct msix_entry {
+	u16 vector; /* kernel uses to write allocated vector */
+	u16 entry;  /* driver uses to specify entry, OS writes */
+};
+#endif
+#define pci_enable_msi(a) -ENOTSUPP
+#define pci_disable_msi(a) do {} while (0)
+#define pci_enable_msix(a, b, c) -ENOTSUPP
+#define pci_disable_msix(a) do {} while (0)
+#define msi_remove_pci_irq_vectors(a) do {} while (0)
+#endif /* CONFIG_PCI_MSI */
 #ifdef DISABLE_PM
 #undef CONFIG_PM
 #endif
@@ -101,6 +113,23 @@
 #ifndef PMSG_SUSPEND
 #define PMSG_SUSPEND 3
 #endif
+
+/* generic boolean compatibility */
+#undef TRUE
+#undef FALSE
+#define TRUE true
+#define FALSE false
+#ifdef GCC_VERSION
+#if ( GCC_VERSION < 3000 )
+#define _Bool char
+#endif
+#endif
+#ifndef bool
+#define bool _Bool
+#define true 1
+#define false 0
+#endif
+
 
 #ifndef module_param
 #define module_param(v,t,p) MODULE_PARM(v, "i");
@@ -227,6 +256,26 @@ enum {
 #ifndef _LINUX_RANDOM_H
 #include <linux/random.h>
 #endif
+
+#ifndef DECLARE_BITMAP
+#ifndef BITS_TO_LONGS
+#define BITS_TO_LONGS(bits) (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
+#endif
+#define DECLARE_BITMAP(name,bits) long name[BITS_TO_LONGS(bits)]
+#endif
+
+#ifndef VLAN_HLEN
+#define VLAN_HLEN 4
+#endif
+
+#ifndef VLAN_ETH_HLEN
+#define VLAN_ETH_HLEN 18
+#endif
+
+#ifndef VLAN_ETH_FRAME_LEN
+#define VLAN_ETH_FRAME_LEN 1518
+#endif
+
 
 /*****************************************************************************/
 /* Installations with ethtool version without eeprom, adapter id, or statistics
@@ -597,6 +646,38 @@ extern int _kc_is_valid_ether_addr(u8 *addr);
 #endif /* 2.4.3 => 2.4.0 */
 
 /*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,5) )
+/* Generic MII registers. */
+#define MII_BMCR            0x00        /* Basic mode control register */
+#define MII_BMSR            0x01        /* Basic mode status register  */
+#define MII_PHYSID1         0x02        /* PHYS ID 1                   */
+#define MII_PHYSID2         0x03        /* PHYS ID 2                   */
+#define MII_ADVERTISE       0x04        /* Advertisement control reg   */
+#define MII_LPA             0x05        /* Link partner ability reg    */
+#define MII_EXPANSION       0x06        /* Expansion register          */
+/* Basic mode control register. */
+#define BMCR_FULLDPLX           0x0100  /* Full duplex                 */
+#define BMCR_ANENABLE           0x1000  /* Enable auto negotiation     */
+/* Basic mode status register. */
+#define BMSR_ERCAP              0x0001  /* Ext-reg capability          */
+#define BMSR_ANEGCAPABLE        0x0008  /* Able to do auto-negotiation */
+#define BMSR_10HALF             0x0800  /* Can do 10mbps, half-duplex  */
+#define BMSR_10FULL             0x1000  /* Can do 10mbps, full-duplex  */
+#define BMSR_100HALF            0x2000  /* Can do 100mbps, half-duplex */
+#define BMSR_100FULL            0x4000  /* Can do 100mbps, full-duplex */
+/* Advertisement control register. */
+#define ADVERTISE_CSMA          0x0001  /* Only selector supported     */
+#define ADVERTISE_10HALF        0x0020  /* Try for 10mbps half-duplex  */
+#define ADVERTISE_10FULL        0x0040  /* Try for 10mbps full-duplex  */
+#define ADVERTISE_100HALF       0x0080  /* Try for 100mbps half-duplex */
+#define ADVERTISE_100FULL       0x0100  /* Try for 100mbps full-duplex */
+#define ADVERTISE_ALL (ADVERTISE_10HALF | ADVERTISE_10FULL | \
+                       ADVERTISE_100HALF | ADVERTISE_100FULL)
+/* Expansion register for auto-negotiation. */
+#define EXPANSION_ENABLENPAGE   0x0004  /* This enables npage words    */
+#endif
+
+/*****************************************************************************/
 /* 2.4.6 => 2.4.3 */
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,6) )
 
@@ -721,18 +802,6 @@ extern void _kc_pci_unmap_page(struct pci_dev *dev, u64 dma_addr, size_t size, i
 	#define __devexit_p(x) &(x)
 #endif
 
-#ifndef VLAN_HLEN
-#define VLAN_HLEN 4
-#endif
-
-#ifndef VLAN_ETH_HLEN
-#define VLAN_ETH_HLEN 18
-#endif
-
-#ifndef VLAN_ETH_FRAME_LEN
-#define VLAN_ETH_FRAME_LEN 1518
-#endif
-
 #endif /* 2.4.17 => 2.4.13 */
 
 /*****************************************************************************/
@@ -808,6 +877,8 @@ static inline void _kc_netif_tx_disable(struct net_device *dev)
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,5,71) )
 #include <net/sock.h>
 #define sk_protocol protocol
+
+#define pci_get_device pci_find_device
 #endif /* 2.5.70 => 2.4.x */
 
 /*****************************************************************************/
@@ -846,12 +917,6 @@ static inline u32 _kc_netif_msg_init(int debug_value, int default_msg_enable_bit
 
 #define dev_err(__unused_dev, format, arg...)            \
 	printk(KERN_ERR "%s: " format, pci_name(pdev) , ## arg)
-
-/* MSI fakes */
-#ifndef CONFIG_PCI_MSI
-static inline int pci_enable_msi(struct pci_dev *dev) {return -1;}
-static inline void pci_disable_msi(struct pci_dev *dev) {}
-#endif
 
 /* hlist_* code - double linked lists */
 struct hlist_head {
@@ -967,6 +1032,17 @@ static inline int _kc_pci_dma_mapping_error(dma_addr_t dma_addr)
 #undef ALIGN
 #define ALIGN(x,a) (((x)+(a)-1)&~((a)-1))
 
+/* find_first_bit and find_next bit are not defined for most
+ * 2.4 kernels (except for the redhat 2.4.21 kernels
+ */
+#include <linux/bitops.h>
+#define BITOP_WORD(nr)          ((nr) / BITS_PER_LONG)
+#define find_next_bit _kc_find_next_bit
+extern unsigned long _kc_find_next_bit(const unsigned long *addr,
+                                       unsigned long size,
+                                       unsigned long offset);
+#define find_first_bit(addr, size) find_next_bit((addr), (size), 0)
+
 #endif /* 2.6.0 => 2.5.28 */
 
 /*****************************************************************************/
@@ -997,7 +1073,8 @@ static inline struct mii_ioctl_data *_kc_if_mii(struct ifreq *rq)
 #define msleep(x)	do { set_current_state(TASK_UNINTERRUPTIBLE); \
 				schedule_timeout((x * HZ)/1000 + 2); \
 			} while (0)
-#endif
+
+#endif /* < 2.6.8 */
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9))
@@ -1043,6 +1120,9 @@ static inline unsigned long _kc_msleep_interruptible(unsigned int msecs)
 	}
 	return _kc_jiffies_to_msecs(timeout);
 }
+
+/* Basic mode control register. */
+#define BMCR_SPEED1000		0x0040  /* MSB of Speed (1000)         */
 #endif /* < 2.6.9 */
 
 /*****************************************************************************/
@@ -1122,6 +1202,15 @@ static inline unsigned long _kc_msleep_interruptible(unsigned int msecs)
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,12) )
 #include <linux/reboot.h>
 #define USE_REBOOT_NOTIFIER
+
+/* Generic MII registers. */
+#define MII_CTRL1000        0x09        /* 1000BASE-T control          */
+#define MII_STAT1000        0x0a        /* 1000BASE-T status           */
+/* Advertisement control register. */
+#define ADVERTISE_PAUSE_CAP     0x0400  /* Try for pause               */
+#define ADVERTISE_PAUSE_ASYM    0x0800  /* Try for asymetric pause     */
+/* 1000BASE-T Control register */
+#define ADVERTISE_1000FULL      0x0200  /* Advertise 1000BASE-T full duplex */
 #endif
 
 /*****************************************************************************/
@@ -1131,6 +1220,14 @@ static inline unsigned long _kc_msleep_interruptible(unsigned int msecs)
 #define kzalloc _kc_kzalloc
 extern void *_kc_kzalloc(size_t size, int flags);
 #endif
+
+/* Generic MII registers. */
+#define MII_ESTATUS	    0x0f	/* Extended Status */
+/* Basic mode status register. */
+#define BMSR_ESTATEN		0x0100	/* Extended Status in R15 */
+/* Extended status register. */
+#define ESTATUS_1000_TFULL	0x2000	/* Can do 1000BT Full */
+#define ESTATUS_1000_THALF	0x1000	/* Can do 1000BT Half */
 #endif
 
 /*****************************************************************************/
@@ -1161,10 +1258,6 @@ extern void *_kc_kzalloc(size_t size, int flags);
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
-#ifndef DIV_ROUND_UP
-#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
-#endif
-
 #ifndef netdev_alloc_skb
 #define netdev_alloc_skb _kc_netdev_alloc_skb
 extern struct sk_buff *_kc_netdev_alloc_skb(struct net_device *dev,
@@ -1178,24 +1271,19 @@ static inline int _kc_skb_is_gso(const struct sk_buff *skb)
 {
 	return skb_shinfo(skb)->gso_size;
 }
+#else
+#define skb_is_gso(a) 0
 #endif
 #endif
 
 #endif /* < 2.6.18 */
+
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19) )
-#ifdef GCC_VERSION
-#if ( GCC_VERSION < 3000 )
-#define _Bool u8
+
+#ifndef DIV_ROUND_UP
+#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 #endif
-#endif
-#undef true
-#undef false
-enum {
-	false = 0,
-	true = 1
-};
-typedef _Bool bool;
 
 #if ( LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0) )
 #ifndef RHEL_RELEASE_CODE
@@ -1327,7 +1415,15 @@ do { \
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE > KERNEL_VERSION(2,6,22) )
 #undef ETHTOOL_GPERMADDR
+#undef SET_MODULE_OWNER
+#define SET_MODULE_OWNER(dev) do { } while (0)
 #endif /* > 2.6.22 */
+
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
+#undef dev_get_by_name
+#define dev_get_by_name(_a, _b) dev_get_by_name(_b)
+#define __netif_subqueue_stopped(_a, _b) netif_subqueue_stopped(_a, _b)
+#endif /* < 2.6.24 */
 
 #endif /* _KCOMPAT_H_ */
 

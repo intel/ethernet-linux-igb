@@ -135,7 +135,7 @@ out:
  *  Reads the MDI control regsiter in the PHY at offset and stores the
  *  information read to data.
  **/
-static s32 e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data)
+s32 e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	u32 i, mdic = 0;
@@ -195,7 +195,7 @@ out:
  *
  *  Writes data to MDI control register in the PHY at offset.
  **/
-static s32 e1000_write_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 data)
+s32 e1000_write_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 data)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	u32 i, mdic = 0;
@@ -328,8 +328,8 @@ s32 e1000_read_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 *data)
 
 	if (offset > MAX_PHY_MULTI_PAGE_REG) {
 		ret_val = e1000_write_phy_reg_mdic(hw,
-						   IGP01E1000_PHY_PAGE_SELECT,
-						   (u16)offset);
+		                                   IGP01E1000_PHY_PAGE_SELECT,
+		                                   (u16)offset);
 		if (ret_val) {
 			e1000_release_phy(hw);
 			goto out;
@@ -337,8 +337,8 @@ s32 e1000_read_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 *data)
 	}
 
 	ret_val = e1000_read_phy_reg_mdic(hw,
-					  MAX_PHY_REG_ADDRESS & offset,
-					  data);
+	                                  MAX_PHY_REG_ADDRESS & offset,
+	                                  data);
 
 	e1000_release_phy(hw);
 
@@ -367,8 +367,8 @@ s32 e1000_write_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 data)
 
 	if (offset > MAX_PHY_MULTI_PAGE_REG) {
 		ret_val = e1000_write_phy_reg_mdic(hw,
-						   IGP01E1000_PHY_PAGE_SELECT,
-						   (u16)offset);
+		                                   IGP01E1000_PHY_PAGE_SELECT,
+		                                   (u16)offset);
 		if (ret_val) {
 			e1000_release_phy(hw);
 			goto out;
@@ -376,8 +376,8 @@ s32 e1000_write_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 data)
 	}
 
 	ret_val = e1000_write_phy_reg_mdic(hw,
-					   MAX_PHY_REG_ADDRESS & offset,
-					   data);
+	                                   MAX_PHY_REG_ADDRESS & offset,
+	                                   data);
 
 	e1000_release_phy(hw);
 
@@ -542,9 +542,9 @@ s32 e1000_copper_link_setup_m88(struct e1000_hw *hw)
 		} else {
 			/* Configure Master and Slave downshift values */
 			phy_data &= ~(M88E1000_EPSCR_MASTER_DOWNSHIFT_MASK |
-				      M88E1000_EPSCR_SLAVE_DOWNSHIFT_MASK);
+			             M88E1000_EPSCR_SLAVE_DOWNSHIFT_MASK);
 			phy_data |= (M88E1000_EPSCR_MASTER_DOWNSHIFT_1X |
-				     M88E1000_EPSCR_SLAVE_DOWNSHIFT_1X);
+			             M88E1000_EPSCR_SLAVE_DOWNSHIFT_1X);
 		}
 		ret_val = e1000_write_phy_reg(hw,
 		                             M88E1000_EXT_PHY_SPEC_CTRL,
@@ -875,26 +875,26 @@ s32 e1000_phy_setup_autoneg(struct e1000_hw *hw)
 	 *          but not send pause frames).
 	 *      2:  Tx flow control is enabled (we can send pause frames
 	 *          but we do not support receiving pause frames).
-	 *      3:  Both Rx and TX flow control (symmetric) are enabled.
+	 *      3:  Both Rx and Tx flow control (symmetric) are enabled.
 	 *  other:  No software override.  The flow control configuration
 	 *          in the EEPROM is used.
 	 */
 	switch (hw->fc.type) {
 	case e1000_fc_none:
 		/*
-		 * Flow control (RX & TX) is completely disabled by a
+		 * Flow control (Rx & Tx) is completely disabled by a
 		 * software over-ride.
 		 */
 		mii_autoneg_adv_reg &= ~(NWAY_AR_ASM_DIR | NWAY_AR_PAUSE);
 		break;
 	case e1000_fc_rx_pause:
 		/*
-		 * RX Flow control is enabled, and TX Flow control is
+		 * Rx Flow control is enabled, and Tx Flow control is
 		 * disabled, by a software over-ride.
 		 *
 		 * Since there really isn't a way to advertise that we are
-		 * capable of RX Pause ONLY, we will advertise that we
-		 * support both symmetric and asymmetric RX PAUSE.  Later
+		 * capable of Rx Pause ONLY, we will advertise that we
+		 * support both symmetric and asymmetric Rx PAUSE.  Later
 		 * (in e1000_config_fc_after_link_up) we will disable the
 		 * hw's ability to send PAUSE frames.
 		 */
@@ -902,7 +902,7 @@ s32 e1000_phy_setup_autoneg(struct e1000_hw *hw)
 		break;
 	case e1000_fc_tx_pause:
 		/*
-		 * TX Flow control is enabled, and RX Flow control is
+		 * Tx Flow control is enabled, and Rx Flow control is
 		 * disabled, by a software over-ride.
 		 */
 		mii_autoneg_adv_reg |= NWAY_AR_ASM_DIR;
@@ -910,7 +910,7 @@ s32 e1000_phy_setup_autoneg(struct e1000_hw *hw)
 		break;
 	case e1000_fc_full:
 		/*
-		 * Flow control (both RX and TX) is enabled by a software
+		 * Flow control (both Rx and Tx) is enabled by a software
 		 * over-ride.
 		 */
 		mii_autoneg_adv_reg |= (NWAY_AR_ASM_DIR | NWAY_AR_PAUSE);
@@ -1079,7 +1079,7 @@ out:
  *  Calls the PHY setup function to force speed and duplex.  Clears the
  *  auto-crossover to force MDI manually.  Resets the PHY to commit the
  *  changes.  If time expires while waiting for link up, we reset the DSP.
- *  After reset, TX_CLK and CRS on TX must be set.  Return successful upon
+ *  After reset, TX_CLK and CRS on Tx must be set.  Return successful upon
  *  successful completion, else return corresponding error code.
  **/
 s32 e1000_phy_force_speed_duplex_m88(struct e1000_hw *hw)
@@ -1893,7 +1893,7 @@ s32 e1000_get_cfg_done_generic(struct e1000_hw *hw)
  *  Return success if silicon family did not implement a family specific
  *  get_cfg_done function.
  **/
-s32 e1000_get_phy_cfg_done(struct e1000_hw *hw)
+static s32 e1000_get_phy_cfg_done(struct e1000_hw *hw)
 {
 	if (hw->func.get_cfg_done)
 		return hw->func.get_cfg_done(hw);
@@ -1908,7 +1908,7 @@ s32 e1000_get_phy_cfg_done(struct e1000_hw *hw)
  *  Return if silicon family does not require a semaphore when accessing the
  *  PHY.
  **/
-void e1000_release_phy(struct e1000_hw *hw)
+static void e1000_release_phy(struct e1000_hw *hw)
 {
 	if (hw->func.release_phy)
 		hw->func.release_phy(hw);
@@ -1921,7 +1921,7 @@ void e1000_release_phy(struct e1000_hw *hw)
  *  Return success if silicon family does not require a semaphore when
  *  accessing the PHY.
  **/
-s32 e1000_acquire_phy(struct e1000_hw *hw)
+static s32 e1000_acquire_phy(struct e1000_hw *hw)
 {
 	if (hw->func.acquire_phy)
 		return hw->func.acquire_phy(hw);
@@ -1963,7 +1963,7 @@ s32 e1000_phy_init_script_igp3(struct e1000_hw *hw)
 	e1000_write_phy_reg(hw, 0x2FB1, 0x8B24);
 	/* Increase Hybrid poly bias */
 	e1000_write_phy_reg(hw, 0x2FB2, 0xF8F0);
-	/* Add 4% to TX amplitude in Giga mode */
+	/* Add 4% to Tx amplitude in Giga mode */
 	e1000_write_phy_reg(hw, 0x2010, 0x10B0);
 	/* Disable trimming (TTT) */
 	e1000_write_phy_reg(hw, 0x2011, 0x0000);
@@ -2067,4 +2067,39 @@ e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id)
 	return phy_type;
 }
 
+/**
+ * e1000_power_up_phy_copper - Restore copper link in case of PHY power down
+ * @hw: pointer to the HW structure
+ *
+ * In the case of a PHY power down to save power, or to turn off link during a
+ * driver unload, or wake on lan is not enabled, restore the link to previous
+ * settings.
+ **/
+void e1000_power_up_phy_copper(struct e1000_hw *hw)
+{
+	u16 mii_reg = 0;
 
+	/* The PHY will retain its settings across a power down/up cycle */
+	e1000_read_phy_reg(hw, PHY_CONTROL, &mii_reg);
+	mii_reg &= ~MII_CR_POWER_DOWN;
+	e1000_write_phy_reg(hw, PHY_CONTROL, mii_reg);
+}
+
+/**
+ * e1000_power_down_phy_copper - Restore copper link in case of PHY power down
+ * @hw: pointer to the HW structure
+ *
+ * In the case of a PHY power down to save power, or to turn off link during a
+ * driver unload, or wake on lan is not enabled, restore the link to previous
+ * settings.
+ **/
+void e1000_power_down_phy_copper(struct e1000_hw *hw)
+{
+	u16 mii_reg = 0;
+
+	/* The PHY will retain its settings across a power down/up cycle */
+	e1000_read_phy_reg(hw, PHY_CONTROL, &mii_reg);
+	mii_reg |= MII_CR_POWER_DOWN;
+	e1000_write_phy_reg(hw, PHY_CONTROL, mii_reg);
+	msec_delay(1);
+}

@@ -1,6 +1,6 @@
 Name: igb
-Summary: Intel(R) Gigabit Ethernet driver for Linux
-Version: 1.0.8
+Summary: Intel(R) Gigabit Ethernet Connection
+Version: 1.2.18.4
 Release: 1
 Source: %{name}-%{version}.tar.gz
 Vendor: Intel Corporation
@@ -19,8 +19,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-root
 Requires: kernel, fileutils, findutils, gawk, bash
 
 %description
-This package contains the Linux driver for the Intel(R) Gigabit
-Family of Server Adapters.
+This package contains the Linux driver for the Intel(R) Gigabit Family of Server Adapters.
 
 %prep
 %setup
@@ -118,7 +117,6 @@ rm -rf %{buildroot}
 %{_mandir}/man7/igb.7.gz
 %doc COPYING
 %doc README
-%doc ldistrib.txt
 %doc file.list
 %doc pci.updates
 

@@ -456,6 +456,8 @@ struct e1000_functions {
 	s32  (*set_d0_lplu_state)(struct e1000_hw *, bool);
 	s32  (*set_d3_lplu_state)(struct e1000_hw *, bool);
 	s32  (*write_phy_reg)(struct e1000_hw *, u32, u16);
+	void (*power_up_phy)(struct e1000_hw *);
+	void (*power_down_phy)(struct e1000_hw *);
 
 	/* Function pointers for the NVM. */
 	s32  (*init_nvm_params)(struct e1000_hw *);
@@ -580,8 +582,8 @@ struct e1000_hw {
 	void *back;
 	void *dev_spec;
 
-	u8 *hw_addr;
-	u8 *flash_address;
+	u8 __iomem *hw_addr;
+	u8 __iomem *flash_address;
 	unsigned long io_base;
 
 	struct e1000_functions func;

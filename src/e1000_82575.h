@@ -71,6 +71,8 @@ struct e1000_adv_data_desc {
 #define E1000_ADV_DCMD_RS       0x8  /* Report Status */
 #define E1000_ADV_DCMD_VLE      0x40 /* Add VLAN tag */
 #define E1000_ADV_DCMD_TSE      0x80 /* TCP Seg enable */
+/* Extended Device Control */
+#define E1000_CTRL_EXT_NSICR    0x00000001 /* Disable Intr Clear all on read */
 
 struct e1000_adv_context_desc {
 	union {
@@ -141,7 +143,7 @@ struct e1000_adv_context_desc {
     E1000_EIMS_TCP_TIMER | \
     E1000_EIMS_OTHER)
 
-/* Immediate Interrupt RX (A.K.A. Low Latency Interrupt) */
+/* Immediate Interrupt Rx (A.K.A. Low Latency Interrupt) */
 #define E1000_IMIR_PORT_IM_EN     0x00010000  /* TCP port enable */
 #define E1000_IMIR_PORT_BP        0x00020000  /* TCP port check bypass */
 #define E1000_IMIREXT_SIZE_BP     0x00001000  /* Packet size bypass */
@@ -151,7 +153,7 @@ struct e1000_adv_context_desc {
 #define E1000_IMIREXT_CTRL_RST    0x00010000  /* Check RST bit in header */
 #define E1000_IMIREXT_CTRL_SYN    0x00020000  /* Check SYN bit in header */
 #define E1000_IMIREXT_CTRL_FIN    0x00040000  /* Check FIN bit in header */
-#define E1000_IMIREXT_CTRL_BP     0x00080000  /* Bypass check of control bits */
+#define E1000_IMIREXT_CTRL_BP     0x00080000  /* Bypass check of ctrl bits */
 
 /* Receive Descriptor - Advanced */
 union e1000_adv_rx_desc {
@@ -238,7 +240,6 @@ union e1000_adv_tx_desc {
 #define E1000_ADVTXD_DCMD_DEXT    0x20000000 /* Descriptor extension (1=Adv) */
 #define E1000_ADVTXD_DCMD_VLE     0x40000000 /* VLAN pkt enable */
 #define E1000_ADVTXD_DCMD_TSE     0x80000000 /* TCP Seg enable */
-#define E1000_ADVTXD_MAC_LINKSEC  0x00040000 /* Apply LinkSec on packet */
 #define E1000_ADVTXD_MAC_TSTAMP   0x00080000 /* IEEE1588 Timestamp packet */
 #define E1000_ADVTXD_STAT_SN_CRC  0x00000002 /* NXTSEQ/SEED present in WB */
 #define E1000_ADVTXD_IDX_SHIFT    4  /* Adv desc Index shift */
@@ -299,6 +300,8 @@ struct e1000_adv_tx_context_desc {
 
 #define E1000_DCA_TXCTRL_CPUID_MASK 0x0000001F /* Tx CPUID Mask */
 #define E1000_DCA_TXCTRL_DESC_DCA_EN (1 << 5) /* DCA Tx Desc enable */
-#define E1000_DCA_TXCTRL_TX_WB_RO_EN (1 << 11) /* TX Desc writeback RO bit */
+#define E1000_DCA_TXCTRL_TX_WB_RO_EN (1 << 11) /* Tx Desc writeback RO bit */
+
+
 
 #endif

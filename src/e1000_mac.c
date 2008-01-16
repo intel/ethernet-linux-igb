@@ -218,9 +218,9 @@ void e1000_init_rx_addrs_generic(struct e1000_hw *hw, u16 rar_count)
  *  Checks the nvm for an alternate MAC address.  An alternate MAC address
  *  can be setup by pre-boot software and must be treated like a permanent
  *  address and must override the actual permanent MAC address.  If an
- *  alternate MAC address is fopund it is saved in the hw struct and
- *  prgrammed into RAR0 and the cuntion returns success, otherwise the
- *  fucntion returns an error.
+ *  alternate MAC address is found it is saved in the hw struct and
+ *  programmed into RAR0 and the function returns success, otherwise the
+ *  function returns an error.
  **/
 s32 e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 {
@@ -231,7 +231,8 @@ s32 e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_check_alt_mac_addr_generic");
 
-	ret_val = e1000_read_nvm(hw, NVM_ALT_MAC_ADDR_PTR, 1, &nvm_alt_mac_addr_offset);
+	ret_val = e1000_read_nvm(hw, NVM_ALT_MAC_ADDR_PTR, 1,
+	                         &nvm_alt_mac_addr_offset);
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");
 		goto out;
@@ -292,13 +293,16 @@ void e1000_rar_set_generic(struct e1000_hw *hw, u8 *addr, u32 index)
 	 * from network order (big endian) to little endian
 	 */
 	rar_low = ((u32) addr[0] |
-		   ((u32) addr[1] << 8) |
-		    ((u32) addr[2] << 16) | ((u32) addr[3] << 24));
+	           ((u32) addr[1] << 8) |
+	           ((u32) addr[2] << 16) | ((u32) addr[3] << 24));
 
 	rar_high = ((u32) addr[4] | ((u32) addr[5] << 8));
 
-	if (!hw->mac.disable_av)
-		rar_high |= E1000_RAH_AV;
+	/* If MAC address zero, no need to set the AV bit */
+	if (rar_low || rar_high) {
+		if (!hw->mac.disable_av)
+			rar_high |= E1000_RAH_AV;
+	}
 
 	E1000_WRITE_REG_ARRAY(hw, E1000_RA, (index << 1), rar_low);
 	E1000_WRITE_REG_ARRAY(hw, E1000_RA, ((index << 1) + 1), rar_high);
@@ -494,9 +498,9 @@ void e1000_pcix_mmrbc_workaround_generic(struct e1000_hw *hw)
 	e1000_read_pci_cfg(hw, PCIX_COMMAND_REGISTER, &pcix_cmd);
 	e1000_read_pci_cfg(hw, PCIX_STATUS_REGISTER_HI, &pcix_stat_hi_word);
 	cmd_mmrbc = (pcix_cmd & PCIX_COMMAND_MMRBC_MASK) >>
-		    PCIX_COMMAND_MMRBC_SHIFT;
+	             PCIX_COMMAND_MMRBC_SHIFT;
 	stat_mmrbc = (pcix_stat_hi_word & PCIX_STATUS_HI_MMRBC_MASK) >>
-		     PCIX_STATUS_HI_MMRBC_SHIFT;
+	              PCIX_STATUS_HI_MMRBC_SHIFT;
 	if (stat_mmrbc == PCIX_STATUS_HI_MMRBC_4K)
 		stat_mmrbc = PCIX_STATUS_HI_MMRBC_2K;
 	if (cmd_mmrbc > stat_mmrbc) {
@@ -821,9 +825,15 @@ s32 e1000_setup_link_generic(struct e1000_hw *hw)
 	if (e1000_check_reset_block(hw))
 		goto out;
 
-	ret_val = e1000_set_default_fc_generic(hw);
-	if (ret_val)
-		goto out;
+	/*
+	 * If flow control is set to default, set flow control based on
+	 * the EEPROM flow control settings.
+	 */
+	if (hw->fc.type == e1000_fc_default) {
+		ret_val = e1000_set_default_fc_generic(hw);
+		if (ret_val)
+			goto out;
+	}
 
 	/*
 	 * We want to save off the original Flow Control configuration just
@@ -1017,7 +1027,7 @@ s32 e1000_commit_fc_settings_generic(struct e1000_hw *hw)
 	 *          but not send pause frames).
 	 *      2:  Tx flow control is enabled (we can send pause frames but we
 	 *          do not support receiving pause frames).
-	 *      3:  Both Rx and TX flow control (symmetric) are enabled.
+	 *      3:  Both Rx and Tx flow control (symmetric) are enabled.
 	 */
 	switch (hw->fc.type) {
 	case e1000_fc_none:
@@ -1026,9 +1036,9 @@ s32 e1000_commit_fc_settings_generic(struct e1000_hw *hw)
 		break;
 	case e1000_fc_rx_pause:
 		/*
-		 * RX Flow control is enabled and TX Flow control is disabled
+		 * Rx Flow control is enabled and Tx Flow control is disabled
 		 * by a software over-ride. Since there really isn't a way to
-		 * advertise that we are capable of RX Pause ONLY, we will
+		 * advertise that we are capable of Rx Pause ONLY, we will
 		 * advertise that we support both symmetric and asymmetric RX
 		 * PAUSE.  Later, we will disable the adapter's ability to send
 		 * PAUSE frames.
@@ -1037,14 +1047,14 @@ s32 e1000_commit_fc_settings_generic(struct e1000_hw *hw)
 		break;
 	case e1000_fc_tx_pause:
 		/*
-		 * TX Flow control is enabled, and RX Flow control is disabled,
+		 * Tx Flow control is enabled, and Rx Flow control is disabled,
 		 * by a software over-ride.
 		 */
 		txcw = (E1000_TXCW_ANE | E1000_TXCW_FD | E1000_TXCW_ASM_DIR);
 		break;
 	case e1000_fc_full:
 		/*
-		 * Flow control (both RX and TX) is enabled by a software
+		 * Flow control (both Rx and Tx) is enabled by a software
 		 * over-ride.
 		 */
 		txcw = (E1000_TXCW_ANE | E1000_TXCW_FD | E1000_TXCW_PAUSE_MASK);
@@ -1179,7 +1189,7 @@ s32 e1000_force_mac_fc_generic(struct e1000_hw *hw)
 	 *          frames but not send pause frames).
 	 *      2:  Tx flow control is enabled (we can send pause frames
 	 *          frames but we do not receive pause frames).
-	 *      3:  Both Rx and TX flow control (symmetric) is enabled.
+	 *      3:  Both Rx and Tx flow control (symmetric) is enabled.
 	 *  other:  No other values should be possible at this point.
 	 */
 	DEBUGOUT1("hw->fc.type = %u\n", hw->fc.type);
@@ -1282,11 +1292,11 @@ s32 e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		 * flow control was negotiated.
 		 */
 		ret_val = e1000_read_phy_reg(hw, PHY_AUTONEG_ADV,
-					    &mii_nway_adv_reg);
+		                             &mii_nway_adv_reg);
 		if (ret_val)
 			goto out;
 		ret_val = e1000_read_phy_reg(hw, PHY_LP_ABILITY,
-					    &mii_nway_lp_ability_reg);
+		                             &mii_nway_lp_ability_reg);
 		if (ret_val)
 			goto out;
 
@@ -1327,7 +1337,7 @@ s32 e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		if ((mii_nway_adv_reg & NWAY_AR_PAUSE) &&
 		    (mii_nway_lp_ability_reg & NWAY_LPAR_PAUSE)) {
 			/*
-			 * Now we need to check if the user selected RX ONLY
+			 * Now we need to check if the user selected Rx ONLY
 			 * of pause frames.  In this case, we had to advertise
 			 * FULL flow control because we could not advertise RX
 			 * ONLY. Hence, we must now check to see if we need to
@@ -1371,36 +1381,13 @@ s32 e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		         (mii_nway_lp_ability_reg & NWAY_LPAR_ASM_DIR)) {
 			hw->fc.type = e1000_fc_rx_pause;
 			DEBUGOUT("Flow Control = RX PAUSE frames only.\r\n");
-		}
-		/*
-		 * Per the IEEE spec, at this point flow control should be
-		 * disabled.  However, we want to consider that we could
-		 * be connected to a legacy switch that doesn't advertise
-		 * desired flow control, but can be forced on the link
-		 * partner.  So if we advertised no flow control, that is
-		 * what we will resolve to.  If we advertised some kind of
-		 * receive capability (Rx Pause Only or Full Flow Control)
-		 * and the link partner advertised none, we will configure
-		 * ourselves to enable Rx Flow Control only.  We can do
-		 * this safely for two reasons:  If the link partner really
-		 * didn't want flow control enabled, and we enable Rx, no
-		 * harm done since we won't be receiving any PAUSE frames
-		 * anyway.  If the intent on the link partner was to have
-		 * flow control enabled, then by us enabling RX only, we
-		 * can at least receive pause frames and process them.
-		 * This is a good idea because in most cases, since we are
-		 * predominantly a server NIC, more times than not we will
-		 * be asked to delay transmission of packets than asking
-		 * our link partner to pause transmission of frames.
-		 */
-		else if ((hw->fc.original_type == e1000_fc_none ||
-		          hw->fc.original_type == e1000_fc_tx_pause) ||
-		         hw->fc.strict_ieee) {
+		} else {
+			/*
+			 * Per the IEEE spec, at this point flow control
+			 * should be disabled.
+			 */
 			hw->fc.type = e1000_fc_none;
 			DEBUGOUT("Flow Control = NONE.\r\n");
-		} else {
-			hw->fc.type = e1000_fc_rx_pause;
-			DEBUGOUT("Flow Control = RX PAUSE frames only.\r\n");
 		}
 
 		/*

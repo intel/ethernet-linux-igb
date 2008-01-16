@@ -31,6 +31,7 @@
 #ifndef _IGB_H_
 #define _IGB_H_
 
+
 #include "kcompat.h"
 
 #include "e1000_api.h"
@@ -44,9 +45,6 @@
 	PCI_DEVICE(PCI_VENDOR_ID_INTEL, device_id)}
 
 struct igb_adapter;
-#ifndef CONFIG_PCI_MSI
-#undef CONFIG_IGB_MQ_RX
-#endif
 
 #if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
 #define IGB_DCA
@@ -66,14 +64,19 @@ struct igb_adapter;
 /* Interrupt defines */
 #define IGB_MAX_TX_CLEAN 72
 
+#define IGB_PACKETS_PER_INT_LOW 8
+#define IGB_PACKETS_PER_INT_HI 32
 #define IGB_MIN_DYN_ITR 3000
 #define IGB_MAX_DYN_ITR 96000
 #define IGB_START_ITR 6000
+#define IGB_ITR_INT_COUNT 5
+/* Interrupt modes, as used by the IntMode paramter */
+#define IGB_INT_MODE_LEGACY                0
+#define IGB_INT_MODE_MSI                   1
+#define IGB_INT_MODE_MSIX_1Q               2
+#define IGB_INT_MODE_MSIX_MQ               3
 
-#define IGB_DYN_ITR_PACKET_THRESHOLD 2
-#define IGB_DYN_ITR_LENGTH_LOW 200
-#define IGB_DYN_ITR_LENGTH_HIGH 1000
-
+#define HW_PERF
 /* TX/RX descriptor defines */
 #define IGB_DEFAULT_TXD                  256
 #define IGB_MIN_TXD                       80
@@ -82,6 +85,9 @@ struct igb_adapter;
 #define IGB_DEFAULT_RXD                  256
 #define IGB_MIN_RXD                       80
 #define IGB_MAX_RXD                     4096
+
+#define IGB_MIN_ITR_USECS                 10 /* 100k irq/sec */
+#define IGB_MAX_ITR_USECS              10000 /* 100  irq/sec */
 
 /* Transmit and receive queues */
 #define IGB_MAX_RX_QUEUES                  4
@@ -178,6 +184,7 @@ struct igb_ring {
 	u16 itr_register;
 	u16 cpu;
 
+	int queue_index;
 	unsigned int total_bytes;
 	unsigned int total_packets;
 
@@ -185,9 +192,7 @@ struct igb_ring {
 		/* TX */
 		struct {
 			spinlock_t tx_clean_lock;
-#ifdef NETIF_F_LLTX
-			spinlock_t tx_lock;
-#endif
+			struct igb_queue_stats tx_stats;
 			bool detect_tx_hung;
 			char name[IFNAMSIZ + 5];
 		};
@@ -196,14 +201,10 @@ struct igb_ring {
 			/* arrays of page information for packet split */
 			struct sk_buff *pending_skb;
 			int pending_skb_page;
-#ifdef CONFIG_IGB_MQ_RX
-			int no_itr_adjust;
+			int set_itr;
 			struct igb_queue_stats rx_stats;
-#endif
-
-#ifndef CONFIG_IGB_SEPARATE_TX_HANDLER
+			int interrupt_count;
 			struct igb_ring *buddy;
-#endif
 			struct net_device *netdev;
 		};
 	};
@@ -237,6 +238,7 @@ struct igb_adapter {
 	u32 en_mng_pt;
 	u16 link_speed;
 	u16 link_duplex;
+
 	unsigned int total_tx_bytes;
 	unsigned int total_tx_packets;
 	unsigned int total_rx_bytes;
@@ -246,7 +248,6 @@ struct igb_adapter {
 	u32 itr_setting;
 	u16 tx_itr;
 	u16 rx_itr;
-	int set_itr;
 
 	struct work_struct reset_task;
 	struct work_struct watchdog_task;
@@ -277,7 +278,7 @@ struct igb_adapter {
 	u64 hw_csum_good;
 	u64 rx_hdr_split;
 	u32 alloc_rx_buff_failed;
-	boolean_t rx_csum;
+	bool rx_csum;
 	u32 gorc;
 	u64 gorc_old;
 	u16 rx_ps_hdr_size;
@@ -305,28 +306,48 @@ struct igb_adapter {
 
 	int msg_enable;
 	struct msix_entry *msix_entries;
+	int int_mode;
 	u32 eims_enable_mask;
 	u32 lli_port;
 	u32 lli_size;
 
 	/* to not mess up cache alignment, always add to the bottom */
 	unsigned long state;
-	struct {
-		unsigned int has_msi:1;
-		unsigned int msi_enabled:1;
-		unsigned int has_dca:1;
-		unsigned int dca_enabled:1;
-		unsigned int lli_push:1;
-		unsigned int in_netpoll:1;
-		unsigned int quad_port_a:1;
-	} flags;
+	unsigned int flags;
 	u32 eeprom_wol;
 	u32 *config_space;
 };
+
+
+#define IGB_FLAG_HAS_MSI           (1 << 0)
+#define IGB_FLAG_MSI_ENABLE        (1 << 1)
+#define IGB_FLAG_HAS_DCA           (1 << 2)
+#define IGB_FLAG_DCA_ENABLED       (1 << 3)
+#define IGB_FLAG_LLI_PUSH          (1 << 4)
+#define IGB_FLAG_IN_NETPOLL        (1 << 5)
+#define IGB_FLAG_QUAD_PORT_A       (1 << 6)
 
 enum e1000_state_t {
 	__IGB_TESTING,
 	__IGB_RESETTING,
 	__IGB_DOWN
 };
+
+extern char igb_driver_name[];
+extern char igb_driver_version[];
+
+extern int igb_up(struct igb_adapter *);
+extern void igb_down(struct igb_adapter *);
+extern void igb_reinit_locked(struct igb_adapter *);
+extern void igb_reset(struct igb_adapter *);
+extern int igb_set_spd_dplx(struct igb_adapter *, u16);
+extern int igb_setup_tx_resources(struct igb_adapter *, struct igb_ring *);
+extern int igb_setup_rx_resources(struct igb_adapter *, struct igb_ring *);
+extern void igb_update_stats(struct igb_adapter *);
+extern void igb_set_ethtool_ops(struct net_device *);
+extern void igb_check_options(struct igb_adapter *);
+#ifdef ETHTOOL_OPS_COMPAT
+extern int ethtool_ioctl(struct ifreq *);
+#endif
+
 #endif /* _IGB_H_ */
