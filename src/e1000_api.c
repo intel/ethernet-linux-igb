@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -171,7 +171,7 @@ s32 e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device)
 	/*
 	 * Init some generic function pointers that are currently all pointing
 	 * to generic implementations. We do this first allowing a driver
-	 * module to override it afterwards.
+	 * module to override it afterward.
 	 */
 	hw->func.config_collision_dist = e1000_config_collision_dist_generic;
 	hw->func.rar_set = e1000_rar_set_generic;
@@ -238,7 +238,7 @@ void e1000_remove_device(struct e1000_hw *hw)
  *  @hw: pointer to the HW structure
  *
  *  This will obtain information about the HW bus for which the
- *  adaper is attached and stores it in the hw structure. This is a
+ *  adapter is attached and stores it in the hw structure. This is a
  *  function pointer entry point called by drivers.
  **/
 s32 e1000_get_bus_info(struct e1000_hw *hw)
@@ -666,7 +666,7 @@ s32 e1000_mng_write_cmd_header(struct e1000_hw *hw,
  *
  *  Returns E1000_success upon success, else E1000_ERR_HOST_INTERFACE_COMMAND
  *
- *  This function checks whether the HOST IF is enabled for command operaton
+ *  This function checks whether the HOST IF is enabled for command operation
  *  and also checks whether the previous command is completed.  It busy waits
  *  in case of previous command is not completed.
  **/

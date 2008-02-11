@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -163,10 +163,13 @@ union e1000_adv_rx_desc {
 	} read;
 	struct {
 		struct {
-			struct {
-				u16 pkt_info;   /* RSS type, Packet type */
-				u16 hdr_info;   /* Split Header,
-				                 * header buffer length */
+			union {
+				u32 data;
+				struct {
+					u16 pkt_info; /* RSS type, Packet type */
+					u16 hdr_info; /* Split Header,
+				        	       * header buffer length */
+				} hs_rss;
 			} lo_dword;
 			union {
 				u32 rss;          /* RSS Hash */
@@ -234,7 +237,6 @@ union e1000_adv_tx_desc {
 #define E1000_ADVTXD_DTYP_DATA    0x00300000 /* Advanced Data Descriptor */
 #define E1000_ADVTXD_DCMD_EOP     0x01000000 /* End of Packet */
 #define E1000_ADVTXD_DCMD_IFCS    0x02000000 /* Insert FCS (Ethernet CRC) */
-#define E1000_ADVTXD_DCMD_RDMA    0x04000000 /* RDMA */
 #define E1000_ADVTXD_DCMD_RS      0x08000000 /* Report Status */
 #define E1000_ADVTXD_DCMD_DDTYP_ISCSI  0x10000000 /* DDP hdr type or iSCSI */
 #define E1000_ADVTXD_DCMD_DEXT    0x20000000 /* Descriptor extension (1=Adv) */
@@ -243,7 +245,6 @@ union e1000_adv_tx_desc {
 #define E1000_ADVTXD_MAC_TSTAMP   0x00080000 /* IEEE1588 Timestamp packet */
 #define E1000_ADVTXD_STAT_SN_CRC  0x00000002 /* NXTSEQ/SEED present in WB */
 #define E1000_ADVTXD_IDX_SHIFT    4  /* Adv desc Index shift */
-#define E1000_ADVTXD_POPTS_EOM    0x00000400 /* Enable L bit in RDMA DDP hdr */
 #define E1000_ADVTXD_POPTS_ISCO_1ST  0x00000000 /* 1st TSO of iSCSI PDU */
 #define E1000_ADVTXD_POPTS_ISCO_MDL  0x00000800 /* Middle TSO of iSCSI PDU */
 #define E1000_ADVTXD_POPTS_ISCO_LAST 0x00001000 /* Last TSO of iSCSI PDU */

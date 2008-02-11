@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -47,7 +47,6 @@ static s32  e1000_init_hw_82575(struct e1000_hw *hw);
 static s32  e1000_phy_hw_reset_sgmii_82575(struct e1000_hw *hw);
 static s32  e1000_read_phy_reg_sgmii_82575(struct e1000_hw *hw, u32 offset,
                                            u16 *data);
-static void e1000_rar_set_82575(struct e1000_hw *hw, u8 *addr, u32 index);
 static s32  e1000_reset_hw_82575(struct e1000_hw *hw);
 static s32  e1000_set_d0_lplu_state_82575(struct e1000_hw *hw,
                                           bool active);
@@ -281,7 +280,7 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	/* check for link */
 	func->check_for_link = e1000_check_for_link_82575;
 	/* receive address register setting */
-	func->rar_set = e1000_rar_set_82575;
+	func->rar_set = e1000_rar_set_generic;
 	/* read mac address */
 	func->read_mac_addr = e1000_read_mac_addr_82575;
 	/* multicast address update */
@@ -476,10 +475,10 @@ static s32 e1000_write_phy_reg_sgmii_82575(struct e1000_hw *hw, u32 offset,
 }
 
 /**
- *  e1000_get_phy_id_82575 - Retreive PHY addr and id
+ *  e1000_get_phy_id_82575 - Retrieve PHY addr and id
  *  @hw: pointer to the HW structure
  *
- *  Retreives the PHY address and ID for both PHY's which do and do not use
+ *  Retrieves the PHY address and ID for both PHY's which do and do not use
  *  sgmi interface.
  **/
 static s32 e1000_get_phy_id_82575(struct e1000_hw *hw)
@@ -662,7 +661,7 @@ out:
  *  e1000_acquire_nvm_82575 - Request for access to EEPROM
  *  @hw: pointer to the HW structure
  *
- *  Acquire the necessary semaphores for exclussive access to the EEPROM.
+ *  Acquire the necessary semaphores for exclusive access to the EEPROM.
  *  Set the EEPROM access request bit and wait for EEPROM access grant bit.
  *  Return successful if access grant bit set, else clear the request for
  *  EEPROM access and return -E1000_ERR_NVM (-1).
@@ -824,7 +823,7 @@ static s32 e1000_get_cfg_done_82575(struct e1000_hw *hw)
  *  @duplex: stores the current duplex
  *
  *  This is a wrapper function, if using the serial gigabit media independent
- *  interface, use pcs to retreive the link speed and duplex information.
+ *  interface, use PCS to retrieve the link speed and duplex information.
  *  Otherwise, use the generic function to get the link speed and duplex info.
  **/
 static s32 e1000_get_link_up_info_82575(struct e1000_hw *hw, u16 *speed,
@@ -877,7 +876,7 @@ static s32 e1000_check_for_link_82575(struct e1000_hw *hw)
  *  @speed: stores the current speed
  *  @duplex: stores the current duplex
  *
- *  Using the physical coding sub-layer (PCS), retreive the current speed and
+ *  Using the physical coding sub-layer (PCS), retrieve the current speed and
  *  duplex, then store the values in the pointers provided.
  **/
 static s32 e1000_get_pcs_speed_and_duplex_82575(struct e1000_hw *hw,
@@ -926,26 +925,6 @@ static s32 e1000_get_pcs_speed_and_duplex_82575(struct e1000_hw *hw,
 	}
 
 	return E1000_SUCCESS;
-}
-
-/**
- *  e1000_rar_set_82575 - Set receive address register
- *  @hw: pointer to the HW structure
- *  @addr: pointer to the receive address
- *  @index: receive address array register
- *
- *  Sets the receive address array register at index to the address passed
- *  in by addr.
- **/
-static void e1000_rar_set_82575(struct e1000_hw *hw, u8 *addr, u32 index)
-{
-	DEBUGFUNC("e1000_rar_set_82575");
-
-	if (index < E1000_RAR_ENTRIES_82575) {
-		e1000_rar_set_generic(hw, addr, index);
-	}
-
-	return;
 }
 
 /**
@@ -1246,7 +1225,7 @@ static s32 e1000_configure_pcs_link_82575(struct e1000_hw *hw)
 		 */
 		reg |= E1000_PCS_LCTL_AN_RESTART | E1000_PCS_LCTL_AN_ENABLE;
 	} else {
-		/* Set PCS regiseter for forced speed */
+		/* Set PCS register for forced speed */
 
 		/* Turn off bits for full duplex, speed, and autoneg */
 		reg &= ~(E1000_PCS_LCTL_FSV_1000 |

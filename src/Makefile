@@ -1,7 +1,7 @@
 ################################################################################
 #
 # Intel(R) Gigabit Ethernet Linux driver
-# Copyright(c) 2007 Intel Corporation.
+# Copyright(c) 2007-2008 Intel Corporation.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms and conditions of the GNU General Public License,
@@ -40,6 +40,7 @@ ifeq (,$(BUILD_KERNEL))
 BUILD_KERNEL=$(shell uname -r)
 endif
 
+DRIVER_NAME=igb
 ###########################################################################
 # Environment tests
 
@@ -148,6 +149,10 @@ ifneq (,$(findstring NO_82542_SUPPORT, $(CFLAGS_EXTRA)))
   CFILES := $(filter-out e1000_82542.c, $(CFILES))
 endif
 
+# extra flags for module builds
+EXTRA_CFLAGS += -DDRIVER_$(shell echo $(DRIVER_NAME) | tr '[a-z]' '[A-Z]')
+EXTRA_CFLAGS += -DDRIVER_NAME=$(DRIVER_NAME)
+EXTRA_CFLAGS += -DDRIVER_NAME_CAPS=$(shell echo $(DRIVER_NAME) | tr '[a-z]' '[A-Z]')
 # standard flags for module builds
 EXTRA_CFLAGS += -DLINUX -D__KERNEL__ -DMODULE -O2 -pipe -Wall
 EXTRA_CFLAGS += -I$(KSRC)/include -I.
@@ -184,7 +189,7 @@ ifeq ($(KKVER), 0)
 endif
 
 # set the install path
-INSTDIR := /lib/modules/$(KVER)/kernel/drivers/net/igb
+INSTDIR := /lib/modules/$(KVER)/kernel/drivers/net/$(DRIVER_NAME)
 
 # look for SMP in config.h
 SMP := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(CONFIG_FILE) | \
@@ -219,7 +224,7 @@ K_VERSION:=$(shell uname -r | cut -c1-3 | sed 's/2\.[56]/2\.6/')
 ifeq ($(K_VERSION), 2.6)
 
 # Makefile for 2.6.x kernel
-TARGET = igb.ko
+TARGET = $(DRIVER_NAME).ko
 
 # man page
 MANSECTION = 7
@@ -227,8 +232,8 @@ MANFILE = $(TARGET:.ko=.$(MANSECTION))
 
 ifneq ($(PATCHLEVEL),)
 EXTRA_CFLAGS += $(CFLAGS_EXTRA)
-obj-m += igb.o
-igb-objs := $(CFILES:.c=.o)
+obj-m += $(DRIVER_NAME).o
+$(DRIVER_NAME)-objs := $(CFILES:.c=.o)
 else
 default:
 ifeq ($(KOBJ),$(KSRC))
@@ -241,7 +246,7 @@ endif
 else # ifeq ($(K_VERSION),2.6)
 
 # Makefile for 2.4.x kernel
-TARGET = igb.o
+TARGET = $(DRIVER_NAME).o
 
 # man page
 MANSECTION = 7

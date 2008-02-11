@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -94,6 +94,7 @@ static const struct igb_stats igb_gstrings_stats[] = {
 	{ "rx_csum_offload_good", IGB_STAT(hw_csum_good) },
 	{ "rx_csum_offload_errors", IGB_STAT(hw_csum_err) },
 	{ "rx_header_split", IGB_STAT(rx_hdr_split) },
+	{ "low_latency_interrupt", IGB_STAT(lli_int)},
 	{ "alloc_rx_buff_failed", IGB_STAT(alloc_rx_buff_failed) },
 	{ "tx_smbus", IGB_STAT(stats.mgptc) },
 	{ "rx_smbus", IGB_STAT(stats.mgprc) },
@@ -272,15 +273,14 @@ static int igb_set_pauseparam(struct net_device *netdev,
 
 	hw->fc.original_type = hw->fc.type;
 
-	if (adapter->fc_autoneg == AUTONEG_ENABLE) {
-		if (netif_running(adapter->netdev)) {
-			igb_down(adapter);
-			igb_up(adapter);
-		} else
-			igb_reset(adapter);
-	} else
-		retval = ((hw->phy.media_type == e1000_media_type_fiber) ?
-			  e1000_setup_link(hw) : e1000_force_mac_fc(hw));
+	/* reset the adapter/link to have settings take effect immediately and
+	 * let our link partner know as well */
+	if (netif_running(adapter->netdev)) {
+		igb_down(adapter);
+		igb_up(adapter);
+	} else {
+		igb_reset(adapter);
+	}
 
 	clear_bit(__IGB_RESETTING, &adapter->state);
 	return retval;

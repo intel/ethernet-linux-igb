@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -37,13 +37,6 @@
 #include "e1000_api.h"
 #include "e1000_82575.h"
 
-#define BAR_0		0
-#define BAR_1		1
-#define BAR_5		5
-
-#define INTEL_IGB_ETHERNET_DEVICE(device_id) {\
-	PCI_DEVICE(PCI_VENDOR_ID_INTEL, device_id)}
-
 struct igb_adapter;
 
 #if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
@@ -62,12 +55,11 @@ struct igb_adapter;
 		__FUNCTION__ , ## args))
 
 /* Interrupt defines */
-#define IGB_MAX_TX_CLEAN 72
-
-#define IGB_PACKETS_PER_INT_LOW 8
-#define IGB_PACKETS_PER_INT_HI 32
+#define IGB_PACKETS_PER_INT_LOW 32
+#define IGB_PACKETS_PER_INT_HI 96
 #define IGB_MIN_DYN_ITR 3000
 #define IGB_MAX_DYN_ITR 96000
+#define IGB_ITR_INT_MULTIPLIER 2
 #define IGB_START_ITR 6000
 #define IGB_ITR_INT_COUNT 5
 /* Interrupt modes, as used by the IntMode paramter */
@@ -129,7 +121,7 @@ struct igb_adapter;
 #define IGB_FC_PAUSE_TIME 0x0680 /* 858 usec */
 
 /* How many Tx Descriptors do we need to call netif_wake_queue ? */
-#define IGB_TX_QUEUE_WAKE	16
+#define IGB_TX_QUEUE_WAKE	32
 /* How many Rx Buffers do we bundle into one write to the hardware ? */
 #define IGB_RX_BUFFER_WRITE	16	/* Must be power of 2 */
 
@@ -188,24 +180,22 @@ struct igb_ring {
 	unsigned int total_bytes;
 	unsigned int total_packets;
 
+	char name[IFNAMSIZ + 5];
 	union {
 		/* TX */
 		struct {
-			spinlock_t tx_clean_lock;
 			struct igb_queue_stats tx_stats;
 			bool detect_tx_hung;
-			char name[IFNAMSIZ + 5];
 		};
 		/* RX */
 		struct {
-			/* arrays of page information for packet split */
 			struct sk_buff *pending_skb;
 			int pending_skb_page;
 			int set_itr;
 			struct igb_queue_stats rx_stats;
+			struct napi_struct napi;
 			int interrupt_count;
 			struct igb_ring *buddy;
-			struct net_device *netdev;
 		};
 	};
 };
@@ -263,10 +253,6 @@ struct igb_adapter {
 	unsigned int restart_queue;
 	unsigned long tx_queue_len;
 	u32 txd_cmd;
-	u32 gotc;
-	u64 gotc_old;
-	u64 tpt_old;
-	u64 colc_old;
 	u32 tx_timeout_count;
 
 	/* RX */
@@ -279,8 +265,6 @@ struct igb_adapter {
 	u64 rx_hdr_split;
 	u32 alloc_rx_buff_failed;
 	bool rx_csum;
-	u32 gorc;
-	u64 gorc_old;
 	u16 rx_ps_hdr_size;
 	u32 max_frame_size;
 	u32 min_frame_size;
@@ -310,6 +294,7 @@ struct igb_adapter {
 	u32 eims_enable_mask;
 	u32 lli_port;
 	u32 lli_size;
+	u64 lli_int;
 
 	/* to not mess up cache alignment, always add to the bottom */
 	unsigned long state;

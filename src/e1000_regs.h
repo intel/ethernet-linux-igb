@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -131,8 +131,8 @@
 #define E1000_TXDMAC   0x03000  /* Tx DMA Control - RW */
 #define E1000_KABGTXD  0x03004  /* AFE Band Gap Transmit Ref Data */
 #define E1000_PSRTYPE(_i)       (0x05480 + ((_i) * 4))
-#define E1000_RAL(_i)           (0x05400 + ((_i) * 8))
-#define E1000_RAH(_i)           (0x05404 + ((_i) * 8))
+#define E1000_RAL(_i)  (((_i) <= 15) ? (0x05400 + ((_i) * 8)) : (0x054E0 + ((_i - 16) * 8)))
+#define E1000_RAH(_i)  (((_i) <= 15) ? (0x05404 + ((_i) * 8)) : (0x054E4 + ((_i - 16) * 8)))
 #define E1000_IP4AT_REG(_i)     (0x05840 + ((_i) * 8))
 #define E1000_IP6AT_REG(_i)     (0x05880 + ((_i) * 4))
 #define E1000_WUPM_REG(_i)      (0x05A00 + ((_i) * 4))
@@ -285,7 +285,7 @@
 #define E1000_DCA_ID    0x05B70 /* DCA Requester ID Information - RO */
 #define E1000_DCA_CTRL  0x05B74 /* DCA Control - RW */
 #define E1000_FFLT_DBG  0x05F04 /* Debug Register */
-#define E1000_HICR      0x08F00 /* Host Inteface Control */
+#define E1000_HICR      0x08F00 /* Host Interface Control */
 
 /* RSS registers */
 #define E1000_CPUVEC    0x02C10 /* CPU Vector Register - RW */

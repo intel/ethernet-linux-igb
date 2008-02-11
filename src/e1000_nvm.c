@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -272,7 +272,7 @@ void e1000_stop_nvm(struct e1000_hw *hw)
 		eecd |= E1000_EECD_CS;
 		e1000_lower_eec_clk(hw, &eecd);
 	} else if (hw->nvm.type == e1000_nvm_eeprom_microwire) {
-		/* CS on Microcwire is active-high */
+		/* CS on Microwire is active-high */
 		eecd &= ~(E1000_EECD_CS | E1000_EECD_DI);
 		E1000_WRITE_REG(hw, E1000_EECD, eecd);
 		e1000_raise_eec_clk(hw, &eecd);
@@ -536,7 +536,7 @@ out:
  *  Writes data to EEPROM at offset using SPI interface.
  *
  *  If e1000_update_nvm_checksum is not called after this function , the
- *  EEPROM will most likley contain an invalid checksum.
+ *  EEPROM will most likely contain an invalid checksum.
  **/
 s32 e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 {
@@ -622,7 +622,7 @@ out:
  *  Writes data to EEPROM at offset using microwire interface.
  *
  *  If e1000_update_nvm_checksum is not called after this function , the
- *  EEPROM will most likley contain an invalid checksum.
+ *  EEPROM will most likely contain an invalid checksum.
  **/
 s32 e1000_write_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
                               u16 *data)
@@ -882,7 +882,7 @@ s32 e1000_acquire_nvm(struct e1000_hw *hw)
  *  @hw: pointer to the HW structure
  *
  *  For those silicon families which have implemented a NVM release function,
- *  run the defined fucntion else return success.
+ *  run the defined function else return success.
  **/
 void e1000_release_nvm(struct e1000_hw *hw)
 {

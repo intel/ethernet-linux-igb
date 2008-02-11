@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -60,7 +60,7 @@ static u8 e1000_calculate_checksum(u8 *buffer, u32 length)
  *
  *  Returns E1000_success upon success, else E1000_ERR_HOST_INTERFACE_COMMAND
  *
- *  This function checks whether the HOST IF is enabled for command operaton
+ *  This function checks whether the HOST IF is enabled for command operation
  *  and also checks whether the previous command is completed.  It busy waits
  *  in case of previous command is not completed.
  **/
@@ -98,7 +98,7 @@ out:
 }
 
 /**
- *  e1000_check_mng_mode_generic - Generic check managament mode
+ *  e1000_check_mng_mode_generic - Generic check management mode
  *  @hw: pointer to the HW structure
  *
  *  Reads the firmware semaphore register and returns true (>0) if

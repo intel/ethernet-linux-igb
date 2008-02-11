@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -132,7 +132,7 @@ out:
  *  @offset: register offset to be read
  *  @data: pointer to the read data
  *
- *  Reads the MDI control regsiter in the PHY at offset and stores the
+ *  Reads the MDI control register in the PHY at offset and stores the
  *  information read to data.
  **/
 s32 e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data)
@@ -590,8 +590,11 @@ s32 e1000_copper_link_setup_igp(struct e1000_hw *hw)
 		goto out;
 	}
 
-	/* Wait 15ms for MAC to configure PHY from NVM settings. */
-	msec_delay(15);
+	/*
+	 * Wait 100ms for MAC to configure PHY from NVM settings, to avoid
+	 * timeout issues when LFS is enabled.
+	 */
+	msec_delay(100);
 
 	/*
 	 * The NVM settings will configure LPLU in D3 for
@@ -1340,7 +1343,7 @@ out:
 }
 
 /**
- *  e1000_check_downshift_generic - Checks whether a downshift in speed occured
+ *  e1000_check_downshift_generic - Checks whether a downshift in speed occurred
  *  @hw: pointer to the HW structure
  *
  *  Success returns 0, Failure returns 1
@@ -1459,7 +1462,7 @@ out:
 }
 
 /**
- *  e1000_wait_autoneg_generic - Wait for auto-neg compeletion
+ *  e1000_wait_autoneg_generic - Wait for auto-neg completion
  *  @hw: pointer to the HW structure
  *
  *  Waits for auto-negotiation to complete or for the auto-negotiation time
@@ -1578,8 +1581,8 @@ out:
  *
  *  The automatic gain control (agc) normalizes the amplitude of the
  *  received signal, adjusting for the attenuation produced by the
- *  cable.  By reading the AGC registers, which reperesent the
- *  cobination of course and fine gain value, the value can be put
+ *  cable.  By reading the AGC registers, which represent the
+ *  combination of coarse and fine gain value, the value can be put
  *  into a lookup table to obtain the approximate cable length
  *  for each channel.
  **/
@@ -1606,7 +1609,7 @@ s32 e1000_get_cable_length_igp_2(struct e1000_hw *hw)
 
 		/*
 		 * Getting bits 15:9, which represent the combination of
-		 * course and fine gain values.  The result is a number
+		 * coarse and fine gain values.  The result is a number
 		 * that can be put into the lookup table to obtain the
 		 * approximate cable length.
 		 */
@@ -1829,7 +1832,7 @@ out:
  *  Verify the reset block is not blocking us from resetting.  Acquire
  *  semaphore (if necessary) and read/set/write the device control reset
  *  bit in the PHY.  Wait the appropriate delay time for the device to
- *  reset and relase the semaphore (if necessary).
+ *  reset and release the semaphore (if necessary).
  **/
 s32 e1000_phy_hw_reset_generic(struct e1000_hw *hw)
 {
@@ -1963,7 +1966,7 @@ s32 e1000_phy_init_script_igp3(struct e1000_hw *hw)
 	e1000_write_phy_reg(hw, 0x2FB1, 0x8B24);
 	/* Increase Hybrid poly bias */
 	e1000_write_phy_reg(hw, 0x2FB2, 0xF8F0);
-	/* Add 4% to Tx amplitude in Giga mode */
+	/* Add 4% to Tx amplitude in Gig mode */
 	e1000_write_phy_reg(hw, 0x2010, 0x10B0);
 	/* Disable trimming (TTT) */
 	e1000_write_phy_reg(hw, 0x2011, 0x0000);

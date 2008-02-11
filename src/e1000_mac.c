@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -304,8 +304,8 @@ void e1000_rar_set_generic(struct e1000_hw *hw, u8 *addr, u32 index)
 			rar_high |= E1000_RAH_AV;
 	}
 
-	E1000_WRITE_REG_ARRAY(hw, E1000_RA, (index << 1), rar_low);
-	E1000_WRITE_REG_ARRAY(hw, E1000_RA, ((index << 1) + 1), rar_high);
+	E1000_WRITE_REG(hw, E1000_RAL(index), rar_low);
+	E1000_WRITE_REG(hw, E1000_RAH(index), rar_high);
 }
 
 /**
@@ -479,8 +479,8 @@ u32 e1000_hash_mc_addr_generic(struct e1000_hw *hw, u8 *mc_addr)
  *
  *  In certain situations, a system BIOS may report that the PCIx maximum
  *  memory read byte count (MMRBC) value is higher than than the actual
- *  value. We check the PCIx command regsiter with the current PCIx status
- *  regsiter.
+ *  value. We check the PCIx command register with the current PCIx status
+ *  register.
  **/
 void e1000_pcix_mmrbc_workaround_generic(struct e1000_hw *hw)
 {
@@ -907,7 +907,7 @@ s32 e1000_setup_fiber_serdes_link_generic(struct e1000_hw *hw)
 	msec_delay(1);
 
 	/*
-	 * For these adapters, the SW defineable pin 1 is set when the optics
+	 * For these adapters, the SW definable pin 1 is set when the optics
 	 * detect a signal.  If we have a signal, then poll for a "Link-Up"
 	 * indication.
 	 */
@@ -1079,7 +1079,7 @@ out:
  *
  *  Sets the flow control high/low threshold (watermark) registers.  If
  *  flow control XON frame transmission is enabled, then set XON frame
- *  tansmission as well.
+ *  transmission as well.
  **/
 s32 e1000_set_fc_watermarks_generic(struct e1000_hw *hw)
 {
@@ -1420,7 +1420,7 @@ out:
 }
 
 /**
- *  e1000_get_speed_and_duplex_copper_generic - Retreive current speed/duplex
+ *  e1000_get_speed_and_duplex_copper_generic - Retrieve current speed/duplex
  *  @hw: pointer to the HW structure
  *  @speed: stores the current speed
  *  @duplex: stores the current duplex
@@ -1459,7 +1459,7 @@ s32 e1000_get_speed_and_duplex_copper_generic(struct e1000_hw *hw, u16 *speed,
 }
 
 /**
- *  e1000_get_speed_and_duplex_fiber_generic - Retreive current speed/duplex
+ *  e1000_get_speed_and_duplex_fiber_generic - Retrieve current speed/duplex
  *  @hw: pointer to the HW structure
  *  @speed: stores the current speed
  *  @duplex: stores the current duplex
@@ -1741,7 +1741,7 @@ out:
  *  e1000_blink_led_generic - Blink LED
  *  @hw: pointer to the HW structure
  *
- *  Blink the led's which are set to be on.
+ *  Blink the LEDs which are set to be on.
  **/
 s32 e1000_blink_led_generic(struct e1000_hw *hw)
 {
@@ -1861,7 +1861,7 @@ out:
  *  @hw: pointer to the HW structure
  *
  *  Returns 0 (E1000_SUCCESS) if successful, else returns -10
- *  (-E1000_ERR_MASTER_REQUESTS_PENDING) if master disable bit has not casued
+ *  (-E1000_ERR_MASTER_REQUESTS_PENDING) if master disable bit has not caused
  *  the master requests to be disabled.
  *
  *  Disables PCI-Express master access and verifies there are no pending
@@ -1977,7 +1977,7 @@ out:
  *  e1000_validate_mdi_setting_generic - Verify MDI/MDIx settings
  *  @hw: pointer to the HW structure
  *
- *  Verify that when not using auto-negotitation that MDI/MDIx is correctly
+ *  Verify that when not using auto-negotiation that MDI/MDIx is correctly
  *  set, which is forced to MDI mode only.
  **/
 s32 e1000_validate_mdi_setting_generic(struct e1000_hw *hw)

@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -96,11 +96,11 @@
 #define E1000_CTRL_EXT_GPI2_EN   0x00000004 /* Maps SDP6 to GPI2 */
 #define E1000_CTRL_EXT_GPI3_EN   0x00000008 /* Maps SDP7 to GPI3 */
 /* Reserved (bits 4,5) in >= 82575 */
-#define E1000_CTRL_EXT_SDP4_DATA 0x00000010 /* Value of SW Defineable Pin 4 */
-#define E1000_CTRL_EXT_SDP5_DATA 0x00000020 /* Value of SW Defineable Pin 5 */
+#define E1000_CTRL_EXT_SDP4_DATA 0x00000010 /* Value of SW Definable Pin 4 */
+#define E1000_CTRL_EXT_SDP5_DATA 0x00000020 /* Value of SW Definable Pin 5 */
 #define E1000_CTRL_EXT_PHY_INT   E1000_CTRL_EXT_SDP5_DATA
-#define E1000_CTRL_EXT_SDP6_DATA 0x00000040 /* Value of SW Defineable Pin 6 */
-#define E1000_CTRL_EXT_SDP7_DATA 0x00000080 /* Value of SW Defineable Pin 7 */
+#define E1000_CTRL_EXT_SDP6_DATA 0x00000040 /* Value of SW Definable Pin 6 */
+#define E1000_CTRL_EXT_SDP7_DATA 0x00000080 /* Value of SW Definable Pin 7 */
 /* SDP 4/5 (bits 8,9) are reserved in >= 82575 */
 #define E1000_CTRL_EXT_SDP4_DIR  0x00000100 /* Direction of SDP4 0=in 1=out */
 #define E1000_CTRL_EXT_SDP5_DIR  0x00000200 /* Direction of SDP5 0=in 1=out */
@@ -147,12 +147,12 @@
 #define E1000_MAX_SGMII_PHY_REG_ADDR  255
 #define E1000_I2CCMD_PHY_TIMEOUT      200
 
-/* Receive Decriptor bit definitions */
+/* Receive Descriptor bit definitions */
 #define E1000_RXD_STAT_DD       0x01    /* Descriptor Done */
 #define E1000_RXD_STAT_EOP      0x02    /* End of Packet */
 #define E1000_RXD_STAT_IXSM     0x04    /* Ignore checksum */
 #define E1000_RXD_STAT_VP       0x08    /* IEEE VLAN Packet */
-#define E1000_RXD_STAT_UDPCS    0x10    /* UDP xsum caculated */
+#define E1000_RXD_STAT_UDPCS    0x10    /* UDP xsum calculated */
 #define E1000_RXD_STAT_TCPCS    0x20    /* TCP xsum calculated */
 #define E1000_RXD_STAT_IPCS     0x40    /* IP xsum calculated */
 #define E1000_RXD_STAT_PIF      0x80    /* passed in-exact filter */
@@ -321,6 +321,7 @@
 #define E1000_SWFW_EEP_SM   0x1
 #define E1000_SWFW_PHY0_SM  0x2
 #define E1000_SWFW_PHY1_SM  0x4
+#define E1000_SWFW_CSR_SM   0x8
 
 /* FACTPS Definitions */
 #define E1000_FACTPS_LFS    0x40000000  /* LAN Function Select */
@@ -439,7 +440,7 @@
 #define E1000_STATUS_SERDES0_DIS  0x10000000 /* SERDES disabled on port 0 */
 #define E1000_STATUS_SERDES1_DIS  0x20000000 /* SERDES disabled on port 1 */
 
-/* Constants used to intrepret the masked PCI-X bus speed. */
+/* Constants used to interpret the masked PCI-X bus speed. */
 #define E1000_STATUS_PCIX_SPEED_66  0x00000000 /* PCI-X bus speed  50-66 MHz */
 #define E1000_STATUS_PCIX_SPEED_100 0x00004000 /* PCI-X bus speed  66-100 MHz */
 #define E1000_STATUS_PCIX_SPEED_133 0x00008000 /* PCI-X bus speed 100-133 MHz */
@@ -684,7 +685,7 @@
 #define E1000_ICR_ALL_PARITY    0x03F00000 /* all parity error bits */
 #define E1000_ICR_DSW           0x00000020 /* FW changed the status of DISSW bit in the FWSM */
 #define E1000_ICR_PHYINT        0x00001000 /* LAN connected device generates an interrupt */
-#define E1000_ICR_EPRST         0x00100000 /* ME handware reset occurs */
+#define E1000_ICR_EPRST         0x00100000 /* ME hardware reset occurs */
 
 /* Extended Interrupt Cause Read */
 #define E1000_EICR_RX_QUEUE0    0x00000001 /* Rx Queue 0 Interrupt */
@@ -1008,7 +1009,7 @@
 /* PHY 1000 MII Register/Bit Definitions */
 /* PHY Registers defined by IEEE */
 #define PHY_CONTROL      0x00 /* Control Register */
-#define PHY_STATUS       0x01 /* Status Regiser */
+#define PHY_STATUS       0x01 /* Status Register */
 #define PHY_ID1          0x02 /* Phy Id Reg (word 1) */
 #define PHY_ID2          0x03 /* Phy Id Reg (word 2) */
 #define PHY_AUTONEG_ADV  0x04 /* Autoneg Advertisement */
@@ -1110,7 +1111,7 @@
 #define NVM_WRITE_OPCODE_MICROWIRE 0x5  /* NVM write opcode */
 #define NVM_ERASE_OPCODE_MICROWIRE 0x7  /* NVM erase opcode */
 #define NVM_EWEN_OPCODE_MICROWIRE  0x13 /* NVM erase/write enable */
-#define NVM_EWDS_OPCODE_MICROWIRE  0x10 /* NVM erast/write disable */
+#define NVM_EWDS_OPCODE_MICROWIRE  0x10 /* NVM erase/write disable */
 
 /* NVM Commands - SPI */
 #define NVM_MAX_RETRY_SPI          5000 /* Max wait of 5ms, for RDY signal */

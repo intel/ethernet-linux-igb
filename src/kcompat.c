@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -24,6 +24,15 @@
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
 *******************************************************************************/
+
+
+
+
+#ifdef DRIVER_IGB
+#include "igb.h"
+#endif
+
+
 
 #include "kcompat.h"
 
@@ -279,3 +288,22 @@ struct sk_buff *_kc_netdev_alloc_skb(struct net_device *dev,
 	return skb;
 }
 #endif /* <= 2.6.17 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
+#ifdef NAPI
+int __kc_adapter_clean(struct net_device *netdev, int *budget)
+{
+	int work_done;
+	int work_to_do = min(*budget, netdev->quota);
+	struct adapter_struct *adapter = netdev_priv(netdev);
+	struct napi_struct *napi = &adapter->rx_ring[0].napi;
+
+	work_done = napi->poll(napi, work_to_do);
+	*budget -= work_done;
+	netdev->quota -= work_done;
+	return work_done ? 1 : 0;
+}
+#endif /* NAPI */
+#endif /* <= 2.6.24 */
+

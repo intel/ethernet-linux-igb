@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007 Intel Corporation.
+  Copyright(c) 2007-2008 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -285,6 +285,15 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 		if (num_IntMode > bd) {
 #endif
 			unsigned int int_mode = IntMode[bd];
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
+			/* < 2.6.24 can NOT support multiple rx queues */
+			if (int_mode == IGB_INT_MODE_MSIX_MQ) {
+				DPRINTK(PROBE, INFO,
+				 "%s limited to (0-2) for < 2.6.24 kernels\n",
+				 opt.name);
+				opt.arg.r.max = IGB_INT_MODE_MSIX_1Q;
+			}
+#endif
 			igb_validate_option(&int_mode, &opt, adapter);
 			adapter->int_mode = int_mode;
 #ifdef module_param_array
@@ -363,7 +372,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			adapter->flags |= lli_push ? IGB_FLAG_LLI_PUSH : 0;
 #ifdef module_param_array
 		} else {
-			adapter->lli_port = opt.def;
+			adapter->flags |= opt.def ? IGB_FLAG_LLI_PUSH : 0;
 		}
 #endif
 	}
