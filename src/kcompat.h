@@ -71,6 +71,7 @@
 
 
 
+
 #ifdef DRIVER_IGB
 #define adapter_struct igb_adapter
 #define NAPI

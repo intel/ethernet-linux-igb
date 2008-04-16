@@ -62,7 +62,7 @@
 #endif
 #define DRV_HW_PERF
 
-#define DRV_VERSION "1.2.22" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION "1.2.24" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
@@ -758,9 +758,6 @@ static void igb_init_manageability(struct igb_adapter *adapter)
 		u32 manc2h = E1000_READ_REG(&adapter->hw, E1000_MANC2H);
 		u32 manc = E1000_READ_REG(&adapter->hw, E1000_MANC);
 
-		/* disable hardware interception of ARP */
-		manc &= ~(E1000_MANC_ARP_EN);
-
 		/* enable receiving management packets to the host */
 		/* this will probably generate destination unreachable messages
 		 * from the host OS, but the packets will be handled on SMBUS */
@@ -771,23 +768,6 @@ static void igb_init_manageability(struct igb_adapter *adapter)
 		manc2h |= E1000_MNG2HOST_PORT_664;
 		E1000_WRITE_REG(&adapter->hw, E1000_MANC2H, manc2h);
 
-		E1000_WRITE_REG(&adapter->hw, E1000_MANC, manc);
-	}
-}
-
-static void igb_release_manageability(struct igb_adapter *adapter)
-{
-	if (adapter->en_mng_pt) {
-		u32 manc = E1000_READ_REG(&adapter->hw, E1000_MANC);
-
-		/* re-enable hardware interception of ARP */
-		manc |= E1000_MANC_ARP_EN;
-		manc &= ~E1000_MANC_EN_MNG2HOST;
-
-		/* don't explicitly have to mess with MANC2H since
-		 * MANC has an enable disable that gates MANC2H */
-
-		/* XXX stop the hardware watchdog ? */
 		E1000_WRITE_REG(&adapter->hw, E1000_MANC, manc);
 	}
 }
@@ -994,7 +974,6 @@ void igb_reset(struct igb_adapter *adapter)
 	E1000_WRITE_REG(&adapter->hw, E1000_VET, ETHERNET_IEEE_VLAN_TYPE);
 
 	e1000_get_phy_info(&adapter->hw);
-	igb_release_manageability(adapter);
 }
 
 /**
@@ -1340,8 +1319,6 @@ static void __devexit igb_remove(struct pci_dev *pdev)
 		E1000_WRITE_REG(&adapter->hw, E1000_DCA_CTRL, 1);
 	}
 #endif
-
-	igb_release_manageability(adapter);
 
 	/* Release control of h/w to f/w.  If f/w is AMT enabled, this
 	 * would have already happened in close and is redundant. */
@@ -4321,7 +4298,10 @@ static int igb_suspend(struct pci_dev *pdev, pm_message_t state)
 		igb_down(adapter);
 		igb_free_irq(adapter);
 	}
-
+	if (adapter->msix_entries)
+		pci_disable_msix(adapter->pdev);
+	else if (adapter->flags & IGB_FLAG_HAS_MSI) 
+		pci_disable_msi(adapter->pdev);
 #ifdef CONFIG_PM
 	retval = pci_save_state(pdev);
 	if (retval)
@@ -4373,8 +4353,6 @@ static int igb_suspend(struct pci_dev *pdev, pm_message_t state)
 		pci_enable_wake(pdev, PCI_D3cold, 0);
 	}
 
-	igb_release_manageability(adapter);
-
 	/* make sure adapter isn't asleep if manageability is enabled */
 	if (adapter->en_mng_pt) {
 		pci_enable_wake(pdev, PCI_D3hot, 1);
@@ -4398,6 +4376,11 @@ static int igb_resume(struct pci_dev *pdev)
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	u32 err;
+#ifdef CONFIG_IGB_SEPARATE_TX_HANDLER
+	int numvecs = adapter->num_tx_queues + adapter->num_rx_queues + 1;
+#else
+	int numvecs = adapter->num_rx_queues + 1;
+#endif
 
 	pci_set_power_state(pdev, PCI_D0);
 	pci_restore_state(pdev);
@@ -4411,6 +4394,17 @@ static int igb_resume(struct pci_dev *pdev)
 
 	pci_enable_wake(pdev, PCI_D3hot, 0);
 	pci_enable_wake(pdev, PCI_D3cold, 0);
+
+	if (adapter->msix_entries) {
+		err = pci_enable_msix(adapter->pdev,
+		                      adapter->msix_entries, numvecs);
+		if (err)
+			return err;
+	} else if (adapter->flags & IGB_FLAG_HAS_MSI) {
+		err = pci_enable_msi(adapter->pdev);
+		if (err)
+			return err;
+	}		
 
 	if (netif_running(netdev)) {
 		err = igb_request_irq(adapter);

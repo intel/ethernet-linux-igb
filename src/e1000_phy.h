@@ -46,7 +46,6 @@ s32  e1000_check_polarity_m88(struct e1000_hw *hw);
 s32  e1000_check_polarity_igp(struct e1000_hw *hw);
 s32  e1000_check_reset_block_generic(struct e1000_hw *hw);
 s32  e1000_copper_link_autoneg(struct e1000_hw *hw);
-s32  e1000_phy_force_speed_duplex(struct e1000_hw *hw);
 s32  e1000_copper_link_setup_igp(struct e1000_hw *hw);
 s32  e1000_copper_link_setup_m88(struct e1000_hw *hw);
 s32  e1000_phy_force_speed_duplex_igp(struct e1000_hw *hw);

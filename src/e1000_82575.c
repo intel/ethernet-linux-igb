@@ -80,7 +80,6 @@ struct e1000_dev_spec_82575 {
 static s32 e1000_init_phy_params_82575(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_init_phy_params_82575");
@@ -89,27 +88,27 @@ static s32 e1000_init_phy_params_82575(struct e1000_hw *hw)
 		phy->type = e1000_phy_none;
 		goto out;
 	} else {
-		func->power_up_phy      = e1000_power_up_phy_copper;
-		func->power_down_phy    = e1000_power_down_phy_copper_82575;
+		phy->ops.power_up   = e1000_power_up_phy_copper;
+		phy->ops.power_down = e1000_power_down_phy_copper_82575;
 	}
 
-	phy->autoneg_mask        = AUTONEG_ADVERTISE_SPEED_DEFAULT;
-	phy->reset_delay_us      = 100;
+	phy->autoneg_mask           = AUTONEG_ADVERTISE_SPEED_DEFAULT;
+	phy->reset_delay_us         = 100;
 
-	func->acquire_phy        = e1000_acquire_phy_82575;
-	func->check_reset_block  = e1000_check_reset_block_generic;
-	func->commit_phy         = e1000_phy_sw_reset_generic;
-	func->get_cfg_done       = e1000_get_cfg_done_82575;
-	func->release_phy        = e1000_release_phy_82575;
+	phy->ops.acquire            = e1000_acquire_phy_82575;
+	phy->ops.check_reset_block  = e1000_check_reset_block_generic;
+	phy->ops.commit             = e1000_phy_sw_reset_generic;
+	phy->ops.get_cfg_done       = e1000_get_cfg_done_82575;
+	phy->ops.release            = e1000_release_phy_82575;
 
 	if (e1000_sgmii_active_82575(hw)) {
-		func->reset_phy          = e1000_phy_hw_reset_sgmii_82575;
-		func->read_phy_reg       = e1000_read_phy_reg_sgmii_82575;
-		func->write_phy_reg      = e1000_write_phy_reg_sgmii_82575;
+		phy->ops.reset      = e1000_phy_hw_reset_sgmii_82575;
+		phy->ops.read_reg   = e1000_read_phy_reg_sgmii_82575;
+		phy->ops.write_reg  = e1000_write_phy_reg_sgmii_82575;
 	} else {
-		func->reset_phy          = e1000_phy_hw_reset_generic;
-		func->read_phy_reg       = e1000_read_phy_reg_igp;
-		func->write_phy_reg      = e1000_write_phy_reg_igp;
+		phy->ops.reset      = e1000_phy_hw_reset_generic;
+		phy->ops.read_reg   = e1000_read_phy_reg_igp;
+		phy->ops.write_reg  = e1000_write_phy_reg_igp;
 	}
 
 	/* Set phy->phy_addr and phy->id. */
@@ -118,20 +117,20 @@ static s32 e1000_init_phy_params_82575(struct e1000_hw *hw)
 	/* Verify phy id and set remaining function pointers */
 	switch (phy->id) {
 	case M88E1111_I_PHY_ID:
-		phy->type                = e1000_phy_m88;
-		func->check_polarity     = e1000_check_polarity_m88;
-		func->get_phy_info       = e1000_get_phy_info_m88;
-		func->get_cable_length   = e1000_get_cable_length_m88;
-		func->force_speed_duplex = e1000_phy_force_speed_duplex_m88;
+		phy->type                   = e1000_phy_m88;
+		phy->ops.check_polarity     = e1000_check_polarity_m88;
+		phy->ops.get_info           = e1000_get_phy_info_m88;
+		phy->ops.get_cable_length   = e1000_get_cable_length_m88;
+		phy->ops.force_speed_duplex = e1000_phy_force_speed_duplex_m88;
 		break;
 	case IGP03E1000_E_PHY_ID:
-		phy->type                = e1000_phy_igp_3;
-		func->check_polarity     = e1000_check_polarity_igp;
-		func->get_phy_info       = e1000_get_phy_info_igp;
-		func->get_cable_length   = e1000_get_cable_length_igp_2;
-		func->force_speed_duplex = e1000_phy_force_speed_duplex_igp;
-		func->set_d0_lplu_state  = e1000_set_d0_lplu_state_82575;
-		func->set_d3_lplu_state  = e1000_set_d3_lplu_state_generic;
+		phy->type                   = e1000_phy_igp_3;
+		phy->ops.check_polarity     = e1000_check_polarity_igp;
+		phy->ops.get_info           = e1000_get_phy_info_igp;
+		phy->ops.get_cable_length   = e1000_get_cable_length_igp_2;
+		phy->ops.force_speed_duplex = e1000_phy_force_speed_duplex_igp;
+		phy->ops.set_d0_lplu_state  = e1000_set_d0_lplu_state_82575;
+		phy->ops.set_d3_lplu_state  = e1000_set_d3_lplu_state_generic;
 		break;
 	default:
 		ret_val = -E1000_ERR_PHY;
@@ -151,7 +150,6 @@ out:
 static s32 e1000_init_nvm_params_82575(struct e1000_hw *hw)
 {
 	struct e1000_nvm_info *nvm = &hw->nvm;
-	struct e1000_functions *func = &hw->func;
 	u32 eecd = E1000_READ_REG(hw, E1000_EECD);
 	u16 size;
 
@@ -174,7 +172,7 @@ static s32 e1000_init_nvm_params_82575(struct e1000_hw *hw)
 		break;
 	}
 
-	nvm->type               = e1000_nvm_eeprom_spi;
+	nvm->type              = e1000_nvm_eeprom_spi;
 
 	size = (u16)((eecd & E1000_EECD_SIZE_EX_MASK) >>
 	                  E1000_EECD_SIZE_EX_SHIFT);
@@ -191,13 +189,13 @@ static s32 e1000_init_nvm_params_82575(struct e1000_hw *hw)
 	nvm->word_size	= 1 << size;
 
 	/* Function Pointers */
-	func->acquire_nvm       = e1000_acquire_nvm_82575;
-	func->read_nvm          = e1000_read_nvm_eerd;
-	func->release_nvm       = e1000_release_nvm_82575;
-	func->update_nvm        = e1000_update_nvm_checksum_generic;
-	func->valid_led_default = e1000_valid_led_default_generic;
-	func->validate_nvm      = e1000_validate_nvm_checksum_generic;
-	func->write_nvm         = e1000_write_nvm_spi;
+	nvm->ops.acquire       = e1000_acquire_nvm_82575;
+	nvm->ops.read          = e1000_read_nvm_eerd;
+	nvm->ops.release       = e1000_release_nvm_82575;
+	nvm->ops.update        = e1000_update_nvm_checksum_generic;
+	nvm->ops.valid_led_default = e1000_valid_led_default_generic;
+	nvm->ops.validate      = e1000_validate_nvm_checksum_generic;
+	nvm->ops.write         = e1000_write_nvm_spi;
 
 	return E1000_SUCCESS;
 }
@@ -211,7 +209,6 @@ static s32 e1000_init_nvm_params_82575(struct e1000_hw *hw)
 static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_functions *func = &hw->func;
 	struct e1000_dev_spec_82575 *dev_spec;
 	u32 ctrl_ext = 0;
 	s32 ret_val = E1000_SUCCESS;
@@ -265,47 +262,47 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	/* Function pointers */
 
 	/* bus type/speed/width */
-	func->get_bus_info = e1000_get_bus_info_pcie_generic;
+	mac->ops.get_bus_info = e1000_get_bus_info_pcie_generic;
 	/* reset */
-	func->reset_hw = e1000_reset_hw_82575;
+	mac->ops.reset_hw = e1000_reset_hw_82575;
 	/* hw initialization */
-	func->init_hw = e1000_init_hw_82575;
+	mac->ops.init_hw = e1000_init_hw_82575;
 	/* link setup */
-	func->setup_link = e1000_setup_link_generic;
+	mac->ops.setup_link = e1000_setup_link_generic;
 	/* physical interface link setup */
-	func->setup_physical_interface =
+	mac->ops.setup_physical_interface =
 	        (hw->phy.media_type == e1000_media_type_copper)
 	                ? e1000_setup_copper_link_82575
 	                : e1000_setup_fiber_serdes_link_82575;
 	/* check for link */
-	func->check_for_link = e1000_check_for_link_82575;
+	mac->ops.check_for_link = e1000_check_for_link_82575;
 	/* receive address register setting */
-	func->rar_set = e1000_rar_set_generic;
+	mac->ops.rar_set = e1000_rar_set_generic;
 	/* read mac address */
-	func->read_mac_addr = e1000_read_mac_addr_82575;
+	mac->ops.read_mac_addr = e1000_read_mac_addr_82575;
 	/* multicast address update */
-	func->update_mc_addr_list = e1000_update_mc_addr_list_generic;
+	mac->ops.update_mc_addr_list = e1000_update_mc_addr_list_generic;
 	/* writing VFTA */
-	func->write_vfta = e1000_write_vfta_generic;
+	mac->ops.write_vfta = e1000_write_vfta_generic;
 	/* clearing VFTA */
-	func->clear_vfta = e1000_clear_vfta_generic;
+	mac->ops.clear_vfta = e1000_clear_vfta_generic;
 	/* setting MTA */
-	func->mta_set = e1000_mta_set_generic;
+	mac->ops.mta_set = e1000_mta_set_generic;
 	/* blink LED */
-	func->blink_led = e1000_blink_led_generic;
+	mac->ops.blink_led = e1000_blink_led_generic;
 	/* setup LED */
-	func->setup_led = e1000_setup_led_generic;
+	mac->ops.setup_led = e1000_setup_led_generic;
 	/* cleanup LED */
-	func->cleanup_led = e1000_cleanup_led_generic;
+	mac->ops.cleanup_led = e1000_cleanup_led_generic;
 	/* turn on/off LED */
-	func->led_on = e1000_led_on_generic;
-	func->led_off = e1000_led_off_generic;
+	mac->ops.led_on = e1000_led_on_generic;
+	mac->ops.led_off = e1000_led_off_generic;
 	/* remove device */
-	func->remove_device = e1000_remove_device_generic;
+	mac->ops.remove_device = e1000_remove_device_generic;
 	/* clear hardware counters */
-	func->clear_hw_cntrs = e1000_clear_hw_cntrs_82575;
+	mac->ops.clear_hw_cntrs = e1000_clear_hw_cntrs_82575;
 	/* link info */
-	func->get_link_up_info = e1000_get_link_up_info_82575;
+	mac->ops.get_link_up_info = e1000_get_link_up_info_82575;
 
 out:
 	return ret_val;
@@ -322,9 +319,9 @@ void e1000_init_function_pointers_82575(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_init_function_pointers_82575");
 
-	hw->func.init_mac_params = e1000_init_mac_params_82575;
-	hw->func.init_nvm_params = e1000_init_nvm_params_82575;
-	hw->func.init_phy_params = e1000_init_phy_params_82575;
+	hw->mac.ops.init_params = e1000_init_mac_params_82575;
+	hw->nvm.ops.init_params = e1000_init_nvm_params_82575;
+	hw->phy.ops.init_params = e1000_init_phy_params_82575;
 }
 
 /**
@@ -560,11 +557,11 @@ static s32 e1000_phy_hw_reset_sgmii_82575(struct e1000_hw *hw)
 	 * SFP documentation requires the following to configure the SPF module
 	 * to work on SGMII.  No further documentation is given.
 	 */
-	ret_val = e1000_write_phy_reg(hw, 0x1B, 0x8084);
+	ret_val = hw->phy.ops.write_reg(hw, 0x1B, 0x8084);
 	if (ret_val)
 		goto out;
 
-	ret_val = e1000_phy_commit(hw);
+	ret_val = hw->phy.ops.commit(hw);
 
 out:
 	return ret_val;
@@ -591,33 +588,29 @@ static s32 e1000_set_d0_lplu_state_82575(struct e1000_hw *hw, bool active)
 
 	DEBUGFUNC("e1000_set_d0_lplu_state_82575");
 
-	ret_val = e1000_read_phy_reg(hw, IGP02E1000_PHY_POWER_MGMT, &data);
+	ret_val = phy->ops.read_reg(hw, IGP02E1000_PHY_POWER_MGMT, &data);
 	if (ret_val)
 		goto out;
 
 	if (active) {
 		data |= IGP02E1000_PM_D0_LPLU;
-		ret_val = e1000_write_phy_reg(hw,
-		                              IGP02E1000_PHY_POWER_MGMT,
-		                              data);
+		ret_val = phy->ops.write_reg(hw, IGP02E1000_PHY_POWER_MGMT,
+		                             data);
 		if (ret_val)
 			goto out;
 
 		/* When LPLU is enabled, we should disable SmartSpeed */
-		ret_val = e1000_read_phy_reg(hw,
-		                             IGP01E1000_PHY_PORT_CONFIG,
-		                             &data);
+		ret_val = phy->ops.read_reg(hw, IGP01E1000_PHY_PORT_CONFIG,
+		                            &data);
 		data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-		ret_val = e1000_write_phy_reg(hw,
-		                              IGP01E1000_PHY_PORT_CONFIG,
-		                              data);
+		ret_val = phy->ops.write_reg(hw, IGP01E1000_PHY_PORT_CONFIG,
+		                             data);
 		if (ret_val)
 			goto out;
 	} else {
 		data &= ~IGP02E1000_PM_D0_LPLU;
-		ret_val = e1000_write_phy_reg(hw,
-		                              IGP02E1000_PHY_POWER_MGMT,
-		                              data);
+		ret_val = phy->ops.write_reg(hw, IGP02E1000_PHY_POWER_MGMT,
+		                             data);
 		/*
 		 * LPLU and SmartSpeed are mutually exclusive.  LPLU is used
 		 * during Dx states where the power conservation is most
@@ -625,27 +618,27 @@ static s32 e1000_set_d0_lplu_state_82575(struct e1000_hw *hw, bool active)
 		 * SmartSpeed, so performance is maintained.
 		 */
 		if (phy->smart_speed == e1000_smart_speed_on) {
-			ret_val = e1000_read_phy_reg(hw,
-			                             IGP01E1000_PHY_PORT_CONFIG,
-			                             &data);
+			ret_val = phy->ops.read_reg(hw,
+			                            IGP01E1000_PHY_PORT_CONFIG,
+			                            &data);
 			if (ret_val)
 				goto out;
 
 			data |= IGP01E1000_PSCFR_SMART_SPEED;
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			                             IGP01E1000_PHY_PORT_CONFIG,
 			                             data);
 			if (ret_val)
 				goto out;
 		} else if (phy->smart_speed == e1000_smart_speed_off) {
-			ret_val = e1000_read_phy_reg(hw,
-			                             IGP01E1000_PHY_PORT_CONFIG,
-			                             &data);
+			ret_val = phy->ops.read_reg(hw,
+			                            IGP01E1000_PHY_PORT_CONFIG,
+			                            &data);
 			if (ret_val)
 				goto out;
 
 			data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-			ret_val = e1000_write_phy_reg(hw,
+			ret_val = phy->ops.write_reg(hw,
 			                             IGP01E1000_PHY_PORT_CONFIG,
 			                             data);
 			if (ret_val)
@@ -1010,7 +1003,7 @@ static s32 e1000_init_hw_82575(struct e1000_hw *hw)
 
 	/* Disabling VLAN filtering */
 	DEBUGOUT("Initializing the IEEE VLAN\n");
-	e1000_clear_vfta(hw);
+	mac->ops.clear_vfta(hw);
 
 	/* Setup the receive address */
 	e1000_init_rx_addrs_generic(hw, rar_count);
@@ -1020,7 +1013,7 @@ static s32 e1000_init_hw_82575(struct e1000_hw *hw)
 		E1000_WRITE_REG_ARRAY(hw, E1000_MTA, i, 0);
 
 	/* Setup link and flow control */
-	ret_val = e1000_setup_link(hw);
+	ret_val = mac->ops.setup_link(hw);
 
 	/*
 	 * Clear all of the statistics registers (clear on read).  It is
@@ -1088,7 +1081,7 @@ static s32 e1000_setup_copper_link_82575(struct e1000_hw *hw)
 		 * depending on user settings.
 		 */
 		DEBUGOUT("Forcing Speed and Duplex\n");
-		ret_val = e1000_phy_force_speed_duplex(hw);
+		ret_val = hw->phy.ops.force_speed_duplex(hw);
 		if (ret_val) {
 			DEBUGOUT("Error Forcing Speed and Duplex\n");
 			goto out;

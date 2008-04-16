@@ -231,7 +231,7 @@ s32 e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_check_alt_mac_addr_generic");
 
-	ret_val = e1000_read_nvm(hw, NVM_ALT_MAC_ADDR_PTR, 1,
+	ret_val = hw->nvm.ops.read(hw, NVM_ALT_MAC_ADDR_PTR, 1,
 	                         &nvm_alt_mac_addr_offset);
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");
@@ -248,7 +248,7 @@ s32 e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 
 	for (i = 0; i < ETH_ADDR_LEN; i += 2) {
 		offset = nvm_alt_mac_addr_offset + (i >> 1);
-		ret_val = e1000_read_nvm(hw, offset, 1, &nvm_data);
+		ret_val = hw->nvm.ops.read(hw, offset, 1, &nvm_data);
 		if (ret_val) {
 			DEBUGOUT("NVM Read Error\n");
 			goto out;
@@ -267,7 +267,7 @@ s32 e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 	for (i = 0; i < ETH_ADDR_LEN; i++)
 		hw->mac.addr[i] = hw->mac.perm_addr[i] = alt_mac_addr[i];
 
-	e1000_rar_set(hw, hw->mac.perm_addr, 0);
+	hw->mac.ops.rar_set(hw, hw->mac.perm_addr, 0);
 
 out:
 	return ret_val;
@@ -373,7 +373,7 @@ void e1000_update_mc_addr_list_generic(struct e1000_hw *hw,
 	 */
 	for (i = rar_used_count; i < rar_count; i++) {
 		if (mc_addr_count) {
-			e1000_rar_set(hw, mc_addr_list, i);
+			hw->mac.ops.rar_set(hw, mc_addr_list, i);
 			mc_addr_count--;
 			mc_addr_list += ETH_ADDR_LEN;
 		} else {
@@ -395,7 +395,7 @@ void e1000_update_mc_addr_list_generic(struct e1000_hw *hw,
 	for (; mc_addr_count > 0; mc_addr_count--) {
 		hash_value = e1000_hash_mc_addr(hw, mc_addr_list);
 		DEBUGOUT1("Hash value = 0x%03X\n", hash_value);
-		e1000_mta_set(hw, hash_value);
+		hw->mac.ops.mta_set(hw, hash_value);
 		mc_addr_list += ETH_ADDR_LEN;
 	}
 }
@@ -813,7 +813,6 @@ out:
  **/
 s32 e1000_setup_link_generic(struct e1000_hw *hw)
 {
-	struct e1000_functions *func = &hw->func;
 	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_setup_link_generic");
@@ -822,7 +821,7 @@ s32 e1000_setup_link_generic(struct e1000_hw *hw)
 	 * In the case of the phy reset being blocked, we already have a link.
 	 * We do not need to set it up again.
 	 */
-	if (e1000_check_reset_block(hw))
+	if (hw->phy.ops.check_reset_block(hw))
 		goto out;
 
 	/*
@@ -845,7 +844,7 @@ s32 e1000_setup_link_generic(struct e1000_hw *hw)
 	DEBUGOUT1("After fix-ups FlowControl is now = %x\n", hw->fc.type);
 
 	/* Call the necessary media_type subroutine to configure the link. */
-	ret_val = func->setup_physical_interface(hw);
+	ret_val = hw->mac.ops.setup_physical_interface(hw);
 	if (ret_val)
 		goto out;
 
@@ -982,7 +981,7 @@ s32 e1000_poll_fiber_serdes_link_generic(struct e1000_hw *hw)
 		 * link up if we detect a signal. This will allow us to
 		 * communicate with non-autonegotiating link partners.
 		 */
-		ret_val = e1000_check_for_link(hw);
+		ret_val = hw->mac.ops.check_for_link(hw);
 		if (ret_val) {
 			DEBUGOUT("Error while checking for link\n");
 			goto out;
@@ -1136,7 +1135,7 @@ s32 e1000_set_default_fc_generic(struct e1000_hw *hw)
 	 * control setting, then the variable hw->fc will
 	 * be initialized based on a value in the EEPROM.
 	 */
-	ret_val = e1000_read_nvm(hw, NVM_INIT_CONTROL2_REG, 1, &nvm_data);
+	ret_val = hw->nvm.ops.read(hw, NVM_INIT_CONTROL2_REG, 1, &nvm_data);
 
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");
@@ -1234,6 +1233,7 @@ out:
 s32 e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
+	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val = E1000_SUCCESS;
 	u16 mii_status_reg, mii_nway_adv_reg, mii_nway_lp_ability_reg;
 	u16 speed, duplex;
@@ -1271,10 +1271,10 @@ s32 e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		 * has completed.  We read this twice because this reg has
 		 * some "sticky" (latched) bits.
 		 */
-		ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg);
+		ret_val = phy->ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
 		if (ret_val)
 			goto out;
-		ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg);
+		ret_val = phy->ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
 		if (ret_val)
 			goto out;
 
@@ -1291,11 +1291,11 @@ s32 e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		 * Page Ability Register (Address 5) to determine how
 		 * flow control was negotiated.
 		 */
-		ret_val = e1000_read_phy_reg(hw, PHY_AUTONEG_ADV,
+		ret_val = phy->ops.read_reg(hw, PHY_AUTONEG_ADV,
 		                             &mii_nway_adv_reg);
 		if (ret_val)
 			goto out;
-		ret_val = e1000_read_phy_reg(hw, PHY_LP_ABILITY,
+		ret_val = phy->ops.read_reg(hw, PHY_LP_ABILITY,
 		                             &mii_nway_lp_ability_reg);
 		if (ret_val)
 			goto out;
@@ -1395,7 +1395,7 @@ s32 e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		 * negotiated to HALF DUPLEX, flow control should not be
 		 * enabled per IEEE 802.3 spec.
 		 */
-		ret_val = e1000_get_speed_and_duplex(hw, &speed, &duplex);
+		ret_val = mac->ops.get_link_up_info(hw, &speed, &duplex);
 		if (ret_val) {
 			DEBUGOUT("Error getting link speed and duplex\n");
 			goto out;
@@ -1596,7 +1596,7 @@ s32 e1000_valid_led_default_generic(struct e1000_hw *hw, u16 *data)
 
 	DEBUGFUNC("e1000_valid_led_default_generic");
 
-	ret_val = e1000_read_nvm(hw, NVM_ID_LED_SETTINGS, 1, data);
+	ret_val = hw->nvm.ops.read(hw, NVM_ID_LED_SETTINGS, 1, data);
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");
 		goto out;
@@ -1626,7 +1626,7 @@ s32 e1000_id_led_init_generic(struct e1000_hw * hw)
 
 	DEBUGFUNC("e1000_id_led_init_generic");
 
-	ret_val = hw->func.valid_led_default(hw, &data);
+	ret_val = hw->nvm.ops.valid_led_default(hw, &data);
 	if (ret_val)
 		goto out;
 
@@ -1690,7 +1690,7 @@ s32 e1000_setup_led_generic(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_setup_led_generic");
 
-	if (hw->func.setup_led != e1000_setup_led_generic) {
+	if (hw->mac.ops.setup_led != e1000_setup_led_generic) {
 		ret_val = -E1000_ERR_CONFIG;
 		goto out;
 	}
@@ -1726,7 +1726,7 @@ s32 e1000_cleanup_led_generic(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_cleanup_led_generic");
 
-	if (hw->func.cleanup_led != e1000_cleanup_led_generic) {
+	if (hw->mac.ops.cleanup_led != e1000_cleanup_led_generic) {
 		ret_val = -E1000_ERR_CONFIG;
 		goto out;
 	}

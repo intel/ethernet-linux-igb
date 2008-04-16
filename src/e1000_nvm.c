@@ -388,7 +388,7 @@ s32 e1000_read_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		goto out;
 	}
 
-	ret_val = e1000_acquire_nvm(hw);
+	ret_val = nvm->ops.acquire(hw);
 	if (ret_val)
 		goto out;
 
@@ -416,7 +416,7 @@ s32 e1000_read_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 	}
 
 release:
-	e1000_release_nvm(hw);
+	nvm->ops.release(hw);
 
 out:
 	return ret_val;
@@ -452,7 +452,7 @@ s32 e1000_read_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
 		goto out;
 	}
 
-	ret_val = e1000_acquire_nvm(hw);
+	ret_val = nvm->ops.acquire(hw);
 	if (ret_val)
 		goto out;
 
@@ -475,7 +475,7 @@ s32 e1000_read_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
 	}
 
 release:
-	e1000_release_nvm(hw);
+	nvm->ops.release(hw);
 
 out:
 	return ret_val;
@@ -557,7 +557,7 @@ s32 e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		goto out;
 	}
 
-	ret_val = e1000_acquire_nvm(hw);
+	ret_val = nvm->ops.acquire(hw);
 	if (ret_val)
 		goto out;
 
@@ -606,7 +606,7 @@ s32 e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 
 	msec_delay(10);
 release:
-	e1000_release_nvm(hw);
+	nvm->ops.release(hw);
 
 out:
 	return ret_val;
@@ -646,7 +646,7 @@ s32 e1000_write_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
 		goto out;
 	}
 
-	ret_val = e1000_acquire_nvm(hw);
+	ret_val = nvm->ops.acquire(hw);
 	if (ret_val)
 		goto out;
 
@@ -696,7 +696,7 @@ s32 e1000_write_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
 	e1000_shift_out_eec_bits(hw, 0, (u16)(nvm->address_bits - 2));
 
 release:
-	e1000_release_nvm(hw);
+	nvm->ops.release(hw);
 
 out:
 	return ret_val;
@@ -717,14 +717,14 @@ s32 e1000_read_pba_num_generic(struct e1000_hw *hw, u32 *pba_num)
 
 	DEBUGFUNC("e1000_read_pba_num_generic");
 
-	ret_val = e1000_read_nvm(hw, NVM_PBA_OFFSET_0, 1, &nvm_data);
+	ret_val = hw->nvm.ops.read(hw, NVM_PBA_OFFSET_0, 1, &nvm_data);
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");
 		goto out;
 	}
 	*pba_num = (u32)(nvm_data << 16);
 
-	ret_val = e1000_read_nvm(hw, NVM_PBA_OFFSET_1, 1, &nvm_data);
+	ret_val = hw->nvm.ops.read(hw, NVM_PBA_OFFSET_1, 1, &nvm_data);
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");
 		goto out;
@@ -752,7 +752,7 @@ s32 e1000_read_mac_addr_generic(struct e1000_hw *hw)
 
 	for (i = 0; i < ETH_ADDR_LEN; i += 2) {
 		offset = i >> 1;
-		ret_val = e1000_read_nvm(hw, offset, 1, &nvm_data);
+		ret_val = hw->nvm.ops.read(hw, offset, 1, &nvm_data);
 		if (ret_val) {
 			DEBUGOUT("NVM Read Error\n");
 			goto out;
@@ -788,7 +788,7 @@ s32 e1000_validate_nvm_checksum_generic(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_validate_nvm_checksum_generic");
 
 	for (i = 0; i < (NVM_CHECKSUM_REG + 1); i++) {
-		ret_val = e1000_read_nvm(hw, i, 1, &nvm_data);
+		ret_val = hw->nvm.ops.read(hw, i, 1, &nvm_data);
 		if (ret_val) {
 			DEBUGOUT("NVM Read Error\n");
 			goto out;
@@ -823,7 +823,7 @@ s32 e1000_update_nvm_checksum_generic(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_update_nvm_checksum");
 
 	for (i = 0; i < NVM_CHECKSUM_REG; i++) {
-		ret_val = e1000_read_nvm(hw, i, 1, &nvm_data);
+		ret_val = hw->nvm.ops.read(hw, i, 1, &nvm_data);
 		if (ret_val) {
 			DEBUGOUT("NVM Read Error while updating checksum.\n");
 			goto out;
@@ -831,7 +831,7 @@ s32 e1000_update_nvm_checksum_generic(struct e1000_hw *hw)
 		checksum += nvm_data;
 	}
 	checksum = (u16) NVM_SUM - checksum;
-	ret_val = e1000_write_nvm(hw, NVM_CHECKSUM_REG, 1, &checksum);
+	ret_val = hw->nvm.ops.write(hw, NVM_CHECKSUM_REG, 1, &checksum);
 	if (ret_val) {
 		DEBUGOUT("NVM Write Error while updating checksum.\n");
 	}
@@ -858,35 +858,5 @@ void e1000_reload_nvm_generic(struct e1000_hw *hw)
 	ctrl_ext |= E1000_CTRL_EXT_EE_RST;
 	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
 	E1000_WRITE_FLUSH(hw);
-}
-
-/* Function pointers local to this file and not intended for public use */
-
-/**
- *  e1000_acquire_nvm - Acquire exclusive access to EEPROM
- *  @hw: pointer to the HW structure
- *
- *  For those silicon families which have implemented a NVM acquire function,
- *  run the defined function else return success.
- **/
-s32 e1000_acquire_nvm(struct e1000_hw *hw)
-{
-	if (hw->func.acquire_nvm)
-		return hw->func.acquire_nvm(hw);
-
-	return E1000_SUCCESS;
-}
-
-/**
- *  e1000_release_nvm - Release exclusive access to EEPROM
- *  @hw: pointer to the HW structure
- *
- *  For those silicon families which have implemented a NVM release function,
- *  run the defined function else return success.
- **/
-void e1000_release_nvm(struct e1000_hw *hw)
-{
-	if (hw->func.release_nvm)
-		hw->func.release_nvm(hw);
 }
 

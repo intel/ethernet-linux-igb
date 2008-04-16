@@ -407,9 +407,9 @@ struct e1000_host_mng_command_info {
 #include "e1000_nvm.h"
 #include "e1000_manage.h"
 
-struct e1000_functions {
+struct e1000_mac_operations {
 	/* Function pointers for the MAC. */
-	s32  (*init_mac_params)(struct e1000_hw *);
+	s32  (*init_params)(struct e1000_hw *);
 	s32  (*blink_led)(struct e1000_hw *);
 	s32  (*check_for_link)(struct e1000_hw *);
 	bool (*check_mng_mode)(struct e1000_hw *hw);
@@ -439,39 +439,42 @@ struct e1000_functions {
                       struct e1000_host_mng_command_header*);
 	s32  (*mng_enable_host_if)(struct e1000_hw*);
 	s32  (*wait_autoneg)(struct e1000_hw*);
+};
 
-	/* Function pointers for the PHY. */
-	s32  (*init_phy_params)(struct e1000_hw *);
-	s32  (*acquire_phy)(struct e1000_hw *);
+struct e1000_phy_operations {
+	s32  (*init_params)(struct e1000_hw *);
+	s32  (*acquire)(struct e1000_hw *);
 	s32  (*check_polarity)(struct e1000_hw *);
 	s32  (*check_reset_block)(struct e1000_hw *);
-	s32  (*commit_phy)(struct e1000_hw *);
+	s32  (*commit)(struct e1000_hw *);
 	s32  (*force_speed_duplex)(struct e1000_hw *);
 	s32  (*get_cfg_done)(struct e1000_hw *hw);
 	s32  (*get_cable_length)(struct e1000_hw *);
-	s32  (*get_phy_info)(struct e1000_hw *);
-	s32  (*read_phy_reg)(struct e1000_hw *, u32, u16 *);
-	void (*release_phy)(struct e1000_hw *);
-	s32  (*reset_phy)(struct e1000_hw *);
+	s32  (*get_info)(struct e1000_hw *);
+	s32  (*read_reg)(struct e1000_hw *, u32, u16 *);
+	void (*release)(struct e1000_hw *);
+	s32  (*reset)(struct e1000_hw *);
 	s32  (*set_d0_lplu_state)(struct e1000_hw *, bool);
 	s32  (*set_d3_lplu_state)(struct e1000_hw *, bool);
-	s32  (*write_phy_reg)(struct e1000_hw *, u32, u16);
-	void (*power_up_phy)(struct e1000_hw *);
-	void (*power_down_phy)(struct e1000_hw *);
+	s32  (*write_reg)(struct e1000_hw *, u32, u16);
+	void (*power_up)(struct e1000_hw *);
+	void (*power_down)(struct e1000_hw *);
+};
 
-	/* Function pointers for the NVM. */
-	s32  (*init_nvm_params)(struct e1000_hw *);
-	s32  (*acquire_nvm)(struct e1000_hw *);
-	s32  (*read_nvm)(struct e1000_hw *, u16, u16, u16 *);
-	void (*release_nvm)(struct e1000_hw *);
-	void (*reload_nvm)(struct e1000_hw *);
-	s32  (*update_nvm)(struct e1000_hw *);
+struct e1000_nvm_operations {
+	s32  (*init_params)(struct e1000_hw *);
+	s32  (*acquire)(struct e1000_hw *);
+	s32  (*read)(struct e1000_hw *, u16, u16, u16 *);
+	void (*release)(struct e1000_hw *);
+	void (*reload)(struct e1000_hw *);
+	s32  (*update)(struct e1000_hw *);
 	s32  (*valid_led_default)(struct e1000_hw *, u16 *);
-	s32  (*validate_nvm)(struct e1000_hw *);
-	s32  (*write_nvm)(struct e1000_hw *, u16, u16, u16 *);
+	s32  (*validate)(struct e1000_hw *);
+	s32  (*write)(struct e1000_hw *, u16, u16, u16 *);
 };
 
 struct e1000_mac_info {
+	struct e1000_mac_operations ops;
 	u8 addr[6];
 	u8 perm_addr[6];
 
@@ -511,6 +514,7 @@ struct e1000_mac_info {
 };
 
 struct e1000_phy_info {
+	struct e1000_phy_operations ops;
 	e1000_phy_type type;
 
 	e1000_1000t_rx_status local_rx;
@@ -544,6 +548,7 @@ struct e1000_phy_info {
 };
 
 struct e1000_nvm_info {
+	struct e1000_nvm_operations ops;
 	e1000_nvm_type type;
 	e1000_nvm_override override;
 
@@ -586,7 +591,6 @@ struct e1000_hw {
 	u8 __iomem *flash_address;
 	unsigned long io_base;
 
-	struct e1000_functions func;
 	struct e1000_mac_info  mac;
 	struct e1000_fc_info   fc;
 	struct e1000_phy_info  phy;

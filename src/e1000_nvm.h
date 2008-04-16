@@ -51,10 +51,6 @@ void e1000_stop_nvm(struct e1000_hw *hw);
 void e1000_release_nvm_generic(struct e1000_hw *hw);
 void e1000_reload_nvm_generic(struct e1000_hw *hw);
 
-/* Function pointers */
-s32  e1000_acquire_nvm(struct e1000_hw *hw);
-void e1000_release_nvm(struct e1000_hw *hw);
-
 #define E1000_STM_OPCODE  0xDB00
 
 #endif

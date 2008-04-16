@@ -135,7 +135,7 @@ bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_enable_tx_pkt_filtering_generic");
 
 	/* No manageability, no filtering */
-	if (!e1000_check_mng_mode(hw)) {
+	if (!hw->mac.ops.check_mng_mode(hw)) {
 		tx_filter = FALSE;
 		goto out;
 	}
@@ -144,7 +144,7 @@ bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 	 * If we can't read from the host interface for whatever
 	 * reason, disable filtering.
 	 */
-	ret_val = e1000_mng_enable_host_if(hw);
+	ret_val = hw->mac.ops.mng_enable_host_if(hw);
 	if (ret_val != E1000_SUCCESS) {
 		tx_filter = FALSE;
 		goto out;
@@ -205,18 +205,18 @@ s32 e1000_mng_write_dhcp_info_generic(struct e1000_hw * hw, u8 *buffer,
 	hdr.checksum = 0;
 
 	/* Enable the host interface */
-	ret_val = e1000_mng_enable_host_if(hw);
+	ret_val = hw->mac.ops.mng_enable_host_if(hw);
 	if (ret_val)
 		goto out;
 
 	/* Populate the host interface with the contents of "buffer". */
-	ret_val = e1000_mng_host_if_write(hw, buffer, length,
+	ret_val = hw->mac.ops.mng_host_if_write(hw, buffer, length,
 	                                  sizeof(hdr), &(hdr.checksum));
 	if (ret_val)
 		goto out;
 
 	/* Write the manageability command header */
-	ret_val = e1000_mng_write_cmd_header(hw, &hdr);
+	ret_val = hw->mac.ops.mng_write_cmd_header(hw, &hdr);
 	if (ret_val)
 		goto out;
 
