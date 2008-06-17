@@ -139,9 +139,15 @@ int _kc_ethtool_op_set_tx_csum(struct net_device *dev, u32 data)
 {
 #ifdef NETIF_F_IP_CSUM
 	if (data)
+#ifdef NETIF_F_IPV6_CSUM
+		dev->features |= (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
+	else
+		dev->features &= ~(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
+#else
 		dev->features |= NETIF_F_IP_CSUM;
 	else
 		dev->features &= ~NETIF_F_IP_CSUM;
+#endif
 #endif
 
 	return 0;

@@ -28,13 +28,23 @@
 #ifndef _E1000_82575_H_
 #define _E1000_82575_H_
 
+#define ID_LED_DEFAULT_82575_SERDES ((ID_LED_DEF1_DEF2 << 12) | \
+                                     (ID_LED_DEF1_DEF2 <<  8) | \
+                                     (ID_LED_DEF1_DEF2 <<  4) | \
+                                     (ID_LED_OFF1_ON2))
 /*
  * Receive Address Register Count
  * Number of high/low register pairs in the RAR.  The RAR (Receive Address
  * Registers) holds the directed and multicast addresses that we monitor.
  * These entries are also used for MAC-based filtering.
  */
+/* FIXME: Remove "Kawela" code name!! */
+/*
+ * For Kawela, there are an additional set of RARs that begin at an offset
+ * separate from the first set of RARs.
+ */
 #define E1000_RAR_ENTRIES_82575   16
+#define E1000_RAR_ENTRIES_82576   24
 
 struct e1000_adv_data_desc {
 	u64 buffer_addr;    /* Address of the descriptor's data buffer */
@@ -218,6 +228,26 @@ union e1000_adv_rx_desc {
 #define E1000_RXDADV_PKTTYPE_SCTP        0x00000400 /* SCTP hdr present */
 #define E1000_RXDADV_PKTTYPE_NFS         0x00000800 /* NFS hdr present */
 
+#define E1000_RXDADV_PKTTYPE_ETQF        0x00008000 /* PKTTYPE is ETQF index */
+#define E1000_RXDADV_PKTTYPE_ETQF_MASK   0x00000070 /* ETQF has 8 indices */
+#define E1000_RXDADV_PKTTYPE_ETQF_SHIFT  4          /* Right-shift 4 bits */
+
+/* LinkSec results */
+/* Security Processing bit Indication */
+#define E1000_RXDADV_LNKSEC_STATUS_SECP         0x00020000
+#define E1000_RXDADV_LNKSEC_ERROR_BIT_MASK      0x18000000
+#define E1000_RXDADV_LNKSEC_ERROR_NO_SA_MATCH   0x08000000
+#define E1000_RXDADV_LNKSEC_ERROR_REPLAY_ERROR  0x10000000
+#define E1000_RXDADV_LNKSEC_ERROR_BAD_SIG       0x18000000
+
+#define E1000_RXDADV_IPSEC_STATUS_SECP          0x00020000
+#define E1000_RXDADV_IPSEC_ERROR_BIT_MASK       0x18000000
+#define E1000_RXDADV_IPSEC_ERROR_INVALID_PROTOCOL       0x08000000
+#define E1000_RXDADV_IPSEC_ERROR_INVALID_LENGTH         0x10000000
+#define E1000_RXDADV_IPSEC_ERROR_AUTHENTICATION_FAILED  0x18000000
+
+#define E1000_RXDADV_IPSEC_PACKET_TYPE_INDICATION_IPSEC_ESP     0x1000
+#define E1000_RXDADV_IPSEC_PACKET_TYPE_INDICATION_IPSEC_AH      0x2000
 /* Transmit Descriptor - Advanced */
 union e1000_adv_tx_desc {
 	struct {
@@ -242,6 +272,7 @@ union e1000_adv_tx_desc {
 #define E1000_ADVTXD_DCMD_DEXT    0x20000000 /* Descriptor extension (1=Adv) */
 #define E1000_ADVTXD_DCMD_VLE     0x40000000 /* VLAN pkt enable */
 #define E1000_ADVTXD_DCMD_TSE     0x80000000 /* TCP Seg enable */
+#define E1000_ADVTXD_MAC_LINKSEC  0x00040000 /* Apply LinkSec on packet */
 #define E1000_ADVTXD_MAC_TSTAMP   0x00080000 /* IEEE1588 Timestamp packet */
 #define E1000_ADVTXD_STAT_SN_CRC  0x00000002 /* NXTSEQ/SEED present in WB */
 #define E1000_ADVTXD_IDX_SHIFT    4  /* Adv desc Index shift */
@@ -303,6 +334,80 @@ struct e1000_adv_tx_context_desc {
 #define E1000_DCA_TXCTRL_DESC_DCA_EN (1 << 5) /* DCA Tx Desc enable */
 #define E1000_DCA_TXCTRL_TX_WB_RO_EN (1 << 11) /* Tx Desc writeback RO bit */
 
+/* Additional DCA related definitions, note change in position of CPUID */
+#define E1000_DCA_TXCTRL_CPUID_MASK_82576 0xFF000000 /* Tx CPUID Mask */
+#define E1000_DCA_RXCTRL_CPUID_MASK_82576 0xFF000000 /* Rx CPUID Mask */
+#define E1000_DCA_TXCTRL_CPUID_SHIFT 24 /* Tx CPUID now in the last byte */
+#define E1000_DCA_RXCTRL_CPUID_SHIFT 24 /* Rx CPUID now in the last byte */
+
+/* Additional interrupt register bit definitions */
+#define E1000_ICR_LSECPNS       0x00000020          /* PN threshold - server */
+#define E1000_IMS_LSECPNS       E1000_ICR_LSECPNS   /* PN threshold - server */
+#define E1000_ICS_LSECPNS       E1000_ICR_LSECPNS   /* PN threshold - server */
+
+#define E1000_NVM_APME_82575          0x0400
+#define MAX_NUM_VFS                   8
+
+#define E1000_DTXSWC_MAC_SPOOF_MASK   0x000000FF /* Per VF MAC spoof control */
+#define E1000_DTXSWC_VLAN_SPOOF_MASK  0x0000FF00 /* Per VF VLAN spoof control */
+#define E1000_DTXSWC_LLE_MASK         0x00FF0000 /* Per VF Local LB enables */
+#define E1000_DTXSWC_VMDQ_LOOPBACK_EN (1 << 31)  /* global VF LB enable */
+
+/* Easy defines for setting default pool, would normally be left a zero */
+#define E1000_VMD_CTL_DEFAULT_POOL_MASK 0x00000380
+#define E1000_VMD_CTL_DEFAULT_POOL_0    (0 << 9)
+#define E1000_VMD_CTL_DEFAULT_POOL_1    (1 << 9)
+#define E1000_VMD_CTL_DEFAULT_POOL_2    (2 << 9)
+#define E1000_VMD_CTL_DEFAULT_POOL_3    (3 << 9)
+#define E1000_VMD_CTL_DEFAULT_POOL_4    (4 << 9)
+#define E1000_VMD_CTL_DEFAULT_POOL_5    (5 << 9)
+#define E1000_VMD_CTL_DEFAULT_POOL_6    (6 << 9)
+#define E1000_VMD_CTL_DEFAULT_POOL_7    (7 << 9)
+
+/* Other useful VMD_CTL register defines */
+#define E1000_VMD_CTL_IGNORE_MAC        (1 << 28)
+#define E1000_VMD_CTL_DISABLE_DEF_POOL  (1 << 29)
+#define E1000_VMD_CTL_VM_REPL_EN        (1 << 30)
+
+/* Per VM Offload register setup */
+#define E1000_VMOLR_LPE        0x00010000 /* Accept Long packet */
+#define E1000_VMOLR_AUPE       0x01000000 /* Accept untagged packets */
+#define E1000_VMOLR_BAM        0x08000000 /* Accept Broadcast packets */
+#define E1000_VMOLR_MPME       0x10000000 /* Multicast promiscuous mode */
+#define E1000_VMOLR_STRVLAN    0x40000000 /* Vlan stripping enable */
+
+#define E1000_V2PMAILBOX_REQ   0x00000001 /* Request for PF Ready bit */
+#define E1000_V2PMAILBOX_ACK   0x00000002 /* Ack PF message received */
+#define E1000_V2PMAILBOX_VFU   0x00000004 /* VF owns the mailbox buffer */
+#define E1000_V2PMAILBOX_PFU   0x00000008 /* PF owns the mailbox buffer */
+#define E1000_V2PMAILBOX_PFSTS 0x00000010 /* PF wrote a message in the MB */
+#define E1000_V2PMAILBOX_PFACK 0x00000020 /* PF ack the previous VF msg */
+#define E1000_V2PMAILBOX_RSTI  0x00000040 /* PF has reset indication */
+
+#define E1000_P2VMAILBOX_STS   0x00000001 /* Initiate message send to VF */
+#define E1000_P2VMAILBOX_ACK   0x00000002 /* Ack message recv'd from VF */
+#define E1000_P2VMAILBOX_VFU   0x00000004 /* VF owns the mailbox buffer */
+#define E1000_P2VMAILBOX_PFU   0x00000008 /* PF owns the mailbox buffer */
+#define E1000_P2VMAILBOX_RVFU  0x00000010 /* Reset VFU - used when VF stuck */
+
+#define E1000_VFMAILBOX_SIZE   16 /* 16 32 bit words - 64 bytes */
+
+u32  e1000_translate_register_82576(u32 reg);
+s32  e1000_send_mail_to_pf_vf(struct e1000_hw *hw, u32 *msg,
+                              s16 size);
+s32  e1000_receive_mail_from_pf_vf(struct e1000_hw *hw,
+                                   u32 *msg, s16 size);
+s32  e1000_send_mail_to_vf(struct e1000_hw *hw, u32 *msg,
+                           u32 vf_number, s16 size);
+s32  e1000_receive_mail_from_vf(struct e1000_hw *hw, u32 *msg,
+                                u32 vf_number, s16 size);
+void e1000_vmdq_loopback_enable_vf(struct e1000_hw *hw);
+void e1000_vmdq_loopback_disable_vf(struct e1000_hw *hw);
+void e1000_vmdq_replication_enable_vf(struct e1000_hw *hw, u32 enables);
+void e1000_vmdq_replication_disable_vf(struct e1000_hw *hw);
+void e1000_init_vfnumber_index_vf(struct e1000_hw *hw, u32 vf_number);
+bool e1000_check_for_pf_ack_vf(struct e1000_hw *hw);
+bool e1000_check_for_pf_mail_vf(struct e1000_hw *hw);
 
 
 #endif

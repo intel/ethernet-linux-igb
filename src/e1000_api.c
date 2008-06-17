@@ -26,9 +26,6 @@
 *******************************************************************************/
 
 #include "e1000_api.h"
-#include "e1000_mac.h"
-#include "e1000_nvm.h"
-#include "e1000_phy.h"
 
 /**
  *  e1000_init_mac_params - Initialize MAC function pointers
@@ -68,6 +65,7 @@ s32 e1000_init_nvm_params(struct e1000_hw *hw)
 	s32 ret_val = E1000_SUCCESS;
 
 	if (hw->nvm.ops.init_params) {
+		hw->nvm.semaphore_delay = 10;
 		ret_val = hw->nvm.ops.init_params(hw);
 		if (ret_val) {
 			DEBUGOUT("NVM Initialization Error\n");
@@ -130,6 +128,9 @@ s32 e1000_set_mac_type(struct e1000_hw *hw)
 	case E1000_DEV_ID_82575GB_QUAD_COPPER:
 		mac->type = e1000_82575;
 		break;
+	case E1000_DEV_ID_82576:
+		mac->type = e1000_82576;
+		break;
 	default:
 		/* Should never have loaded on this device */
 		ret_val = -E1000_ERR_MAC_INIT;
@@ -142,10 +143,10 @@ s32 e1000_set_mac_type(struct e1000_hw *hw)
 /**
  *  e1000_setup_init_funcs - Initializes function pointers
  *  @hw: pointer to the HW structure
- *  @init_device: TRUE will initialize the rest of the function pointers
- *                 getting the device ready for use.  FALSE will only set
+ *  @init_device: true will initialize the rest of the function pointers
+ *                 getting the device ready for use.  false will only set
  *                 MAC type and the function pointers for the other init
- *                 functions.  Passing FALSE will not generate any hardware
+ *                 functions.  Passing false will not generate any hardware
  *                 reads or writes.
  *
  *  This function must be called by a driver in order to use the rest
@@ -169,18 +170,11 @@ s32 e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device)
 	}
 
 	/*
-	 * Init some generic function pointers that are currently all pointing
-	 * to generic implementations. We do this first allowing a driver
-	 * module to override it afterward.
+	 * Init function pointers to generic implementations. We do this first
+	 * allowing a driver module to override it afterward.
 	 */
-	hw->mac.ops.config_collision_dist = e1000_config_collision_dist_generic;
-	hw->mac.ops.rar_set = e1000_rar_set_generic;
-	hw->mac.ops.validate_mdi_setting = e1000_validate_mdi_setting_generic;
-	hw->mac.ops.mng_host_if_write = e1000_mng_host_if_write_generic;
-	hw->mac.ops.mng_write_cmd_header = e1000_mng_write_cmd_header_generic;
-	hw->mac.ops.mng_enable_host_if = e1000_mng_enable_host_if_generic;
-	hw->mac.ops.wait_autoneg = e1000_wait_autoneg_generic;
-	hw->nvm.ops.reload = e1000_reload_nvm_generic;
+	e1000_init_mac_ops_generic(hw);
+	e1000_init_nvm_ops_generic(hw);
 
 	/*
 	 * Set up the init function pointers. These are functions within the
@@ -189,6 +183,7 @@ s32 e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device)
 	 */
 	switch (hw->mac.type) {
 	case e1000_82575:
+	case e1000_82576:
 		e1000_init_function_pointers_82575(hw);
 		break;
 	default:
@@ -259,7 +254,7 @@ s32 e1000_get_bus_info(struct e1000_hw *hw)
 void e1000_clear_vfta(struct e1000_hw *hw)
 {
 	if (hw->mac.ops.clear_vfta)
-		hw->mac.ops.clear_vfta (hw);
+		hw->mac.ops.clear_vfta(hw);
 }
 
 /**
@@ -345,7 +340,7 @@ bool e1000_check_mng_mode(struct e1000_hw *hw)
 	if (hw->mac.ops.check_mng_mode)
 		return hw->mac.ops.check_mng_mode(hw);
 
-	return FALSE;
+	return false;
 }
 
 /**
@@ -1058,5 +1053,17 @@ void e1000_power_down_phy(struct e1000_hw *hw)
 {
 	if (hw->phy.ops.power_down)
 		hw->phy.ops.power_down(hw);
+}
+
+/**
+ *  e1000_shutdown_fiber_serdes_link - Remove link during power down
+ *  @hw: pointer to the HW structure
+ *
+ *  Shutdown the optics and PCS on driver unload.
+ **/
+void e1000_shutdown_fiber_serdes_link(struct e1000_hw *hw)
+{
+	if (hw->mac.ops.shutdown_serdes)
+		hw->mac.ops.shutdown_serdes(hw);
 }
 

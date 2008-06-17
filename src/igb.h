@@ -31,11 +31,13 @@
 #ifndef _IGB_H_
 #define _IGB_H_
 
+#include <linux/pci.h>
+#include <linux/netdevice.h>
+#include <linux/vmalloc.h>
 
-#include "kcompat.h"
-
-#include "e1000_api.h"
-#include "e1000_82575.h"
+#ifdef SIOCETHTOOL
+#include <linux/ethtool.h>
+#endif
 
 struct igb_adapter;
 
@@ -45,6 +47,22 @@ struct igb_adapter;
 #ifdef IGB_DCA
 #include <linux/dca.h>
 #endif
+
+#ifdef IGB_LRO
+#undef IGB_LRO
+#ifdef NETIF_F_LRO
+#if defined(CONFIG_INET_LRO) || defined(CONFIG_INET_LRO_MODULE)
+#include <linux/inet_lro.h>
+#define MAX_LRO_DESCRIPTORS		   8
+#define IGB_LRO
+#endif
+#endif
+#endif /* IGB_LRO */
+
+#include "kcompat.h"
+
+#include "e1000_api.h"
+#include "e1000_82575.h"
 
 #define IGB_ERR(args...) printk(KERN_ERR "igb: " args)
 
@@ -86,7 +104,7 @@ struct igb_adapter;
 #define IGB_MAX_TX_QUEUES                  4
 
 /* RX descriptor control thresholds.
- * PTHRESH - MAC will consider prefetch if it has fewer than this number of 
+ * PTHRESH - MAC will consider prefetch if it has fewer than this number of
  *           descriptors available in its onboard memory.
  *           Setting this to 0 disables RX descriptor prefetch.
  * HTHRESH - MAC will only prefetch if there are at least this many descriptors
@@ -191,11 +209,15 @@ struct igb_ring {
 		struct {
 			struct sk_buff *pending_skb;
 			int pending_skb_page;
-			int set_itr;
 			struct igb_queue_stats rx_stats;
 			struct napi_struct napi;
+			int set_itr;
 			int interrupt_count;
 			struct igb_ring *buddy;
+#ifdef IGB_LRO
+			struct net_lro_mgr lro_mgr;
+			bool lro_used;
+#endif
 		};
 	};
 };
@@ -292,6 +314,7 @@ struct igb_adapter {
 	struct msix_entry *msix_entries;
 	int int_mode;
 	u32 eims_enable_mask;
+	u32 eims_other;
 	u32 lli_port;
 	u32 lli_size;
 	u64 lli_int;
@@ -301,6 +324,18 @@ struct igb_adapter {
 	unsigned int flags;
 	u32 eeprom_wol;
 	u32 *config_space;
+#ifdef CONFIG_NETDEVICES_MULTIQUEUE
+	struct igb_ring *multi_tx_table[IGB_MAX_TX_QUEUES];
+#endif /* CONFIG_NETDEVICES_MULTIQUEUE */
+#ifdef IGB_LRO
+	unsigned int lro_max_aggr;
+	unsigned int lro_aggregated;
+	unsigned int lro_flushed;
+	unsigned int lro_no_desc;
+#endif
+	unsigned int tx_ring_count;
+	unsigned int rx_ring_count;
+	u32 stats_freq_us;
 };
 
 
@@ -311,6 +346,7 @@ struct igb_adapter {
 #define IGB_FLAG_LLI_PUSH          (1 << 4)
 #define IGB_FLAG_IN_NETPOLL        (1 << 5)
 #define IGB_FLAG_QUAD_PORT_A       (1 << 6)
+#define IGB_FLAG_NEED_CTX_IDX      (1 << 7)
 
 enum e1000_state_t {
 	__IGB_TESTING,
@@ -328,6 +364,8 @@ extern void igb_reset(struct igb_adapter *);
 extern int igb_set_spd_dplx(struct igb_adapter *, u16);
 extern int igb_setup_tx_resources(struct igb_adapter *, struct igb_ring *);
 extern int igb_setup_rx_resources(struct igb_adapter *, struct igb_ring *);
+extern void igb_free_tx_resources(struct igb_ring *);
+extern void igb_free_rx_resources(struct igb_ring *);
 extern void igb_update_stats(struct igb_adapter *);
 extern void igb_set_ethtool_ops(struct net_device *);
 extern void igb_check_options(struct igb_adapter *);

@@ -76,7 +76,7 @@
 IGB_PARAM(InterruptThrottleRate, "Interrupt Throttling Rate");
 #define DEFAULT_ITR                    3
 #define MAX_ITR                   100000
-#define MIN_ITR                      100
+#define MIN_ITR                      120
 /* IntMode (Interrupt Mode)
  *
  * Valid Range: 0 - 3
@@ -124,6 +124,20 @@ IGB_PARAM(LLISize, "Low Latency Interrupt on Packet Size");
 #define DEFAULT_LLISIZE                0
 #define MAX_LLISIZE                 1500
 #define MIN_LLISIZE                    0
+
+#ifdef IGB_LRO
+/* LROAggr (Large Receive Offload)
+ *
+ * Valid Range: 2 - 44
+ *
+ * Default Value:  32
+ */
+IGB_PARAM(LROAggr, "LRO - Maximum packets to aggregate");
+
+#define DEFAULT_LRO_AGGR              32
+#define MAX_LRO_AGGR                  44
+#define MIN_LRO_AGGR                   2
+#endif
 
 struct igb_option {
 	enum { enable_option, range_option, list_option } type;
@@ -258,7 +272,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 				if (adapter->itr == 3) {
 					adapter->itr_setting = adapter->itr;
 					adapter->itr = IGB_START_ITR;
-				} 
+				}
 				else {
 					adapter->itr_setting = adapter->itr & ~3;
 				}
@@ -376,5 +390,29 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 		}
 #endif
 	}
+#ifdef IGB_LRO
+	{ /* Large Receive Offload - Maximum packets to aggregate */
+		struct igb_option opt = {
+			.type = range_option,
+			.name = "LRO - Maximum packets to aggregate",
+			.err  = "using default of " __MODULE_STRING(DEFAULT_LRO_AGGR),
+			.def  = DEFAULT_LRO_AGGR,
+			.arg  = { .r = { .min = MIN_LRO_AGGR,
+					 .max = MAX_LRO_AGGR }}
+		};
+
+#ifdef module_param_array
+		if (num_LROAggr > bd) {
+#endif
+			adapter->lro_max_aggr = LROAggr[bd];
+			igb_validate_option(&adapter->lro_max_aggr, &opt, adapter);
+
+#ifdef module_param_array
+		} else {
+			adapter->lro_max_aggr = opt.def;
+		}
+#endif
+	}
+#endif /* IGB_LRO */
 }
 

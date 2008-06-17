@@ -34,6 +34,7 @@
 
 struct e1000_hw;
 
+#define E1000_DEV_ID_82576                    0x10C9
 #define E1000_DEV_ID_82575EB_COPPER           0x10A7
 #define E1000_DEV_ID_82575EB_FIBER_SERDES     0x10A9
 #define E1000_DEV_ID_82575GB_QUAD_COPPER      0x10D6
@@ -50,6 +51,7 @@ struct e1000_hw;
 typedef enum {
 	e1000_undefined = 0,
 	e1000_82575,
+	e1000_82576,
 	e1000_num_macs  /* List is 1-based, so subtract 1 for true count. */
 } e1000_mac_type;
 
@@ -87,6 +89,7 @@ typedef enum {
 	e1000_phy_gg82563,
 	e1000_phy_igp_3,
 	e1000_phy_ife,
+	e1000_phy_vf,
 } e1000_phy_type;
 
 typedef enum {
@@ -425,6 +428,7 @@ struct e1000_mac_operations {
 	void (*remove_device)(struct e1000_hw *);
 	s32  (*reset_hw)(struct e1000_hw *);
 	s32  (*init_hw)(struct e1000_hw *);
+	void (*shutdown_serdes)(struct e1000_hw *);
 	s32  (*setup_link)(struct e1000_hw *);
 	s32  (*setup_physical_interface)(struct e1000_hw *);
 	s32  (*setup_led)(struct e1000_hw *);
@@ -554,6 +558,7 @@ struct e1000_nvm_info {
 
 	u32 flash_bank_size;
 	u32 flash_base_addr;
+	u32 semaphore_delay;
 
 	u16 word_size;
 	u16 delay_usec;
@@ -608,13 +613,12 @@ struct e1000_hw {
 	u8  revision_id;
 };
 
+#include "e1000_82575.h"
+
 /* These functions must be implemented by drivers */
-void e1000_pci_clear_mwi(struct e1000_hw *hw);
-void e1000_pci_set_mwi(struct e1000_hw *hw);
 s32  e1000_alloc_zeroed_dev_spec_struct(struct e1000_hw *hw, u32 size);
 s32  e1000_read_pcie_cap_reg(struct e1000_hw *hw, u32 reg, u16 *value);
 void e1000_free_dev_spec_struct(struct e1000_hw *hw);
 void e1000_read_pci_cfg(struct e1000_hw *hw, u32 reg, u16 *value);
-void e1000_write_pci_cfg(struct e1000_hw *hw, u32 reg, u16 *value);
 
 #endif

@@ -26,7 +26,6 @@
 *******************************************************************************/
 
 #include "e1000_api.h"
-#include "e1000_manage.h"
 
 static u8 e1000_calculate_checksum(u8 *buffer, u32 length);
 
@@ -130,13 +129,13 @@ bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 	u32 offset;
 	s32 ret_val, hdr_csum, csum;
 	u8 i, len;
-	bool tx_filter = TRUE;
+	bool tx_filter = true;
 
 	DEBUGFUNC("e1000_enable_tx_pkt_filtering_generic");
 
 	/* No manageability, no filtering */
 	if (!hw->mac.ops.check_mng_mode(hw)) {
-		tx_filter = FALSE;
+		tx_filter = false;
 		goto out;
 	}
 
@@ -146,7 +145,7 @@ bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 	 */
 	ret_val = hw->mac.ops.mng_enable_host_if(hw);
 	if (ret_val != E1000_SUCCESS) {
-		tx_filter = FALSE;
+		tx_filter = false;
 		goto out;
 	}
 
@@ -174,7 +173,7 @@ bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 
 	/* Cookie area is valid, make the final check for filtering. */
 	if (!(hdr->status & E1000_MNG_DHCP_COOKIE_STATUS_PARSING))
-		tx_filter = FALSE;
+		tx_filter = false;
 
 out:
 	hw->mac.tx_pkt_filtering = tx_filter;
@@ -346,7 +345,7 @@ bool e1000_enable_mng_pass_thru(struct e1000_hw *hw)
 {
 	u32 manc;
 	u32 fwsm, factps;
-	bool ret_val = FALSE;
+	bool ret_val = false;
 
 	DEBUGFUNC("e1000_enable_mng_pass_thru");
 
@@ -366,13 +365,13 @@ bool e1000_enable_mng_pass_thru(struct e1000_hw *hw)
 		if (!(factps & E1000_FACTPS_MNGCG) &&
 		    ((fwsm & E1000_FWSM_MODE_MASK) ==
 		     (e1000_mng_mode_pt << E1000_FWSM_MODE_SHIFT))) {
-			ret_val = TRUE;
+			ret_val = true;
 			goto out;
 		}
 	} else {
 		if ((manc & E1000_MANC_SMBUS_EN) &&
 		    !(manc & E1000_MANC_ASF_EN)) {
-			ret_val = TRUE;
+			ret_val = true;
 			goto out;
 		}
 	}

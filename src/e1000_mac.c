@@ -26,7 +26,32 @@
 *******************************************************************************/
 
 #include "e1000_api.h"
-#include "e1000_mac.h"
+
+/**
+ *  e1000_init_mac_ops_generic - Initialize MAC function pointers
+ *  @hw: pointer to the HW structure
+ *
+ *  Setups up the function pointers to no-op functions
+ **/
+void e1000_init_mac_ops_generic(struct e1000_hw *hw)
+{
+	struct e1000_mac_info *mac = &hw->mac;
+	DEBUGFUNC("e1000_init_mac_ops_generic");
+
+	/* General Setup */
+	mac->ops.read_mac_addr = e1000_read_mac_addr_generic;
+	mac->ops.remove_device = e1000_remove_device_generic;
+	mac->ops.config_collision_dist = e1000_config_collision_dist_generic;
+	/* LINK */
+	mac->ops.wait_autoneg = e1000_wait_autoneg_generic;
+	/* Management */
+	mac->ops.mng_host_if_write = e1000_mng_host_if_write_generic;
+	mac->ops.mng_write_cmd_header = e1000_mng_write_cmd_header_generic;
+	mac->ops.mng_enable_host_if = e1000_mng_enable_host_if_generic;
+	/* VLAN, MC, etc. */
+	mac->ops.rar_set = e1000_rar_set_generic;
+	mac->ops.validate_mdi_setting = e1000_validate_mdi_setting_generic;
+}
 
 /**
  *  e1000_remove_device_generic - Free device specific structure
@@ -41,66 +66,6 @@ void e1000_remove_device_generic(struct e1000_hw *hw)
 
 	/* Freeing the dev_spec member of e1000_hw structure */
 	e1000_free_dev_spec_struct(hw);
-}
-
-/**
- *  e1000_get_bus_info_pci_generic - Get PCI(x) bus information
- *  @hw: pointer to the HW structure
- *
- *  Determines and stores the system bus information for a particular
- *  network interface.  The following bus information is determined and stored:
- *  bus speed, bus width, type (PCI/PCIx), and PCI(-x) function.
- **/
-s32 e1000_get_bus_info_pci_generic(struct e1000_hw *hw)
-{
-	struct e1000_bus_info *bus = &hw->bus;
-	u32 status = E1000_READ_REG(hw, E1000_STATUS);
-	s32 ret_val = E1000_SUCCESS;
-	u16 pci_header_type;
-
-	DEBUGFUNC("e1000_get_bus_info_pci_generic");
-
-	/* PCI or PCI-X? */
-	bus->type = (status & E1000_STATUS_PCIX_MODE)
-			? e1000_bus_type_pcix
-			: e1000_bus_type_pci;
-
-	/* Bus speed */
-	if (bus->type == e1000_bus_type_pci) {
-		bus->speed = (status & E1000_STATUS_PCI66)
-		             ? e1000_bus_speed_66
-		             : e1000_bus_speed_33;
-	} else {
-		switch (status & E1000_STATUS_PCIX_SPEED) {
-		case E1000_STATUS_PCIX_SPEED_66:
-			bus->speed = e1000_bus_speed_66;
-			break;
-		case E1000_STATUS_PCIX_SPEED_100:
-			bus->speed = e1000_bus_speed_100;
-			break;
-		case E1000_STATUS_PCIX_SPEED_133:
-			bus->speed = e1000_bus_speed_133;
-			break;
-		default:
-			bus->speed = e1000_bus_speed_reserved;
-			break;
-		}
-	}
-
-	/* Bus width */
-	bus->width = (status & E1000_STATUS_BUS64)
-	             ? e1000_bus_width_64
-	             : e1000_bus_width_32;
-
-	/* Which PCI(-X) function? */
-	e1000_read_pci_cfg(hw, PCI_HEADER_TYPE_REGISTER, &pci_header_type);
-	if (pci_header_type & PCI_HEADER_TYPE_MULTIFUNC)
-		bus->func = (status & E1000_STATUS_FUNC_MASK)
-		            >> E1000_STATUS_FUNC_SHIFT;
-	else
-		bus->func = 0;
-
-	return ret_val;
 }
 
 /**
@@ -199,7 +164,7 @@ void e1000_init_rx_addrs_generic(struct e1000_hw *hw, u16 rar_count)
 	/* Setup the receive address */
 	DEBUGOUT("Programming MAC Address into RAR[0]\n");
 
-	e1000_rar_set_generic(hw, hw->mac.addr, 0);
+	hw->mac.ops.rar_set(hw, hw->mac.addr, 0);
 
 	/* Zero out the other (rar_entry_count - 1) receive addresses */
 	DEBUGOUT1("Clearing RAR[1-%u]\n", rar_count-1);
@@ -393,7 +358,7 @@ void e1000_update_mc_addr_list_generic(struct e1000_hw *hw,
 
 	/* Load any remaining multicast addresses into the hash table. */
 	for (; mc_addr_count > 0; mc_addr_count--) {
-		hash_value = e1000_hash_mc_addr(hw, mc_addr_list);
+		hash_value = e1000_hash_mc_addr_generic(hw, mc_addr_list);
 		DEBUGOUT1("Hash value = 0x%03X\n", hash_value);
 		hw->mac.ops.mta_set(hw, hash_value);
 		mc_addr_list += ETH_ADDR_LEN;
@@ -471,43 +436,6 @@ u32 e1000_hash_mc_addr_generic(struct e1000_hw *hw, u8 *mc_addr)
 	                          (((u16) mc_addr[5]) << bit_shift)));
 
 	return hash_value;
-}
-
-/**
- *  e1000_pcix_mmrbc_workaround_generic - Fix incorrect MMRBC value
- *  @hw: pointer to the HW structure
- *
- *  In certain situations, a system BIOS may report that the PCIx maximum
- *  memory read byte count (MMRBC) value is higher than than the actual
- *  value. We check the PCIx command register with the current PCIx status
- *  register.
- **/
-void e1000_pcix_mmrbc_workaround_generic(struct e1000_hw *hw)
-{
-	u16 cmd_mmrbc;
-	u16 pcix_cmd;
-	u16 pcix_stat_hi_word;
-	u16 stat_mmrbc;
-
-	DEBUGFUNC("e1000_pcix_mmrbc_workaround_generic");
-
-	/* Workaround for PCI-X issue when BIOS sets MMRBC incorrectly */
-	if (hw->bus.type != e1000_bus_type_pcix)
-		return;
-
-	e1000_read_pci_cfg(hw, PCIX_COMMAND_REGISTER, &pcix_cmd);
-	e1000_read_pci_cfg(hw, PCIX_STATUS_REGISTER_HI, &pcix_stat_hi_word);
-	cmd_mmrbc = (pcix_cmd & PCIX_COMMAND_MMRBC_MASK) >>
-	             PCIX_COMMAND_MMRBC_SHIFT;
-	stat_mmrbc = (pcix_stat_hi_word & PCIX_STATUS_HI_MMRBC_MASK) >>
-	              PCIX_STATUS_HI_MMRBC_SHIFT;
-	if (stat_mmrbc == PCIX_STATUS_HI_MMRBC_4K)
-		stat_mmrbc = PCIX_STATUS_HI_MMRBC_2K;
-	if (cmd_mmrbc > stat_mmrbc) {
-		pcix_cmd &= ~PCIX_COMMAND_MMRBC_MASK;
-		pcix_cmd |= stat_mmrbc << PCIX_COMMAND_MMRBC_SHIFT;
-		e1000_write_pci_cfg(hw, PCIX_COMMAND_REGISTER, &pcix_cmd);
-	}
 }
 
 /**
@@ -600,7 +528,7 @@ s32 e1000_check_for_copper_link_generic(struct e1000_hw *hw)
 	if (!link)
 		goto out; /* No link detected */
 
-	mac->get_link_status = FALSE;
+	mac->get_link_status = false;
 
 	/*
 	 * Check if there was DownShift, must be checked
@@ -702,7 +630,7 @@ s32 e1000_check_for_fiber_link_generic(struct e1000_hw *hw)
 		E1000_WRITE_REG(hw, E1000_TXCW, mac->txcw);
 		E1000_WRITE_REG(hw, E1000_CTRL, (ctrl & ~E1000_CTRL_SLU));
 
-		mac->serdes_has_link = TRUE;
+		mac->serdes_has_link = true;
 	}
 
 out:
@@ -770,7 +698,7 @@ s32 e1000_check_for_serdes_link_generic(struct e1000_hw *hw)
 		E1000_WRITE_REG(hw, E1000_TXCW, mac->txcw);
 		E1000_WRITE_REG(hw, E1000_CTRL, (ctrl & ~E1000_CTRL_SLU));
 
-		mac->serdes_has_link = TRUE;
+		mac->serdes_has_link = true;
 	} else if (!(E1000_TXCW_ANE & E1000_READ_REG(hw, E1000_TXCW))) {
 		/*
 		 * If we force link for non-auto-negotiation switch, check
@@ -781,11 +709,11 @@ s32 e1000_check_for_serdes_link_generic(struct e1000_hw *hw)
 		usec_delay(10);
 		if (E1000_RXCW_SYNCH & E1000_READ_REG(hw, E1000_RXCW)) {
 			if (!(rxcw & E1000_RXCW_IV)) {
-				mac->serdes_has_link = TRUE;
+				mac->serdes_has_link = true;
 				DEBUGOUT("SERDES: Link is up.\n");
 			}
 		} else {
-			mac->serdes_has_link = FALSE;
+			mac->serdes_has_link = false;
 			DEBUGOUT("SERDES: Link is down.\n");
 		}
 	}
@@ -793,8 +721,8 @@ s32 e1000_check_for_serdes_link_generic(struct e1000_hw *hw)
 	if (E1000_TXCW_ANE & E1000_READ_REG(hw, E1000_TXCW)) {
 		status = E1000_READ_REG(hw, E1000_STATUS);
 		mac->serdes_has_link = (status & E1000_STATUS_LU)
-					? TRUE
-					: FALSE;
+					? true
+					: false;
 	}
 
 out:
@@ -821,8 +749,9 @@ s32 e1000_setup_link_generic(struct e1000_hw *hw)
 	 * In the case of the phy reset being blocked, we already have a link.
 	 * We do not need to set it up again.
 	 */
-	if (hw->phy.ops.check_reset_block(hw))
-		goto out;
+	if (hw->phy.ops.check_reset_block)
+		if (hw->phy.ops.check_reset_block(hw))
+			goto out;
 
 	/*
 	 * If flow control is set to default, set flow control based on
@@ -1925,7 +1854,7 @@ void e1000_reset_adaptive_generic(struct e1000_hw *hw)
 		mac->ifs_ratio = IFS_RATIO;
 	}
 
-	mac->in_ifs_mode = FALSE;
+	mac->in_ifs_mode = false;
 	E1000_WRITE_REG(hw, E1000_AIT, 0);
 out:
 	return;
@@ -1951,7 +1880,7 @@ void e1000_update_adaptive_generic(struct e1000_hw *hw)
 
 	if ((mac->collision_delta * mac->ifs_ratio) > mac->tx_packet_delta) {
 		if (mac->tx_packet_delta > MIN_NUM_XMITS) {
-			mac->in_ifs_mode = TRUE;
+			mac->in_ifs_mode = true;
 			if (mac->current_ifs_val < mac->ifs_max_val) {
 				if (!mac->current_ifs_val)
 					mac->current_ifs_val = mac->ifs_min_val;
@@ -1965,7 +1894,7 @@ void e1000_update_adaptive_generic(struct e1000_hw *hw)
 		if (mac->in_ifs_mode &&
 		    (mac->tx_packet_delta <= MIN_NUM_XMITS)) {
 			mac->current_ifs_val = 0;
-			mac->in_ifs_mode = FALSE;
+			mac->in_ifs_mode = false;
 			E1000_WRITE_REG(hw, E1000_AIT, 0);
 		}
 	}

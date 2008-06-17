@@ -30,7 +30,6 @@
  */
 
 #include "e1000_api.h"
-#include "e1000_82575.h"
 
 static s32  e1000_init_phy_params_82575(struct e1000_hw *hw);
 static s32  e1000_init_nvm_params_82575(struct e1000_hw *hw);
@@ -52,6 +51,7 @@ static s32  e1000_set_d0_lplu_state_82575(struct e1000_hw *hw,
                                           bool active);
 static s32  e1000_setup_copper_link_82575(struct e1000_hw *hw);
 static s32  e1000_setup_fiber_serdes_link_82575(struct e1000_hw *hw);
+static s32  e1000_valid_led_default_82575(struct e1000_hw *hw, u16 *data);
 static s32  e1000_write_phy_reg_sgmii_82575(struct e1000_hw *hw,
                                             u32 offset, u16 data);
 static void e1000_clear_hw_cntrs_82575(struct e1000_hw *hw);
@@ -66,6 +66,12 @@ static s32  e1000_reset_init_script_82575(struct e1000_hw *hw);
 static s32  e1000_read_mac_addr_82575(struct e1000_hw *hw);
 static void e1000_power_down_phy_copper_82575(struct e1000_hw *hw);
 
+static void e1000_init_rx_addrs_82575(struct e1000_hw *hw, u16 rar_count);
+static void e1000_update_mc_addr_list_82575(struct e1000_hw *hw,
+                                           u8 *mc_addr_list, u32 mc_addr_count,
+                                           u32 rar_used_count, u32 rar_count);
+void e1000_remove_device_82575(struct e1000_hw *hw);
+void e1000_shutdown_fiber_serdes_link_82575(struct e1000_hw *hw);
 
 struct e1000_dev_spec_82575 {
 	bool sgmii_active;
@@ -124,6 +130,7 @@ static s32 e1000_init_phy_params_82575(struct e1000_hw *hw)
 		phy->ops.force_speed_duplex = e1000_phy_force_speed_duplex_m88;
 		break;
 	case IGP03E1000_E_PHY_ID:
+	case IGP04E1000_E_PHY_ID:
 		phy->type                   = e1000_phy_igp_3;
 		phy->ops.check_polarity     = e1000_check_polarity_igp;
 		phy->ops.get_info           = e1000_get_phy_info_igp;
@@ -193,7 +200,7 @@ static s32 e1000_init_nvm_params_82575(struct e1000_hw *hw)
 	nvm->ops.read          = e1000_read_nvm_eerd;
 	nvm->ops.release       = e1000_release_nvm_82575;
 	nvm->ops.update        = e1000_update_nvm_checksum_generic;
-	nvm->ops.valid_led_default = e1000_valid_led_default_generic;
+	nvm->ops.valid_led_default = e1000_valid_led_default_82575;
 	nvm->ops.validate      = e1000_validate_nvm_checksum_generic;
 	nvm->ops.write         = e1000_write_nvm_spi;
 
@@ -230,10 +237,10 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
          * based on the EEPROM. We cannot rely upon device ID. There
          * is no distinguishable difference between fiber and internal
          * SerDes mode on the 82575. There can be an external PHY attached
-         * on the SGMII interface. For this, we'll set sgmii_active to TRUE.
+         * on the SGMII interface. For this, we'll set sgmii_active to true.
          */
 	hw->phy.media_type = e1000_media_type_copper;
-	dev_spec->sgmii_active = FALSE;
+	dev_spec->sgmii_active = false;
 
 	ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
 	if ((ctrl_ext & E1000_CTRL_EXT_LINK_MODE_MASK) ==
@@ -241,7 +248,7 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 		hw->phy.media_type = e1000_media_type_internal_serdes;
 		ctrl_ext |= E1000_CTRL_I2C_ENA;
 	} else if (ctrl_ext & E1000_CTRL_EXT_LINK_MODE_SGMII) {
-		dev_spec->sgmii_active = TRUE;
+		dev_spec->sgmii_active = true;
 		ctrl_ext |= E1000_CTRL_I2C_ENA;
 	} else {
 		ctrl_ext &= ~E1000_CTRL_I2C_ENA;
@@ -252,12 +259,14 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	mac->mta_reg_count = 128;
 	/* Set rar entry count */
 	mac->rar_entry_count = E1000_RAR_ENTRIES_82575;
+	if (mac->type == e1000_82576)
+		mac->rar_entry_count = E1000_RAR_ENTRIES_82576;
 	/* Set if part includes ASF firmware */
-	mac->asf_firmware_present = TRUE;
+	mac->asf_firmware_present = true;
 	/* Set if manageability features are enabled. */
 	mac->arc_subsystem_valid =
 	        (E1000_READ_REG(hw, E1000_FWSM) & E1000_FWSM_MODE_MASK)
-	                ? TRUE : FALSE;
+	                ? true : false;
 
 	/* Function pointers */
 
@@ -274,6 +283,8 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	        (hw->phy.media_type == e1000_media_type_copper)
 	                ? e1000_setup_copper_link_82575
 	                : e1000_setup_fiber_serdes_link_82575;
+	/* physical interface shutdown */
+	mac->ops.shutdown_serdes = e1000_shutdown_fiber_serdes_link_82575;
 	/* check for link */
 	mac->ops.check_for_link = e1000_check_for_link_82575;
 	/* receive address register setting */
@@ -281,7 +292,7 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	/* read mac address */
 	mac->ops.read_mac_addr = e1000_read_mac_addr_82575;
 	/* multicast address update */
-	mac->ops.update_mc_addr_list = e1000_update_mc_addr_list_generic;
+	mac->ops.update_mc_addr_list = e1000_update_mc_addr_list_82575;
 	/* writing VFTA */
 	mac->ops.write_vfta = e1000_write_vfta_generic;
 	/* clearing VFTA */
@@ -298,7 +309,7 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	mac->ops.led_on = e1000_led_on_generic;
 	mac->ops.led_off = e1000_led_off_generic;
 	/* remove device */
-	mac->ops.remove_device = e1000_remove_device_generic;
+	mac->ops.remove_device = e1000_remove_device_82575;
 	/* clear hardware counters */
 	mac->ops.clear_hw_cntrs = e1000_clear_hw_cntrs_82575;
 	/* link info */
@@ -542,7 +553,7 @@ out:
  **/
 static s32 e1000_phy_hw_reset_sgmii_82575(struct e1000_hw *hw)
 {
-	s32 ret_val;
+	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_phy_hw_reset_sgmii_82575");
 
@@ -552,6 +563,9 @@ static s32 e1000_phy_hw_reset_sgmii_82575(struct e1000_hw *hw)
 	 */
 
 	DEBUGOUT("Soft resetting SGMII attached PHY...\n");
+
+	if (!(hw->phy.ops.write_reg))
+		goto out;
 
 	/*
 	 * SFP documentation requires the following to configure the SPF module
@@ -570,7 +584,7 @@ out:
 /**
  *  e1000_set_d0_lplu_state_82575 - Set Low Power Linkup D0 state
  *  @hw: pointer to the HW structure
- *  @active: TRUE to enable LPLU, FALSE to disable
+ *  @active: true to enable LPLU, false to disable
  *
  *  Sets the LPLU D0 state according to the active flag.  When
  *  activating LPLU this function also disables smart speed
@@ -583,10 +597,13 @@ out:
 static s32 e1000_set_d0_lplu_state_82575(struct e1000_hw *hw, bool active)
 {
 	struct e1000_phy_info *phy = &hw->phy;
-	s32 ret_val;
+	s32 ret_val = E1000_SUCCESS;
 	u16 data;
 
 	DEBUGFUNC("e1000_set_d0_lplu_state_82575");
+
+	if (!(hw->phy.ops.read_reg))
+		goto out;
 
 	ret_val = phy->ops.read_reg(hw, IGP02E1000_PHY_POWER_MGMT, &data);
 	if (ret_val)
@@ -881,7 +898,7 @@ static s32 e1000_get_pcs_speed_and_duplex_82575(struct e1000_hw *hw,
 	DEBUGFUNC("e1000_get_pcs_speed_and_duplex_82575");
 
 	/* Set up defaults for the return values of this function */
-	mac->serdes_has_link = FALSE;
+	mac->serdes_has_link = false;
 	*speed = 0;
 	*duplex = 0;
 
@@ -898,7 +915,7 @@ static s32 e1000_get_pcs_speed_and_duplex_82575(struct e1000_hw *hw,
 	 * can be determined by checking for both link up and link sync ok
 	 */
 	if ((pcs & E1000_PCS_LSTS_LINK_OK) && (pcs & E1000_PCS_LSTS_SYNK_OK)) {
-		mac->serdes_has_link = TRUE;
+		mac->serdes_has_link = true;
 
 		/* Detect and store PCS speed */
 		if (pcs & E1000_PCS_LSTS_SPEED_1000) {
@@ -918,6 +935,137 @@ static s32 e1000_get_pcs_speed_and_duplex_82575(struct e1000_hw *hw,
 	}
 
 	return E1000_SUCCESS;
+}
+
+/**
+ *  e1000_init_rx_addrs_82575 - Initialize receive address's
+ *  @hw: pointer to the HW structure
+ *  @rar_count: receive address registers
+ *
+ *  Setups the receive address registers by setting the base receive address
+ *  register to the devices MAC address and clearing all the other receive
+ *  address registers to 0.
+ **/
+static void e1000_init_rx_addrs_82575(struct e1000_hw *hw, u16 rar_count)
+{
+	u32 i;
+	u8 addr[6] = {0,0,0,0,0,0};
+	/*
+	 * This function is essentially the same as that of
+	 * e1000_init_rx_addrs_generic. However it also takes care
+	 * of the special case where the register offset of the
+	 * second set of RARs begins elsewhere. This is implicitly taken care by
+	 * function e1000_rar_set_generic.
+	 */
+
+	DEBUGFUNC("e1000_init_rx_addrs_82575");
+
+	/* Setup the receive address */
+	DEBUGOUT("Programming MAC Address into RAR[0]\n");
+	hw->mac.ops.rar_set(hw, hw->mac.addr, 0);
+
+	/* Zero out the other (rar_entry_count - 1) receive addresses */
+	DEBUGOUT1("Clearing RAR[1-%u]\n", rar_count-1);
+	for (i = 1; i < rar_count; i++) {
+	    hw->mac.ops.rar_set(hw, addr, i);
+	}
+}
+
+/**
+ *  e1000_update_mc_addr_list_82575 - Update Multicast addresses
+ *  @hw: pointer to the HW structure
+ *  @mc_addr_list: array of multicast addresses to program
+ *  @mc_addr_count: number of multicast addresses to program
+ *  @rar_used_count: the first RAR register free to program
+ *  @rar_count: total number of supported Receive Address Registers
+ *
+ *  Updates the Receive Address Registers and Multicast Table Array.
+ *  The caller must have a packed mc_addr_list of multicast addresses.
+ *  The parameter rar_count will usually be hw->mac.rar_entry_count
+ *  unless there are workarounds that change this.
+ **/
+static void e1000_update_mc_addr_list_82575(struct e1000_hw *hw,
+                                     u8 *mc_addr_list, u32 mc_addr_count,
+                                     u32 rar_used_count, u32 rar_count)
+{
+	u32 hash_value;
+	u32 i;
+	u8 addr[6] = {0,0,0,0,0,0};
+	/*
+	 * This function is essentially the same as that of 
+	 * e1000_update_mc_addr_list_generic. However it also takes care 
+	 * of the special case where the register offset of the 
+	 * second set of RARs begins elsewhere. This is implicitly taken care by 
+	 * function e1000_rar_set_generic.
+	 */
+
+	DEBUGFUNC("e1000_update_mc_addr_list_82575");
+
+	/*
+	 * Load the first set of multicast addresses into the exact
+	 * filters (RAR).  If there are not enough to fill the RAR
+	 * array, clear the filters.
+	 */
+	for (i = rar_used_count; i < rar_count; i++) {
+		if (mc_addr_count) {
+			e1000_rar_set_generic(hw, mc_addr_list, i);
+			mc_addr_count--;
+			mc_addr_list += ETH_ADDR_LEN;
+		} else {
+			e1000_rar_set_generic(hw, addr, i);
+		}
+	}
+
+	/* Clear the old settings from the MTA */
+	DEBUGOUT("Clearing MTA\n");
+	for (i = 0; i < hw->mac.mta_reg_count; i++) {
+		E1000_WRITE_REG_ARRAY(hw, E1000_MTA, i, 0);
+		E1000_WRITE_FLUSH(hw);
+	}
+
+	/* Load any remaining multicast addresses into the hash table. */
+	for (; mc_addr_count > 0; mc_addr_count--) {
+		hash_value = e1000_hash_mc_addr_generic(hw, mc_addr_list);
+		DEBUGOUT1("Hash value = 0x%03X\n", hash_value);
+		hw->mac.ops.mta_set(hw, hash_value);
+		mc_addr_list += ETH_ADDR_LEN;
+	}
+}
+
+/**
+ *  e1000_shutdown_fiber_serdes_link_82575 - Remove link during power down
+ *  @hw: pointer to the HW structure
+ *
+ *  In the case of fiber serdes shut down optics and PCS on driver unload
+ *  when management pass thru is not enabled.
+ **/
+void e1000_shutdown_fiber_serdes_link_82575(struct e1000_hw *hw)
+{
+	u32 reg;
+
+	if (hw->mac.type != e1000_82576 ||
+	   (hw->phy.media_type != e1000_media_type_fiber &&
+	    hw->phy.media_type != e1000_media_type_internal_serdes))
+		return;
+
+	/* if the management interface is not enabled, then power down */
+	if (!e1000_enable_mng_pass_thru(hw)) {
+		/* Disable PCS to turn off link */
+		reg = E1000_READ_REG(hw, E1000_PCS_CFG0);
+		reg &= ~E1000_PCS_CFG_PCS_EN;
+		E1000_WRITE_REG(hw, E1000_PCS_CFG0, reg);
+
+		/* shutdown the laser */
+		reg = E1000_READ_REG(hw, E1000_CTRL_EXT);
+		reg |= E1000_CTRL_EXT_SDP7_DATA;
+		E1000_WRITE_REG(hw, E1000_CTRL_EXT, reg);
+
+		/* flush the write to verfiy completion */
+		E1000_WRITE_FLUSH(hw);
+		msec_delay(1);
+	}
+
+	return;
 }
 
 /**
@@ -1006,7 +1154,7 @@ static s32 e1000_init_hw_82575(struct e1000_hw *hw)
 	mac->ops.clear_vfta(hw);
 
 	/* Setup the receive address */
-	e1000_init_rx_addrs_generic(hw, rar_count);
+	e1000_init_rx_addrs_82575(hw, rar_count);
 	/* Zero out the Multicast HASH table */
 	DEBUGOUT("Zeroing the MTA\n");
 	for (i = 0; i < mac->mta_reg_count; i++)
@@ -1145,6 +1293,13 @@ static s32 e1000_setup_fiber_serdes_link_82575(struct e1000_hw *hw)
 	       E1000_CTRL_SWDPIN1;
 	E1000_WRITE_REG(hw, E1000_CTRL, reg);
 
+	/* Power on phy for 82576 fiber adapters */
+	if (hw->mac.type == e1000_82576) {
+		reg = E1000_READ_REG(hw, E1000_CTRL_EXT);
+		reg &= ~E1000_CTRL_EXT_SDP7_DATA;
+		E1000_WRITE_REG(hw, E1000_CTRL_EXT, reg);
+	}
+
 	/* Set switch control to serdes energy detect */
 	reg = E1000_READ_REG(hw, E1000_CONNSW);
 	reg |= E1000_CONNSW_ENRGSRC;
@@ -1180,6 +1335,42 @@ static s32 e1000_setup_fiber_serdes_link_82575(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_PCS_LCTL, reg);
 
 	return E1000_SUCCESS;
+}
+
+/**
+ *  e1000_valid_led_default_82575 - Verify a valid default LED config
+ *  @hw: pointer to the HW structure
+ *  @data: pointer to the NVM (EEPROM)
+ *
+ *  Read the EEPROM for the current default LED configuration.  If the
+ *  LED configuration is not valid, set to a valid LED configuration.
+ **/
+static s32 e1000_valid_led_default_82575(struct e1000_hw *hw, u16 *data)
+{
+	s32 ret_val;
+
+	DEBUGFUNC("e1000_valid_led_default_82575");
+
+	ret_val = hw->nvm.ops.read(hw, NVM_ID_LED_SETTINGS, 1, data);
+	if (ret_val) {
+		DEBUGOUT("NVM Read Error\n");
+		goto out;
+	}
+
+	if (*data == ID_LED_RESERVED_0000 || *data == ID_LED_RESERVED_FFFF) {
+		switch(hw->phy.media_type) {
+		case e1000_media_type_fiber:
+		case e1000_media_type_internal_serdes:
+			*data = ID_LED_DEFAULT_82575_SERDES;
+			break;
+		case e1000_media_type_copper:
+		default:
+			*data = ID_LED_DEFAULT;
+			break;
+		}
+	}
+out:
+	return ret_val;
 }
 
 /**
@@ -1263,8 +1454,8 @@ static bool e1000_sgmii_active_82575(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_sgmii_active_82575");
 
-	if (hw->mac.type != e1000_82575) {
-		ret_val = FALSE;
+	if (hw->mac.type != e1000_82575 && hw->mac.type != e1000_82576) {
+		ret_val = false;
 		goto out;
 	}
 
@@ -1274,6 +1465,70 @@ static bool e1000_sgmii_active_82575(struct e1000_hw *hw)
 
 out:
 	return ret_val;
+}
+
+/**
+ *  e1000_translate_register_82576 - Translate the proper register offset
+ *  @reg: e1000 register to be read
+ *
+ *  Registers in 82576 are located in different offsets than other adapters
+ *  even though they function in the same manner.  This function takes in
+ *  the name of the register to read and returns the correct offset for
+ *  82576 silicon.
+ **/
+u32 e1000_translate_register_82576(u32 reg)
+{
+	/*
+	 * Some of the Kawela registers are located at different
+	 * offsets than they are in older adapters.
+	 * Despite the difference in location, the registers
+	 * function in the same manner.
+	 */
+	switch (reg) {
+	case E1000_TDBAL(0):
+		reg = 0x0E000;
+		break;
+	case E1000_TDBAH(0):
+		reg = 0x0E004;
+		break;
+	case E1000_TDLEN(0):
+		reg = 0x0E008;
+		break;
+	case E1000_TDH(0):
+		reg = 0x0E010;
+		break;
+	case E1000_TDT(0):
+		reg = 0x0E018;
+		break;
+	case E1000_TXDCTL(0):
+		reg = 0x0E028;
+		break;
+	case E1000_RDBAL(0):
+		reg = 0x0C000;
+		break;
+	case E1000_RDBAH(0):
+		reg = 0x0C004;
+		break;
+	case E1000_RDLEN(0):
+		reg = 0x0C008;
+		break;
+	case E1000_RDH(0):
+		reg = 0x0C010;
+		break;
+	case E1000_RDT(0):
+		reg = 0x0C018;
+		break;
+	case E1000_RXDCTL(0):
+		reg = 0x0C028;
+		break;
+	case E1000_SRRCTL(0):
+		reg = 0x0C00C;
+		break;
+	default:
+		break;
+	}
+
+	return reg;
 }
 
 /**
@@ -1290,25 +1545,25 @@ static s32 e1000_reset_init_script_82575(struct e1000_hw* hw)
 	if (hw->mac.type == e1000_82575) {
 		DEBUGOUT("Running reset init script for 82575\n");
 		/* SerDes configuration via SERDESCTRL */
-		e1000_write_8bit_ctrl_reg(hw, E1000_SCTL, 0x00, 0x0C);
-		e1000_write_8bit_ctrl_reg(hw, E1000_SCTL, 0x01, 0x78);
-		e1000_write_8bit_ctrl_reg(hw, E1000_SCTL, 0x1B, 0x23);
-		e1000_write_8bit_ctrl_reg(hw, E1000_SCTL, 0x23, 0x15);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_SCTL, 0x00, 0x0C);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_SCTL, 0x01, 0x78);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_SCTL, 0x1B, 0x23);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_SCTL, 0x23, 0x15);
 
 		/* CCM configuration via CCMCTL register */
-		e1000_write_8bit_ctrl_reg(hw, E1000_CCMCTL, 0x14, 0x00);
-		e1000_write_8bit_ctrl_reg(hw, E1000_CCMCTL, 0x10, 0x00);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_CCMCTL, 0x14, 0x00);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_CCMCTL, 0x10, 0x00);
 
 		/* PCIe lanes configuration */
-		e1000_write_8bit_ctrl_reg(hw, E1000_GIOCTL, 0x00, 0xEC);
-		e1000_write_8bit_ctrl_reg(hw, E1000_GIOCTL, 0x61, 0xDF);
-		e1000_write_8bit_ctrl_reg(hw, E1000_GIOCTL, 0x34, 0x05);
-		e1000_write_8bit_ctrl_reg(hw, E1000_GIOCTL, 0x2F, 0x81);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_GIOCTL, 0x00, 0xEC);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_GIOCTL, 0x61, 0xDF);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_GIOCTL, 0x34, 0x05);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_GIOCTL, 0x2F, 0x81);
 
 		/* PCIe PLL Configuration */
-		e1000_write_8bit_ctrl_reg(hw, E1000_SCCTL, 0x02, 0x47);
-		e1000_write_8bit_ctrl_reg(hw, E1000_SCCTL, 0x14, 0x00);
-		e1000_write_8bit_ctrl_reg(hw, E1000_SCCTL, 0x10, 0x00);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_SCCTL, 0x02, 0x47);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_SCCTL, 0x14, 0x00);
+		e1000_write_8bit_ctrl_reg_generic(hw, E1000_SCCTL, 0x10, 0x00);
 	}
 
 	return E1000_SUCCESS;
@@ -1338,11 +1593,41 @@ static s32 e1000_read_mac_addr_82575(struct e1000_hw *hw)
  **/
 static void e1000_power_down_phy_copper_82575(struct e1000_hw *hw)
 {
+	struct e1000_phy_info *phy = &hw->phy;
+	struct e1000_mac_info *mac = &hw->mac;
+
+	if (!(phy->ops.check_reset_block))
+		return;
+
 	/* If the management interface is not enabled, then power down */
-	if (!(e1000_check_mng_mode(hw) || e1000_check_reset_block(hw)))
+	if (!(mac->ops.check_mng_mode(hw) || phy->ops.check_reset_block(hw)))
 		e1000_power_down_phy_copper(hw);
 
 	return;
+}
+
+/**
+ *  e1000_remove_device_82575 - Free device specific structure
+ *  @hw: pointer to the HW structure
+ *
+ *  If a device specific structure was allocated, this function will
+ *  free it after shutting down the serdes interface if available.
+ **/
+void e1000_remove_device_82575(struct e1000_hw *hw)
+{
+	u16 eeprom_data = 0;
+
+	/*
+	 * If APM is enabled in the EEPROM then leave the port on for fiber
+	 * serdes adapters.
+	 */
+	if (hw->bus.func == 0)
+		hw->nvm.ops.read(hw, NVM_INIT_CONTROL3_PORT_A, 1, &eeprom_data);
+
+	if (!(eeprom_data & E1000_NVM_APME_82575))
+		e1000_shutdown_fiber_serdes_link_82575(hw);
+
+	e1000_remove_device_generic(hw);
 }
 
 /**

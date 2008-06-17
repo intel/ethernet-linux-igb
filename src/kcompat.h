@@ -50,6 +50,7 @@
 
 /* NAPI enable/disable flags here */
 
+
 #ifdef _E1000_H_
 #ifdef CONFIG_E1000_NAPI
 #define NAPI
@@ -58,9 +59,12 @@
 #undef NAPI
 #define NAPI
 #endif
+#undef NAPI
+#define NAPI
 #ifdef E1000_NO_NAPI
 #undef NAPI
 #endif
+#undef NAPI
 #endif
 
 #ifdef _IGB_H_
@@ -84,8 +88,10 @@
 #ifndef CONFIG_E1000_NAPI
 #define CONFIG_E1000_NAPI
 #endif
+#define CONFIG_E1000E_NAPI
 #else
 #undef CONFIG_E1000_NAPI
+#undef CONFIG_E1000E_NAPI
 #undef CONFIG_IXGB_NAPI
 #endif
 
@@ -93,6 +99,8 @@
 #ifdef DISABLE_PACKET_SPLIT
 #undef CONFIG_E1000_DISABLE_PACKET_SPLIT
 #define CONFIG_E1000_DISABLE_PACKET_SPLIT
+#undef CONFIG_IGB_DISABLE_PACKET_SPLIT
+#define CONFIG_IGB_DISABLE_PACKET_SPLIT
 #endif
 
 /* MSI compatibility code for all kernels and drivers */
@@ -284,6 +292,10 @@ enum {
 
 #ifndef VLAN_ETH_FRAME_LEN
 #define VLAN_ETH_FRAME_LEN 1518
+#endif
+
+#ifndef DCA_GET_TAG_TWO_ARGS
+#define dca3_get_tag(a,b) dca_get_tag(b)
 #endif
 
 
@@ -821,6 +833,7 @@ extern void _kc_pci_unmap_page(struct pci_dev *dev, u64 dma_addr, size_t size, i
 /* we won't support NAPI on less than 2.4.20 */
 #ifdef NAPI
 #undef CONFIG_E1000_NAPI
+#undef CONFIG_E1000E_NAPI
 #undef CONFIG_IXGB_NAPI
 #endif
 
@@ -926,7 +939,7 @@ static inline u32 _kc_netif_msg_init(int debug_value, int default_msg_enable_bit
 #define pci_register_driver pci_module_init
 
 #define dev_err(__unused_dev, format, arg...)            \
-	printk(KERN_ERR "%s: " format, pci_name(pdev) , ## arg)
+	printk(KERN_ERR "%s: " format, pci_name(adapter->pdev) , ## arg)
 
 /* hlist_* code - double linked lists */
 struct hlist_head {
@@ -989,6 +1002,16 @@ static inline void INIT_HLIST_NODE(struct hlist_node *h)
 		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
 	     pos = n)
 
+/* we ignore GFP here */
+#define dma_alloc_coherent(dv, sz, dma, gfp) \
+	pci_alloc_consistent(pdev, (sz), (dma))
+#define dma_free_coherent(dv, sz, addr, dma_addr) \
+	pci_free_consistent(pdev, (sz), (addr), (dma_addr))
+
+#ifndef might_sleep
+#define might_sleep()
+#endif
+
 #endif /* <= 2.5.0 */
 
 /*****************************************************************************/
@@ -1010,6 +1033,7 @@ static inline void _kc_synchronize_irq(void)
 #define container_of list_entry
 #define schedule_work schedule_task
 #define flush_scheduled_work flush_scheduled_tasks
+#define cancel_work_sync(x) flush_scheduled_work()
 
 #endif /* 2.5.28 => 2.4.17 */
 
@@ -1019,6 +1043,9 @@ static inline void _kc_synchronize_irq(void)
 #define MODULE_INFO(version, _version)
 #ifndef CONFIG_E1000_DISABLE_PACKET_SPLIT
 #define CONFIG_E1000_DISABLE_PACKET_SPLIT 1
+#endif
+#ifndef CONFIG_IGB_DISABLE_PACKET_SPLIT
+#define CONFIG_IGB_DISABLE_PACKET_SPLIT 1
 #endif
 
 #define pci_set_consistent_dma_mask(dev,mask) 1
@@ -1223,6 +1250,30 @@ static inline unsigned long _kc_msleep_interruptible(unsigned int msecs)
 #define NET_IP_ALIGN 2
 #endif
 
+#define KC_USEC_PER_SEC	1000000L
+#define usecs_to_jiffies _kc_usecs_to_jiffies
+static inline unsigned int _kc_jiffies_to_usecs(const unsigned long j)
+{
+#if HZ <= KC_USEC_PER_SEC && !(KC_USEC_PER_SEC % HZ)
+	return (KC_USEC_PER_SEC / HZ) * j;
+#elif HZ > KC_USEC_PER_SEC && !(HZ % KC_USEC_PER_SEC)
+	return (j + (HZ / KC_USEC_PER_SEC) - 1)/(HZ / KC_USEC_PER_SEC);
+#else
+	return (j * KC_USEC_PER_SEC) / HZ;
+#endif
+}
+static inline unsigned long _kc_usecs_to_jiffies(const unsigned int m)
+{
+	if (m > _kc_jiffies_to_usecs(MAX_JIFFY_OFFSET))
+		return MAX_JIFFY_OFFSET;
+#if HZ <= KC_USEC_PER_SEC && !(KC_USEC_PER_SEC % HZ)
+	return (m + (KC_USEC_PER_SEC / HZ) - 1) / (KC_USEC_PER_SEC / HZ);
+#elif HZ > KC_USEC_PER_SEC && !(HZ % KC_USEC_PER_SEC)
+	return m * (HZ / KC_USEC_PER_SEC);
+#else
+	return (m * HZ + KC_USEC_PER_SEC - 1) / KC_USEC_PER_SEC;
+#endif
+}
 #endif /* < 2.6.11 */
 
 /*****************************************************************************/
@@ -1318,7 +1369,7 @@ static inline int _kc_skb_is_gso(const struct sk_buff *skb)
 #ifndef RHEL_RELEASE_VERSION
 #define RHEL_RELEASE_VERSION(a,b) 0
 #endif
-#if (!(( RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(4,4) ) && ( RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(5,0) ) || ( RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(5,0) ))) 
+#if (!(( RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(4,4) ) && ( RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(5,0) ) || ( RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(5,0) )))
 typedef irqreturn_t (*irq_handler_t)(int, void*, struct pt_regs *);
 #endif
 typedef irqreturn_t (*new_handler_t)(int, void*);
@@ -1336,51 +1387,54 @@ static inline int _kc_request_irq(unsigned int irq, new_handler_t handler, unsig
 #undef request_irq
 #define request_irq(irq, handler, flags, devname, dev_id) _kc_request_irq((irq), (handler), (flags), (devname), (dev_id))
 
+#define irq_handler_t new_handler_t
+
 /* pci_restore_state and pci_save_state handles MSI/PCIE from 2.6.19 */
 #define PCIE_CONFIG_SPACE_LEN 256
 #define PCI_CONFIG_SPACE_LEN 64
 #define PCIE_LINK_STATUS 0x12
+#define pci_config_space_ich8lan()
 #undef pci_save_state
 #define pci_save_state(pdev) _kc_pci_save_state(adapter)
 #define _kc_pci_save_state(adapter) 0; { \
-	int size, i; \
+	int size = PCI_CONFIG_SPACE_LEN, i; \
+	u16 pcie_cap_offset = pci_find_capability(pdev, PCI_CAP_ID_EXP); \
 	u16 pcie_link_status; \
 	\
-	u16 cap_offset = pci_find_capability(pdev, PCI_CAP_ID_EXP); \
-	if (cap_offset) { \
-	if (pci_read_config_word(pdev, cap_offset + PCIE_LINK_STATUS, &pcie_link_status)) \
-		size = PCI_CONFIG_SPACE_LEN; \
-	else \
+	if (pcie_cap_offset) { \
+	if (!pci_read_config_word(pdev, pcie_cap_offset + PCIE_LINK_STATUS, \
+				  &pcie_link_status)) \
 		size = PCIE_CONFIG_SPACE_LEN; \
+	} \
+	pci_config_space_ich8lan(); \
 	WARN_ON(adapter->config_space != NULL); \
 	adapter->config_space = kmalloc(size, GFP_KERNEL); \
 	if (!adapter->config_space) { \
-		printk(KERN_ERR "Out of memory in pci_save_msi_state\n"); \
+		printk(KERN_ERR "Out of memory in pci_save_state\n"); \
 		return -ENOMEM; \
 	} \
 	for (i = 0; i < (size / 4); i++) \
 		pci_read_config_dword(pdev, i * 4, &adapter->config_space[i]); \
-	} \
 }
 #undef pci_restore_state
 #define pci_restore_state(pdev) _kc_pci_restore_state(adapter)
 #define _kc_pci_restore_state(adapter) { \
-	int size, i; \
+	int size = PCI_CONFIG_SPACE_LEN, i; \
+	u16 pcie_cap_offset; \
 	u16 pcie_link_status; \
 	\
-	u16 cap_offset = pci_find_capability(pdev, PCI_CAP_ID_EXP); \
-	if (cap_offset) { \
 	if (adapter->config_space != NULL) { \
-	if (pci_read_config_word(pdev, cap_offset + PCIE_LINK_STATUS, &pcie_link_status)) \
-		size = PCI_CONFIG_SPACE_LEN; \
-	else \
+	pcie_cap_offset = pci_find_capability(pdev, PCI_CAP_ID_EXP); \
+	if (pcie_cap_offset) { \
+	if (!pci_read_config_word(pdev, pcie_cap_offset + PCIE_LINK_STATUS, \
+				  &pcie_link_status)) \
 		size = PCIE_CONFIG_SPACE_LEN; \
-	\
+	} \
+	pci_config_space_ich8lan(); \
 	for (i = 0; i < (size / 4); i++) \
 		pci_write_config_dword(pdev, i * 4, adapter->config_space[i]); \
 	kfree(adapter->config_space); \
 	adapter->config_space = NULL; \
-	} \
 	} \
 }
 
@@ -1438,11 +1492,24 @@ do { \
 #define pci_register_driver pci_module_init
 #define skb_mac_header(skb) skb->mac.raw
 
+#ifdef NETIF_F_MULTI_QUEUE
+#ifndef alloc_etherdev_mq
+#define alloc_etherdev_mq(_a, _b) alloc_etherdev(_a)
+#endif
+#endif /* NETIF_F_MULTI_QUEUE */
 
 #ifndef ETH_FCS_LEN
 #define ETH_FCS_LEN 4
 #endif
+#define cancel_work_sync(x) flush_scheduled_work()
 #endif /* < 2.6.22 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE > KERNEL_VERSION(2,6,22) )
+#undef ETHTOOL_GPERMADDR
+#undef SET_MODULE_OWNER
+#define SET_MODULE_OWNER(dev) do { } while (0)
+#endif /* > 2.6.22 */
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
@@ -1452,6 +1519,7 @@ struct napi_struct {
 	int (*poll)(struct napi_struct *, int);
 	int weight;
 };
+#ifdef NAPI
 extern int __kc_adapter_clean(struct net_device *, int *);
 #define netif_rx_complete(netdev, napi) netif_rx_complete(netdev)
 #define netif_rx_schedule_prep(netdev, napi) netif_rx_schedule_prep(netdev)
@@ -1468,21 +1536,73 @@ extern int __kc_adapter_clean(struct net_device *, int *);
 		__napi->weight = (_weight); \
 		netif_poll_disable(_netdev); \
 	} while (0)
-#endif /* < 2.6.24 */
+#else /* NAPI */
+#define netif_napi_add(_netdev, _napi, _poll, _weight) \
+	do { \
+		struct napi_struct *__napi = _napi; \
+		_netdev->poll = &(_poll); \
+		_netdev->weight = (_weight); \
+		__napi->poll = &(_poll); \
+		__napi->weight = (_weight); \
+	} while (0)
+#endif /* NAPI */
 
-
-/*****************************************************************************/
-#if ( LINUX_VERSION_CODE > KERNEL_VERSION(2,6,22) )
-#undef ETHTOOL_GPERMADDR
-#undef SET_MODULE_OWNER
-#define SET_MODULE_OWNER(dev) do { } while (0)
-#endif /* > 2.6.22 */
-
-#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
 #undef dev_get_by_name
 #define dev_get_by_name(_a, _b) dev_get_by_name(_b)
 #define __netif_subqueue_stopped(_a, _b) netif_subqueue_stopped(_a, _b)
+#define netif_napi_del(_a) do {} while (0)
+#else
+#define netif_napi_del(_a) do {} while (0)
+#ifdef NAPI
+#ifdef CONFIG_NETPOLL
+#undef netif_napi_del
+#define netif_napi_del(_a) list_del(&(_a)->dev_list);
+#endif
+#endif
 #endif /* < 2.6.24 */
 
-#endif /* _KCOMPAT_H_ */
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE > KERNEL_VERSION(2,6,24) )
+#include <linux/pm_qos_params.h>
+#endif /* > 2.6.24 */
 
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25) )
+#define PM_QOS_CPU_DMA_LATENCY	1
+
+#if ( LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18) )
+#include <linux/latency.h>
+#define PM_QOS_DEFAULT_VALUE	INFINITE_LATENCY
+#define pm_qos_add_requirement(pm_qos_class, name, value) \
+		set_acceptable_latency(name, value)
+#define pm_qos_remove_requirement(pm_qos_class, name) \
+		remove_acceptable_latency(name)
+#define pm_qos_update_requirement(pm_qos_class, name, value) \
+		modify_acceptable_latency(name, value)
+#else
+#define PM_QOS_DEFAULT_VALUE	-1
+#define pm_qos_add_requirement(pm_qos_class, name, value)
+#define pm_qos_remove_requirement(pm_qos_class, name)
+#define pm_qos_update_requirement(pm_qos_class, name, value) { \
+	if (value != PM_QOS_DEFAULT_VALUE) { \
+		printk(KERN_WARNING "%s: unable to set PM QoS requirement\n", \
+			pci_name(adapter->pdev)); \
+	} \
+}
+#endif /* > 2.6.18 */
+
+#endif /* < 2.6.25 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26) )
+#endif /* < 2.6.26 */
+
+#ifndef NETIF_F_MULTI_QUEUE
+#define NETIF_F_MULTI_QUEUE 0
+#define netif_is_multiqueue(a) 0
+#define netif_stop_subqueue(a, b)
+#define netif_wake_subqueue(a, b)
+#define netif_start_subqueue(a, b)
+#endif /* NETIF_F_MULTI_QUEUE */
+
+#endif /* _KCOMPAT_H_ */

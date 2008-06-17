@@ -290,6 +290,10 @@ struct sk_buff *_kc_netdev_alloc_skb(struct net_device *dev,
 #endif /* <= 2.6.17 */
 
 /*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23) )
+#endif /* < 2.6.23 */
+
+/*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
 #ifdef NAPI
 int __kc_adapter_clean(struct net_device *netdev, int *budget)

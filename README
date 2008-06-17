@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Network Connection
 ==================================================
 
-October 29, 2007
+June 13, 2008
 
 
 Contents
@@ -19,11 +19,6 @@ Contents
 
 In This Release
 ===============
-
-NOTE: This release includes two Linux* Base Drivers for Intel® Network 
-Connection. These drivers are named e1000 and igb. The igb driver 
-must be installed to support any 82575-based network connections. All 
-other network connections require the e1000 driver.
 
 This file describes the igb Linux* Base Driver for Intel Network Connection.  
 This driver supports kernel versions 2.4.x and 2.6.x. This driver supports
@@ -312,6 +307,14 @@ a recompile. If the driver fails to enable a specific interrupt mode, it will
 fail back to lesser capabilities.
 
 
+LROAggr
+-------
+Valid Range:    2-44
+Default Value:  32
+
+Defines the maximum number of packets that can be aggregated together. 
+
+
 Additional Configurations
 =========================
 
@@ -418,10 +421,14 @@ Additional Configurations
   
   MSI-X support is required for Multiqueue. If MSI-X is not found, the system 
   will fallback to MSI or to Legacy interrupts.
-  NOTE: Do not use MSI-X with the 2.6.19 or 2.6.20 kernels. We recommend the
-  2.6.21 or later kernel.
-  NOTE: On some kernels a reboot is required to switch between a single queue 
-  mode and multiqueue modes, or vice-versa.
+
+  REQUIREMENTS: MSI-X support is required for Multiqueue. If MSI-X is not 
+  found, the system will fallback to MSI or to Legacy interrupts.
+  This driver supports multiqueue in kernel versions 2.6.24 and 
+  greater.
+  This driver supports receive multiqueue on all kernels that support MSI-X, 
+  with the driver in non-NAPI mode.
+  NOTE: Do not use MSI-X with the 2.6.19 or 2.6.20 kernels.
 
   To enable a separate vector for TX, use: 
   # make CFLAGS_EXTRA=-DCONFIG_IGB_SEPARATE_TX_HANDLER
@@ -431,10 +438,38 @@ Additional Configurations
  
   With this option, you would get three MSI-X vectors: one for TX, one for RX, 
   and one for link.
- 
-  Currently there is no kernel support for multiple TX queues.
 
 
+  LRO
+  ---
+  Large Receive Offload (LRO) is a technique for increasing inbound throughput
+  of high-bandwidth network connections by reducing CPU overhead. It works by
+  aggregating multiple incoming packets from a single stream into a larger 
+  buffer before they are passed higher up the networking stack, thus reducing
+  the number of packets that have to be processed. LRO combines multiple 
+  Ethernet frames into a single receive in the stack, thereby potentially 
+  decreasing CPU utilization for receives.
+
+  NOTE: LRO requires 2.6.24 or later kernel version. You also need to have
+  inet_lro enabled via either the CONFIG_INET_LRO or CONFIG_INET_LRO_MODULE 
+  kernel config option. Additionally, if CONFIG_INET_LRO_MODULE is used, the
+  inet_lro module needs to be loaded before the igb driver.
+
+  IGB_LRO is a compile time flag. The user can enable it at compile 
+  time to add support for LRO from the driver. The flag is used by adding 
+  CFLAGS_EXTRA="-DIGB_LRO" to the make file when it's being compiled. 
+
+     make CFLAGS_EXTRA="-DIGB_LRO" install
+
+  You can verify that the driver is using LRO by looking at these counters in 
+  Ethtool:
+
+  lro_aggregated - count of total packets that were combined
+  lro_flushed - counts the number of packets flushed out of LRO
+  lro_no_desc - counts the number of times an LRO descriptor was not available 
+  for the LRO packet
+
+  
 Known Issues/Troubleshooting
 ============================
 
@@ -529,6 +564,21 @@ the network cable while ethtool -p is running will cause the system to
 become unresponsive to keyboard commands, except for control-alt-delete.  
 Restarting the system appears to be the only remedy.
 
+Trouble passing traffic with on ports 1 and 2 using RHEL3
+---------------------------------------------------------
+There is a known hardware compatibility issue on some systems with RHEL3 
+kernels. Traffic on ports 1 and 2 may be slower than expected and ping times
+higher than expected. 
+
+This issue MAY be resolved by updating to the latest kernel and BIOS. You can 
+check your system's BIOS by downloading the Linux Firmware Developer Kit that 
+can be obtained at http://www.linuxfirmwarekit.org/
+
+Do Not Use LRO When Routing Packets
+-----------------------------------
+Due to a known general compatibility issue with LRO and routing, do not use
+LRO when routing packets. 
+
 
 Support
 =======
@@ -551,7 +601,7 @@ License
 =======
 
 Intel Gigabit Linux driver.
-Copyright(c) 1999 - 2006 Intel Corporation.
+Copyright(c) 1999 - 2008 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms and conditions of the GNU General Public License,

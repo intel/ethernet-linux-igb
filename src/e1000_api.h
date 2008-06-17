@@ -31,6 +31,8 @@
 #include "e1000_hw.h"
 
 extern void    e1000_init_function_pointers_82575(struct e1000_hw *hw);
+extern void    e1000_init_function_pointers_vf(struct e1000_hw *hw);
+extern void    e1000_shutdown_fiber_serdes_link(struct e1000_hw *hw);
 
 s32  e1000_set_mac_type(struct e1000_hw *hw);
 s32  e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device);
@@ -91,7 +93,6 @@ s32  e1000_wait_autoneg(struct e1000_hw *hw);
 s32  e1000_set_d3_lplu_state(struct e1000_hw *hw, bool active);
 s32  e1000_set_d0_lplu_state(struct e1000_hw *hw, bool active);
 bool e1000_check_mng_mode(struct e1000_hw *hw);
-bool e1000_enable_mng_pass_thru(struct e1000_hw *hw);
 bool e1000_enable_tx_pkt_filtering(struct e1000_hw *hw);
 s32  e1000_mng_enable_host_if(struct e1000_hw *hw);
 s32  e1000_mng_host_if_write(struct e1000_hw *hw,
@@ -100,7 +101,6 @@ s32  e1000_mng_write_cmd_header(struct e1000_hw *hw,
                                 struct e1000_host_mng_command_header *hdr);
 s32  e1000_mng_write_dhcp_info(struct e1000_hw * hw,
                                     u8 *buffer, u16 length);
-
 
 /*
  * TBI_ACCEPT macro definition:
@@ -121,11 +121,11 @@ s32  e1000_mng_write_dhcp_info(struct e1000_hw * hw,
  * Typical use:
  *  ...
  *  if (TBI_ACCEPT) {
- *      accept_frame = TRUE;
+ *      accept_frame = true;
  *      e1000_tbi_adjust_stats(adapter, MacAddress);
  *      frame_length--;
  *  } else {
- *      accept_frame = FALSE;
+ *      accept_frame = false;
  *  }
  *  ...
  */

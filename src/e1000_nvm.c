@@ -26,7 +26,21 @@
 *******************************************************************************/
 
 #include "e1000_api.h"
-#include "e1000_nvm.h"
+
+/**
+ *  e1000_init_nvm_ops_generic - Initialize NVM function pointers
+ *  @hw: pointer to the HW structure
+ *
+ *  Setups up the function pointers to no-op functions
+ **/
+void e1000_init_nvm_ops_generic(struct e1000_hw *hw)
+{
+	struct e1000_nvm_info *nvm = &hw->nvm;
+	DEBUGFUNC("e1000_init_nvm_ops_generic");
+
+	/* Initialize function pointers */
+	nvm->ops.reload = e1000_reload_nvm_generic;
+}
 
 /**
  *  e1000_raise_eec_clk - Raise EEPROM clock
@@ -561,8 +575,6 @@ s32 e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 	if (ret_val)
 		goto out;
 
-	msec_delay(10);
-
 	while (widx < words) {
 		u8 write_opcode = NVM_WRITE_OPCODE_SPI;
 
@@ -604,7 +616,7 @@ s32 e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		}
 	}
 
-	msec_delay(10);
+	msec_delay(nvm->semaphore_delay);
 release:
 	nvm->ops.release(hw);
 

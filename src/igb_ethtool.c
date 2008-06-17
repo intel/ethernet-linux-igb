@@ -27,8 +27,8 @@
 
 /* ethtool support for igb */
 
-#include <linux/vmalloc.h>
 #include <linux/netdevice.h>
+#include <linux/vmalloc.h>
 
 #ifdef SIOCETHTOOL
 #include <linux/ethtool.h>
@@ -99,11 +99,16 @@ static const struct igb_stats igb_gstrings_stats[] = {
 	{ "tx_smbus", IGB_STAT(stats.mgptc) },
 	{ "rx_smbus", IGB_STAT(stats.mgprc) },
 	{ "dropped_smbus", IGB_STAT(stats.mgpdc) },
+#ifdef IGB_LRO
+	{ "lro_aggregated", IGB_STAT(lro_aggregated) },
+	{ "lro_flushed", IGB_STAT(lro_flushed) },
+	{ "lro_no_desc", IGB_STAT(lro_no_desc) },
+#endif
 };
 
 #define IGB_QUEUE_STATS_LEN \
 	 ((((struct igb_adapter *)netdev->priv)->num_rx_queues + \
-	  ((struct igb_adapter *)netdev->priv)->num_tx_queues ) * \
+	  ((struct igb_adapter *)netdev->priv)->num_tx_queues) * \
 	(sizeof(struct igb_queue_stats) / sizeof(u64)))
 #define IGB_GLOBAL_STATS_LEN	\
 	sizeof(igb_gstrings_stats) / sizeof(struct igb_stats)
@@ -157,7 +162,7 @@ static int igb_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 
 	ecmd->transceiver = XCVR_INTERNAL;
 
-	status = E1000_READ_REG(&adapter->hw, E1000_STATUS);
+	status = E1000_READ_REG(hw, E1000_STATUS);
 
 	if (status & E1000_STATUS_LU) {
 
@@ -302,15 +307,21 @@ static int igb_set_rx_csum(struct net_device *netdev, u32 data)
 
 static u32 igb_get_tx_csum(struct net_device *netdev)
 {
-	return (netdev->features & NETIF_F_HW_CSUM) != 0;
+	return (netdev->features & NETIF_F_IP_CSUM) != 0;
 }
 
 static int igb_set_tx_csum(struct net_device *netdev, u32 data)
 {
 	if (data)
-		netdev->features |= NETIF_F_HW_CSUM;
+#ifdef NETIF_F_IPV6_CSUM
+		netdev->features |= (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
 	else
-		netdev->features &= ~NETIF_F_HW_CSUM;
+		netdev->features &= ~(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
+#else
+		netdev->features |= NETIF_F_IP_CSUM;
+	else
+		netdev->features &= ~NETIF_F_IP_CSUM;
+#endif
 
 	return 0;
 }
@@ -423,7 +434,7 @@ static void igb_get_regs(struct net_device *netdev,
 	regs_buff[29] = E1000_READ_REG(hw, E1000_FCRTL);
 	regs_buff[30] = E1000_READ_REG(hw, E1000_FCRTH);
 	regs_buff[31] = E1000_READ_REG(hw, E1000_FCRTV);
-	
+
 	/* Receive */
 	regs_buff[32] = E1000_READ_REG(hw, E1000_RCTL);
 	regs_buff[33] = E1000_READ_REG(hw, E1000_RXCSUM);
@@ -453,7 +464,7 @@ static void igb_get_regs(struct net_device *netdev,
 	regs_buff[51] = E1000_READ_REG(hw, E1000_PCS_LPAB);
 	regs_buff[52] = E1000_READ_REG(hw, E1000_PCS_NPTX);
 	regs_buff[53] = E1000_READ_REG(hw, E1000_PCS_LPABNP);
-	
+
 	/* Statistics */
 	regs_buff[54] = adapter->stats.crcerrs;
 	regs_buff[55] = adapter->stats.algnerrc;
@@ -533,7 +544,7 @@ static void igb_get_regs(struct net_device *netdev,
 		regs_buff[145 + i] = E1000_READ_REG(hw, E1000_RDT(i));
 	for (i = 0; i < 4; i++)
 		regs_buff[149 + i] = E1000_READ_REG(hw, E1000_RXDCTL(i));
-	
+
 	for (i = 0; i < 10; i++)
 		regs_buff[153 + i] = E1000_READ_REG(hw, E1000_EITR(i));
 	for (i = 0; i < 8; i++)
@@ -745,12 +756,9 @@ static int igb_set_ringparam(struct net_device *netdev,
                              struct ethtool_ringparam *ring)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
-	struct igb_buffer *old_buf;
-	struct igb_buffer *old_rx_buf;
-	void *old_desc;
+	struct igb_ring *temp_ring;
 	int i, err;
-	u32 new_rx_count, new_tx_count, old_size;
-	dma_addr_t old_dma;
+	u32 new_rx_count, new_tx_count;
 
 	if ((ring->rx_mini_pending) || (ring->rx_jumbo_pending))
 		return -EINVAL;
@@ -763,11 +771,18 @@ static int igb_set_ringparam(struct net_device *netdev,
 	new_tx_count = min(new_tx_count, (u32)IGB_MAX_TXD);
 	new_tx_count = ALIGN(new_tx_count, REQ_TX_DESCRIPTOR_MULTIPLE);
 
-	if ((new_tx_count == adapter->tx_ring->count) &&
-	    (new_rx_count == adapter->rx_ring->count)) {
+	if ((new_tx_count == adapter->tx_ring_count) &&
+	    (new_rx_count == adapter->rx_ring_count)) {
 		/* nothing to do */
 		return 0;
 	}
+
+	if (adapter->num_tx_queues > adapter->num_rx_queues)
+		temp_ring = vmalloc(adapter->num_tx_queues * sizeof(struct igb_ring));
+	else
+		temp_ring = vmalloc(adapter->num_rx_queues * sizeof(struct igb_ring));
+	if (!temp_ring)
+		return -ENOMEM;
 
 	while (test_and_set_bit(__IGB_RESETTING, &adapter->state))
 		msleep(1);
@@ -776,66 +791,59 @@ static int igb_set_ringparam(struct net_device *netdev,
 		igb_down(adapter);
 
 	/*
-	 * We can't just free everything and then setup again, 
+	 * We can't just free everything and then setup again,
 	 * because the ISRs in MSI-X mode get passed pointers
 	 * to the tx and rx ring structs.
 	 */
-	if (new_tx_count != adapter->tx_ring->count) {
+	if (new_tx_count != adapter->tx_ring_count) {
+		memcpy(temp_ring, adapter->tx_ring,
+		       adapter->num_tx_queues * sizeof(struct igb_ring));
+
 		for (i = 0; i < adapter->num_tx_queues; i++) {
-			/* Save existing descriptor ring */
-			old_buf = adapter->tx_ring[i].buffer_info;
-			old_desc = adapter->tx_ring[i].desc;
-			old_size = adapter->tx_ring[i].size;
-			old_dma = adapter->tx_ring[i].dma;
-			/* Try to allocate a new one */
-			adapter->tx_ring[i].buffer_info = NULL;
-			adapter->tx_ring[i].desc = NULL;
-			adapter->tx_ring[i].count = new_tx_count;
-			err = igb_setup_tx_resources(adapter, 
-						&adapter->tx_ring[i]);
+			temp_ring[i].count = new_tx_count;
+			err = igb_setup_tx_resources(adapter, &temp_ring[i]);
 			if (err) {
-				/* Restore the old one so at least
-				   the adapter still works, even if
-				   we failed the request */
-				adapter->tx_ring[i].buffer_info = old_buf;
-				adapter->tx_ring[i].desc = old_desc;
-				adapter->tx_ring[i].size = old_size;
-				adapter->tx_ring[i].dma = old_dma;
+				while (i) {
+					i--;
+					igb_free_tx_resources(&temp_ring[i]);
+				}
 				goto err_setup;
 			}
-			/* Free the old buffer manually */
-			vfree(old_buf);
-			pci_free_consistent(adapter->pdev, old_size,
-			                    old_desc, old_dma);
 		}
+
+		for (i = 0; i < adapter->num_tx_queues; i++)
+			igb_free_tx_resources(&adapter->tx_ring[i]);
+
+		memcpy(adapter->tx_ring, temp_ring,
+		       adapter->num_tx_queues * sizeof(struct igb_ring));
+
+		adapter->tx_ring_count = new_tx_count;
 	}
 
 	if (new_rx_count != adapter->rx_ring->count) {
+		memcpy(temp_ring, adapter->rx_ring,
+		       adapter->num_rx_queues * sizeof(struct igb_ring));
+
 		for (i = 0; i < adapter->num_rx_queues; i++) {
-
-			old_rx_buf = adapter->rx_ring[i].buffer_info;
-			old_desc = adapter->rx_ring[i].desc;
-			old_size = adapter->rx_ring[i].size;
-			old_dma = adapter->rx_ring[i].dma;
-
-			adapter->rx_ring[i].buffer_info = NULL;
-			adapter->rx_ring[i].desc = NULL;
-			adapter->rx_ring[i].dma = 0;
-			adapter->rx_ring[i].count = new_rx_count;
-			err = igb_setup_rx_resources(adapter,
-			                             &adapter->rx_ring[i]);
+			temp_ring[i].count = new_rx_count;
+			err = igb_setup_rx_resources(adapter, &temp_ring[i]);
 			if (err) {
-				adapter->rx_ring[i].buffer_info = old_rx_buf;
-				adapter->rx_ring[i].desc = old_desc;
-				adapter->rx_ring[i].size = old_size;
-				adapter->rx_ring[i].dma = old_dma;
+				while (i) {
+					i--;
+					igb_free_rx_resources(&temp_ring[i]);
+				}
 				goto err_setup;
 			}
 
-			vfree(old_rx_buf);
-			pci_free_consistent(adapter->pdev, old_size, old_desc,
-			                    old_dma);
 		}
+
+		for (i = 0; i < adapter->num_rx_queues; i++)
+			igb_free_rx_resources(&adapter->rx_ring[i]);
+
+		memcpy(adapter->rx_ring, temp_ring,
+		       adapter->num_rx_queues * sizeof(struct igb_ring));
+
+		adapter->rx_ring_count = new_rx_count;
 	}
 
 	err = 0;
@@ -844,24 +852,26 @@ err_setup:
 		igb_up(adapter);
 
 	clear_bit(__IGB_RESETTING, &adapter->state);
+	vfree(temp_ring);
 	return err;
 }
 
 static bool reg_pattern_test(struct igb_adapter *adapter, u64 *data,
 			     int reg, u32 mask, u32 write)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	u32 pat, val;
 	static const u32 _test[] =
 		{0x5A5A5A5A, 0xA5A5A5A5, 0x00000000, 0xFFFFFFFF};
 	for (pat = 0; pat < ARRAY_SIZE(_test); pat++) {
-		E1000_WRITE_REG(&adapter->hw, reg, (_test[pat] & write));
-		val = E1000_READ_REG(&adapter->hw, reg);
+		E1000_WRITE_REG(hw, reg, (_test[pat] & write));
+		val = E1000_READ_REG(hw, reg);
 		if (val != (_test[pat] & write & mask)) {
 			DPRINTK(DRV, ERR, "pattern test reg %04X failed: got "
 			        "0x%08X expected 0x%08X\n",
-			        E1000_REGISTER(&adapter->hw, reg), val,
+			        E1000_REGISTER(hw, reg), val,
 				(_test[pat] & write & mask));
-			*data = E1000_REGISTER(&adapter->hw, reg);
+			*data = E1000_REGISTER(hw, reg);
 			return 1;
 		}
 	}
@@ -872,13 +882,14 @@ static bool reg_pattern_test(struct igb_adapter *adapter, u64 *data,
 static bool reg_set_and_check(struct igb_adapter *adapter, u64 *data,
 			      int reg, u32 mask, u32 write)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	u32 val;
-	E1000_WRITE_REG(&adapter->hw, reg, write & mask);
-	val = E1000_READ_REG(&adapter->hw, reg);
+	E1000_WRITE_REG(hw, reg, write & mask);
+	val = E1000_READ_REG(hw, reg);
 	if ((write & mask) != (val & mask)) {
 		DPRINTK(DRV, ERR, "set/check reg %04X test failed: got 0x%08X "
 		        "expected 0x%08X\n", reg, (val & mask), (write & mask));
-		*data = E1000_REGISTER(&adapter->hw, reg);
+		*data = E1000_REGISTER(hw, reg);
 		return 1;
 	}
 
@@ -899,23 +910,31 @@ static bool reg_set_and_check(struct igb_adapter *adapter, u64 *data,
 
 static int igb_reg_test(struct igb_adapter *adapter, u64 *data)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	struct igb_reg_test *test;
 	u32 value, before, after;
 	u32 i, toggle;
 
 	toggle = 0x7FFFF3FF;
 
-	test = reg_test_82575;
-	
+	switch (adapter->hw.mac.type) {
+	case e1000_82576:
+		test = reg_test_82576;
+		break;
+	default:
+		test = reg_test_82575;
+		break;
+	}
+
 	/* Because the status register is such a special case,
 	 * we handle it separately from the rest of the register
 	 * tests.  Some bits are read-only, some toggle, and some
 	 * are writable on newer MACs.
 	 */
-	before = E1000_READ_REG(&adapter->hw, E1000_STATUS);
-	value = (E1000_READ_REG(&adapter->hw, E1000_STATUS) & toggle);
-	E1000_WRITE_REG(&adapter->hw, E1000_STATUS, toggle);
-	after = E1000_READ_REG(&adapter->hw, E1000_STATUS) & toggle;
+	before = E1000_READ_REG(hw, E1000_STATUS);
+	value = (E1000_READ_REG(hw, E1000_STATUS) & toggle);
+	E1000_WRITE_REG(hw, E1000_STATUS, toggle);
+	after = E1000_READ_REG(hw, E1000_STATUS) & toggle;
 	if (value != after) {
 		DPRINTK(DRV, ERR, "failed STATUS register test got: "
 		        "0x%08X expected: 0x%08X\n", after, value);
@@ -923,7 +942,7 @@ static int igb_reg_test(struct igb_adapter *adapter, u64 *data)
 		return 1;
 	}
 	/* restore previous status */
-	E1000_WRITE_REG(&adapter->hw, E1000_STATUS, before);
+	E1000_WRITE_REG(hw, E1000_STATUS, before);
 
 	/* Perform the remainder of the register test, looping through
 	 * the test table until we either fail or reach the null entry.
@@ -944,7 +963,7 @@ static int igb_reg_test(struct igb_adapter *adapter, u64 *data)
 						test->write);
 				break;
 			case WRITE_NO_TEST:
-				writel(test->write, 
+				writel(test->write,
 				       (adapter->hw.hw_addr + test->reg)
 				        + (i * test->reg_offset));
 				break;
@@ -999,14 +1018,16 @@ static irqreturn_t igb_test_intr(int irq, void *data)
 {
 	struct net_device *netdev = (struct net_device *) data;
 	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw *hw = &adapter->hw;
 
-	adapter->test_icr |= E1000_READ_REG(&adapter->hw, E1000_ICR);
+	adapter->test_icr |= E1000_READ_REG(hw, E1000_ICR);
 
 	return IRQ_HANDLED;
 }
 
 static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	struct net_device *netdev = adapter->netdev;
 	u32 mask, i=0, shared_int = TRUE;
 	u32 irq = adapter->pdev->irq;
@@ -1036,7 +1057,7 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 	        (shared_int ? "shared" : "unshared"));
 
 	/* Disable all the interrupts */
-	E1000_WRITE_REG(&adapter->hw, E1000_IMC, 0xFFFFFFFF);
+	E1000_WRITE_REG(hw, E1000_IMC, 0xFFFFFFFF);
 	msleep(10);
 
 	/* Test each interrupt */
@@ -1052,10 +1073,8 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 			 * test failed.
 			 */
 			adapter->test_icr = 0;
-			E1000_WRITE_REG(&adapter->hw, E1000_IMC,
-			                ~mask & 0x00007FFF);
-			E1000_WRITE_REG(&adapter->hw, E1000_ICS,
-			                ~mask & 0x00007FFF);
+			E1000_WRITE_REG(hw, E1000_IMC, ~mask & 0x00007FFF);
+			E1000_WRITE_REG(hw, E1000_ICS, ~mask & 0x00007FFF);
 			msleep(10);
 
 			if (adapter->test_icr & mask) {
@@ -1071,9 +1090,10 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 		 * test failed.
 		 */
 		adapter->test_icr = 0;
-		E1000_WRITE_REG(&adapter->hw, E1000_IMS, mask);
-		E1000_WRITE_REG(&adapter->hw, E1000_ICS, mask);
+		E1000_WRITE_REG(hw, E1000_IMS, mask);
+		E1000_WRITE_REG(hw, E1000_ICS, mask);
 		msleep(10);
+
 		if (!(adapter->test_icr & mask)) {
 			*data = 4;
 			break;
@@ -1087,10 +1107,8 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 			 * test failed.
 			 */
 			adapter->test_icr = 0;
-			E1000_WRITE_REG(&adapter->hw, E1000_IMC,
-			                ~mask & 0x00007FFF);
-			E1000_WRITE_REG(&adapter->hw, E1000_ICS,
-			                ~mask & 0x00007FFF);
+			E1000_WRITE_REG(hw, E1000_IMC, ~mask & 0x00007FFF);
+			E1000_WRITE_REG(hw, E1000_ICS, ~mask & 0x00007FFF);
 			msleep(10);
 
 			if (adapter->test_icr) {
@@ -1101,7 +1119,7 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 	}
 
 	/* Disable all the interrupts */
-	E1000_WRITE_REG(&adapter->hw, E1000_IMC, 0xFFFFFFFF);
+	E1000_WRITE_REG(hw, E1000_IMC, 0xFFFFFFFF);
 	msleep(10);
 
 	/* Unhook test interrupt handler */
@@ -1161,6 +1179,7 @@ static void igb_free_desc_rings(struct igb_adapter *adapter)
 
 static int igb_setup_desc_rings(struct igb_adapter *adapter)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	struct igb_ring *tx_ring = &adapter->test_tx_ring;
 	struct igb_ring *rx_ring = &adapter->test_rx_ring;
 	struct pci_dev *pdev = adapter->pdev;
@@ -1188,14 +1207,14 @@ static int igb_setup_desc_rings(struct igb_adapter *adapter)
 	}
 	tx_ring->next_to_use = tx_ring->next_to_clean = 0;
 
-	E1000_WRITE_REG(&adapter->hw, E1000_TDBAL(0),
+	E1000_WRITE_REG(hw, E1000_TDBAL(0),
 			((u64) tx_ring->dma & 0x00000000FFFFFFFF));
-	E1000_WRITE_REG(&adapter->hw, E1000_TDBAH(0), ((u64) tx_ring->dma >> 32));
-	E1000_WRITE_REG(&adapter->hw, E1000_TDLEN(0),
+	E1000_WRITE_REG(hw, E1000_TDBAH(0), ((u64) tx_ring->dma >> 32));
+	E1000_WRITE_REG(hw, E1000_TDLEN(0),
 			tx_ring->count * sizeof(struct e1000_tx_desc));
-	E1000_WRITE_REG(&adapter->hw, E1000_TDH(0), 0);
-	E1000_WRITE_REG(&adapter->hw, E1000_TDT(0), 0);
-	E1000_WRITE_REG(&adapter->hw, E1000_TCTL,
+	E1000_WRITE_REG(hw, E1000_TDH(0), 0);
+	E1000_WRITE_REG(hw, E1000_TDT(0), 0);
+	E1000_WRITE_REG(hw, E1000_TCTL,
 			E1000_TCTL_PSP | E1000_TCTL_EN |
 			E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT |
 			E1000_COLLISION_DISTANCE << E1000_COLD_SHIFT);
@@ -1243,19 +1262,19 @@ static int igb_setup_desc_rings(struct igb_adapter *adapter)
 	}
 	rx_ring->next_to_use = rx_ring->next_to_clean = 0;
 
-	rctl = E1000_READ_REG(&adapter->hw, E1000_RCTL);
-	E1000_WRITE_REG(&adapter->hw, E1000_RCTL, rctl & ~E1000_RCTL_EN);
-	E1000_WRITE_REG(&adapter->hw, E1000_RDBAL(0),
+	rctl = E1000_READ_REG(hw, E1000_RCTL);
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl & ~E1000_RCTL_EN);
+	E1000_WRITE_REG(hw, E1000_RDBAL(0),
 			((u64) rx_ring->dma & 0xFFFFFFFF));
-	E1000_WRITE_REG(&adapter->hw, E1000_RDBAH(0), ((u64) rx_ring->dma >> 32));
-	E1000_WRITE_REG(&adapter->hw, E1000_RDLEN(0), rx_ring->size);
-	E1000_WRITE_REG(&adapter->hw, E1000_RDH(0), 0);
-	E1000_WRITE_REG(&adapter->hw, E1000_RDT(0), 0);
+	E1000_WRITE_REG(hw, E1000_RDBAH(0), ((u64) rx_ring->dma >> 32));
+	E1000_WRITE_REG(hw, E1000_RDLEN(0), rx_ring->size);
+	E1000_WRITE_REG(hw, E1000_RDH(0), 0);
+	E1000_WRITE_REG(hw, E1000_RDT(0), 0);
 	rctl = E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_SZ_2048 |
 		E1000_RCTL_LBM_NO | E1000_RCTL_RDMTS_HALF |
-		(adapter->hw.mac.mc_filter_type << E1000_RCTL_MO_SHIFT);
-	E1000_WRITE_REG(&adapter->hw, E1000_RCTL, rctl);
-	E1000_WRITE_REG(&adapter->hw, E1000_SRRCTL(0), 0);
+		(hw->mac.mc_filter_type << E1000_RCTL_MO_SHIFT);
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl);
+	E1000_WRITE_REG(hw, E1000_SRRCTL(0), 0);
 
 	for (i = 0; i < rx_ring->count; i++) {
 		struct e1000_rx_desc *rx_desc = E1000_RX_DESC(*rx_ring, i);
@@ -1294,51 +1313,51 @@ static void igb_phy_disable_receiver(struct igb_adapter *adapter)
 
 static int igb_integrated_phy_loopback(struct igb_adapter *adapter)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	u32 ctrl_reg = 0;
 	u32 stat_reg = 0;
 
-	adapter->hw.mac.autoneg = FALSE;
+	hw->mac.autoneg = FALSE;
 
-	if (adapter->hw.phy.type == e1000_phy_m88) {
+	if (hw->phy.type == e1000_phy_m88) {
 		/* Auto-MDI/MDIX Off */
-		e1000_write_phy_reg(&adapter->hw,
-				    M88E1000_PHY_SPEC_CTRL, 0x0808);
+		e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, 0x0808);
 		/* reset to update Auto-MDI/MDIX */
-		e1000_write_phy_reg(&adapter->hw, PHY_CONTROL, 0x9140);
+		e1000_write_phy_reg(hw, PHY_CONTROL, 0x9140);
 		/* autoneg off */
-		e1000_write_phy_reg(&adapter->hw, PHY_CONTROL, 0x8140);
+		e1000_write_phy_reg(hw, PHY_CONTROL, 0x8140);
 	}
 
-	ctrl_reg = E1000_READ_REG(&adapter->hw, E1000_CTRL);
+	ctrl_reg = E1000_READ_REG(hw, E1000_CTRL);
 
 	/* force 1000, set loopback */
-	e1000_write_phy_reg(&adapter->hw, PHY_CONTROL, 0x4140);
+	e1000_write_phy_reg(hw, PHY_CONTROL, 0x4140);
 
 	/* Now set up the MAC to the same speed/duplex as the PHY. */
-	ctrl_reg = E1000_READ_REG(&adapter->hw, E1000_CTRL);
+	ctrl_reg = E1000_READ_REG(hw, E1000_CTRL);
 	ctrl_reg &= ~E1000_CTRL_SPD_SEL; /* Clear the speed sel bits */
 	ctrl_reg |= (E1000_CTRL_FRCSPD | /* Set the Force Speed Bit */
 		     E1000_CTRL_FRCDPX | /* Set the Force Duplex Bit */
 		     E1000_CTRL_SPD_1000 |/* Force Speed to 1000 */
 		     E1000_CTRL_FD);	 /* Force Duplex to FULL */
 
-	if (adapter->hw.phy.media_type == e1000_media_type_copper &&
-	    adapter->hw.phy.type == e1000_phy_m88)
+	if (hw->phy.media_type == e1000_media_type_copper &&
+	    hw->phy.type == e1000_phy_m88)
 		ctrl_reg |= E1000_CTRL_ILOS; /* Invert Loss of Signal */
 	else {
 		/* Set the ILOS bit on the fiber Nic if half duplex link is
 		 * detected. */
-		stat_reg = E1000_READ_REG(&adapter->hw, E1000_STATUS);
+		stat_reg = E1000_READ_REG(hw, E1000_STATUS);
 		if ((stat_reg & E1000_STATUS_FD) == 0)
 			ctrl_reg |= (E1000_CTRL_ILOS | E1000_CTRL_SLU);
 	}
 
-	E1000_WRITE_REG(&adapter->hw, E1000_CTRL, ctrl_reg);
+	E1000_WRITE_REG(hw, E1000_CTRL, ctrl_reg);
 
 	/* Disable the receiver on the PHY so when a cable is plugged in, the
 	 * PHY does not begin to autoneg when a cable is reconnected to the NIC.
 	 */
-	if (adapter->hw.phy.type == e1000_phy_m88)
+	if (hw->phy.type == e1000_phy_m88)
 		igb_phy_disable_receiver(adapter);
 
 	udelay(500);
@@ -1368,9 +1387,9 @@ static int igb_setup_loopback_test(struct igb_adapter *adapter)
 		reg = E1000_READ_REG(hw, E1000_CTRL);
 		reg &= ~(E1000_CTRL_RFCE |
 			 E1000_CTRL_TFCE |
-			 E1000_CTRL_LRST );
+			 E1000_CTRL_LRST);
 		reg |= E1000_CTRL_SLU |
-		       E1000_CTRL_FD; 
+		       E1000_CTRL_FD;
 		E1000_WRITE_REG(hw, E1000_CTRL, reg);
 
 		/* Unset switch control to serdes energy detect */
@@ -1439,13 +1458,14 @@ static int igb_check_lbtest_frame(struct sk_buff *skb, unsigned int frame_size)
 
 static int igb_run_loopback_test(struct igb_adapter *adapter)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	struct igb_ring *tx_ring = &adapter->test_tx_ring;
 	struct igb_ring *rx_ring = &adapter->test_rx_ring;
 	struct pci_dev *pdev = adapter->pdev;
 	int i, j, k, l, lc, good_cnt, ret_val=0;
 	unsigned long time;
 
-	E1000_WRITE_REG(&adapter->hw, E1000_RDT(0), rx_ring->count - 1);
+	E1000_WRITE_REG(hw, E1000_RDT(0), rx_ring->count - 1);
 
 	/* Calculate the loop count based on the largest descriptor ring
 	 * The idea is to wrap the largest ring a number of times using 64
@@ -1468,8 +1488,9 @@ static int igb_run_loopback_test(struct igb_adapter *adapter)
 				PCI_DMA_TODEVICE);
 			if (unlikely(++k == tx_ring->count)) k = 0;
 		}
-		E1000_WRITE_REG(&adapter->hw, E1000_TDT(0), k);
+		E1000_WRITE_REG(hw, E1000_TDT(0), k);
 		msleep(200);
+
 		time = jiffies; /* set the start time for the receive */
 		good_cnt = 0;
 		do { /* receive the sent packets */
@@ -1527,6 +1548,7 @@ out:
 
 static int igb_link_test(struct igb_adapter *adapter, u64 *data)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	*data = 0;
 	if (adapter->hw.phy.media_type == e1000_media_type_internal_serdes) {
 		int i = 0;
@@ -1547,8 +1569,7 @@ static int igb_link_test(struct igb_adapter *adapter, u64 *data)
 		if (adapter->hw.mac.autoneg)
 			msleep(4000);
 
-		if (!(E1000_READ_REG(&adapter->hw, E1000_STATUS) &
-		      E1000_STATUS_LU))
+		if (!(E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_LU))
 			*data = 1;
 	}
 	return *data;
@@ -1760,12 +1781,16 @@ static int igb_set_coalesce(struct net_device *netdev,
 			    struct ethtool_coalesce *ec)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw *hw = &adapter->hw;
 
 	if ((ec->rx_coalesce_usecs > IGB_MAX_ITR_USECS) ||
 	    ((ec->rx_coalesce_usecs > 3) &&
 	     (ec->rx_coalesce_usecs < IGB_MIN_ITR_USECS)) ||
-	    (ec->rx_coalesce_usecs == 2))
+	    (ec->rx_coalesce_usecs == 2) ||
+	    (ec->stats_block_coalesce_usecs > (10 * 1000000)))
 		return -EINVAL;
+
+	adapter->stats_freq_us = ec->stats_block_coalesce_usecs;
 
 	/* convert to rate of irq's per second */
 	if (ec->rx_coalesce_usecs <= 3) {
@@ -1776,8 +1801,7 @@ static int igb_set_coalesce(struct net_device *netdev,
 		adapter->itr_setting = adapter->itr & ~3;
 	}
 
-	E1000_WRITE_REG(&adapter->hw, E1000_ITR,
-			1000000000 / (adapter->itr * 256));
+	E1000_WRITE_REG(hw, E1000_ITR, 1000000000 / (adapter->itr * 256));
 
 	return 0;
 }
@@ -1791,6 +1815,8 @@ static int igb_get_coalesce(struct net_device *netdev,
 		ec->rx_coalesce_usecs = adapter->itr_setting;
 	else
 		ec->rx_coalesce_usecs = 1000000 / adapter->itr_setting;
+
+	ec->stats_block_coalesce_usecs = adapter->stats_freq_us;
 
 	return 0;
 }
@@ -1816,8 +1842,21 @@ static void igb_get_ethtool_stats(struct net_device *netdev,
 	int stat_count = sizeof(struct igb_queue_stats) / sizeof(u64);
 	int j;
 	int i;
+#ifdef IGB_LRO
+	int aggregated = 0, flushed = 0, no_desc = 0;
+
+	for (i = 0; i < adapter->num_rx_queues; i++) {
+		aggregated += adapter->rx_ring[i].lro_mgr.stats.aggregated;
+		flushed += adapter->rx_ring[i].lro_mgr.stats.flushed;
+		no_desc += adapter->rx_ring[i].lro_mgr.stats.no_desc;
+	}
+	adapter->lro_aggregated = aggregated;
+	adapter->lro_flushed = flushed;
+	adapter->lro_no_desc = no_desc;
+#endif
 
 	igb_update_stats(adapter);
+
 	for (i = 0; i < IGB_GLOBAL_STATS_LEN; i++) {
 		char *p = (char *)adapter+igb_gstrings_stats[i].stat_offset;
 		data[i] = (igb_gstrings_stats[i].sizeof_stat ==

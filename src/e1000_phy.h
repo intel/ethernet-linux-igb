@@ -41,6 +41,7 @@ typedef enum {
 	e1000_smart_speed_off
 } e1000_smart_speed;
 
+void e1000_init_phy_ops_generic(struct e1000_hw *hw);
 s32  e1000_check_downshift_generic(struct e1000_hw *hw);
 s32  e1000_check_polarity_m88(struct e1000_hw *hw);
 s32  e1000_check_polarity_igp(struct e1000_hw *hw);
@@ -94,7 +95,6 @@ s32 e1000_write_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 data);
 #define BM_PHY_PAGE_SELECT                22   /* Page Select for BM */
 #define IGP_PAGE_SHIFT                    5
 #define PHY_REG_MASK                      0x1F
-
 
 #define IGP01E1000_PHY_PCS_INIT_REG       0x00B4
 #define IGP01E1000_PHY_POLARITY_MASK      0x0078
