@@ -222,6 +222,7 @@ struct igb_ring {
 	};
 };
 
+
 #define IGB_DESC_UNUSED(R) \
 	((((R)->next_to_clean > (R)->next_to_use) ? 0 : (R)->count) + \
 	(R)->next_to_clean - (R)->next_to_use - 1)
@@ -318,8 +319,6 @@ struct igb_adapter {
 	u32 lli_port;
 	u32 lli_size;
 	u64 lli_int;
-
-	/* to not mess up cache alignment, always add to the bottom */
 	unsigned long state;
 	unsigned int flags;
 	u32 eeprom_wol;

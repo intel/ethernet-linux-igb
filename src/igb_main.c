@@ -50,9 +50,6 @@
 #include "igb.h"
 
 
-
-#define VERSION_SUFFIX
-
 #if defined(DEBUG) || defined (DEBUG_DUMP) || defined (DEBUG_ICR) || \
     defined(DEBUG_ITR)
 #define DRV_DEBUG "_debug"
@@ -61,7 +58,7 @@
 #endif
 #define DRV_HW_PERF
 
-#define DRV_VERSION "1.2.44.3" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION "1.2.44.9" DRV_DEBUG DRV_HW_PERF
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
@@ -71,6 +68,8 @@ static const char igb_copyright[] = "Copyright (c) 2007-2008 Intel Corporation."
 
 static struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576) },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576_FIBER) },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576_SERDES) },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82575EB_COPPER) },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82575EB_FIBER_SERDES) },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82575GB_QUAD_COPPER) },
@@ -888,6 +887,8 @@ static void igb_configure(struct igb_adapter *adapter)
 	igb_configure_tx(adapter);
 	igb_setup_rctl(adapter);
 	igb_configure_rx(adapter);
+
+	e1000_rx_fifo_flush_82575(&adapter->hw);
 	/* call IGB_DESC_UNUSED which always leaves
 	 * at least 1 descriptor unused to make sure
 	 * next_to_use != next_to_clean */
@@ -1325,6 +1326,8 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 		adapter->eeprom_wol = 0;
 		break;
 	case E1000_DEV_ID_82575EB_FIBER_SERDES:
+	case E1000_DEV_ID_82576_FIBER:
+	case E1000_DEV_ID_82576_SERDES:
 		/* Wake events only supported on port A for dual fiber
 		 * regardless of eeprom setting */
 		if (E1000_READ_REG(hw, E1000_STATUS) &

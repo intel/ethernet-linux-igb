@@ -413,13 +413,17 @@ static void igb_get_regs(struct net_device *netdev,
 	regs_buff[12] = E1000_READ_REG(hw, E1000_EECD);
 
 	/* Interrupt */
-	regs_buff[13] = E1000_READ_REG(hw, E1000_EICR);
+	/* Reading EICS for EICR because they read the
+	 * same but EICS does not clear on read */
+	regs_buff[13] = E1000_READ_REG(hw, E1000_EICS);
 	regs_buff[14] = E1000_READ_REG(hw, E1000_EICS);
 	regs_buff[15] = E1000_READ_REG(hw, E1000_EIMS);
 	regs_buff[16] = E1000_READ_REG(hw, E1000_EIMC);
 	regs_buff[17] = E1000_READ_REG(hw, E1000_EIAC);
 	regs_buff[18] = E1000_READ_REG(hw, E1000_EIAM);
-	regs_buff[19] = E1000_READ_REG(hw, E1000_ICR);
+	/* Reading ICS for ICR because they read the
+	 * same but ICS does not clear on read */
+	regs_buff[19] = E1000_READ_REG(hw, E1000_ICS);
 	regs_buff[20] = E1000_READ_REG(hw, E1000_ICS);
 	regs_buff[21] = E1000_READ_REG(hw, E1000_IMS);
 	regs_buff[22] = E1000_READ_REG(hw, E1000_IMC);
@@ -1667,6 +1671,8 @@ static int igb_wol_exclusion(struct igb_adapter *adapter,
 		wol->supported = 0;
 		break;
 	case E1000_DEV_ID_82575EB_FIBER_SERDES:
+	case E1000_DEV_ID_82576_FIBER:
+	case E1000_DEV_ID_82576_SERDES:
 		/* Wake events not supported on port B */
 		if (E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_FUNC_1) {
 			wol->supported = 0;

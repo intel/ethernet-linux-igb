@@ -31,6 +31,7 @@
 #include "e1000_hw.h"
 
 extern void    e1000_init_function_pointers_82575(struct e1000_hw *hw);
+extern void    e1000_rx_fifo_flush_82575(struct e1000_hw *hw);
 extern void    e1000_init_function_pointers_vf(struct e1000_hw *hw);
 extern void    e1000_shutdown_fiber_serdes_link(struct e1000_hw *hw);
 

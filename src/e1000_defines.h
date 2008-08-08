@@ -404,6 +404,7 @@
 #define E1000_PCS_LCTL_FSD               0x10
 #define E1000_PCS_LCTL_FORCE_LINK        0x20
 #define E1000_PCS_LCTL_LOW_LINK_LATCH    0x40
+#define E1000_PCS_LCTL_FORCE_FCTRL       0x80
 #define E1000_PCS_LCTL_AN_ENABLE         0x10000
 #define E1000_PCS_LCTL_AN_RESTART        0x20000
 #define E1000_PCS_LCTL_AN_TIMEOUT        0x40000
@@ -600,6 +601,7 @@
 #define E1000_RFCTL_EXTEN               0x00008000
 #define E1000_RFCTL_IPV6_EX_DIS         0x00010000
 #define E1000_RFCTL_NEW_IPV6_EXT_DIS    0x00020000
+#define E1000_RFCTL_LEF                 0x00040000
 
 /* Collision related configuration parameters */
 #define E1000_COLLISION_THRESHOLD       15

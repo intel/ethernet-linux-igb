@@ -129,6 +129,8 @@ s32 e1000_set_mac_type(struct e1000_hw *hw)
 		mac->type = e1000_82575;
 		break;
 	case E1000_DEV_ID_82576:
+	case E1000_DEV_ID_82576_FIBER:
+	case E1000_DEV_ID_82576_SERDES:
 		mac->type = e1000_82576;
 		break;
 	default:
