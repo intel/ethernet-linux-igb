@@ -84,8 +84,6 @@ IGB_PARAM(InterruptThrottleRate, "Interrupt Throttling Rate");
  * Default Value: 2 (MSI-X single queue)
  */
 IGB_PARAM(IntMode, "Interrupt Mode");
-
-#define DEFAULT_INTMODE                2
 #define MAX_INTMODE                    3
 #define MIN_INTMODE                    0
 
@@ -274,6 +272,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 					adapter->itr = IGB_START_ITR;
 				}
 				else {
+					adapter->itr = 1000000000 / (adapter->itr * 256);
 					adapter->itr_setting = adapter->itr & ~3;
 				}
 				break;
@@ -299,15 +298,6 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 		if (num_IntMode > bd) {
 #endif
 			unsigned int int_mode = IntMode[bd];
-#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
-			/* < 2.6.24 can NOT support multiple rx queues */
-			if (int_mode == IGB_INT_MODE_MSIX_MQ) {
-				DPRINTK(PROBE, INFO,
-				 "%s limited to (0-2) for < 2.6.24 kernels\n",
-				 opt.name);
-				opt.arg.r.max = IGB_INT_MODE_MSIX_1Q;
-			}
-#endif
 			igb_validate_option(&int_mode, &opt, adapter);
 			adapter->int_mode = int_mode;
 #ifdef module_param_array

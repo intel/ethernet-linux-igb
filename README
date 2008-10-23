@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Network Connection
 ==================================================
 
-June 13, 2008
+September 6, 2008
 
 
 Contents
@@ -21,8 +21,7 @@ In This Release
 ===============
 
 This file describes the igb Linux* Base Driver for Intel Network Connection.  
-This driver supports kernel versions 2.4.x and 2.6.x. This driver supports
-kernel versions 2.4.21 and newer, including 2.6.x.
+This driver supports kernel versions 2.4.x and 2.6.x. 
 
 This driver is only supported as a loadable module at this time.  Intel is
 not supplying patches against the kernel source to allow for static linking
@@ -115,7 +114,6 @@ NOTE: For the build to work properly, the currently running kernel MUST
 
      rmmod igb; modprobe igb
 
-
 6. Assign an IP address to the interface by entering the following, where
    x is the interface number:
 
@@ -126,6 +124,17 @@ NOTE: For the build to work properly, the currently running kernel MUST
    interface that is being tested:
 
      ping  <IP_address>
+
+
+TROUBLESHOOTING: Some systems have trouble supporting MSI and/or MSI-X 
+interrupts. If you believe your system needs to disable this style of 
+interrupt, the driver can be built and installed with the command:
+
+     make CFLAGS_EXTRA=-DDISABLE_PCI_MSI install
+
+Normally the driver will generate an interrupt every two seconds, so if 
+you can see that you're no longer getting interrupts in cat /proc/interrupts
+for the ethX igb device, then this workaround may be necessary.
 
 
 To build igb driver with DCA:
@@ -418,16 +427,12 @@ Additional Configurations
   must be used to avoid interrupt storms while the driver is processing one 
   interrupt.  The moderation value should be at least as large as the expected
   time for the driver to process an interrupt. Multiqueue is off by default.
-  
-  MSI-X support is required for Multiqueue. If MSI-X is not found, the system 
-  will fallback to MSI or to Legacy interrupts.
 
   REQUIREMENTS: MSI-X support is required for Multiqueue. If MSI-X is not 
   found, the system will fallback to MSI or to Legacy interrupts.
   This driver supports multiqueue in kernel versions 2.6.24 and 
   greater.
-  This driver supports receive multiqueue on all kernels that support MSI-X, 
-  with the driver in non-NAPI mode.
+  This driver supports receive multiqueue on all kernels that support MSI-X.
   NOTE: Do not use MSI-X with the 2.6.19 or 2.6.20 kernels.
 
   To enable a separate vector for TX, use: 
@@ -469,6 +474,7 @@ Additional Configurations
   lro_no_desc - counts the number of times an LRO descriptor was not available 
   for the LRO packet
 
+  NOTE: IPv6 and UDP are not supported by LRO.
   
 Known Issues/Troubleshooting
 ============================
@@ -577,8 +583,22 @@ can be obtained at http://www.linuxfirmwarekit.org/
 Do Not Use LRO When Routing Packets
 -----------------------------------
 Due to a known general compatibility issue with LRO and routing, do not use
-LRO when routing packets. 
+LRO when routing packets.
 
+Build error with Asianux 3.0 - redefinition of typedef 'irq_handler_t'
+---------------------------------------------------------------------
+Some systems may experience build issues due to redefinition of irq_handler_t.  
+To resolve this issue build the driver (step 4 above) using the command:
+
+    make CFLAGS_EXTRA=-DAX_RELEASE_CODE=1 install
+
+MSI-X Issues with Kernels between 2.6.19 - 2.6.21 (inclusive)
+-------------------------------------------------------------
+Kernel panics and instability may be observed on any MSI-X hardware if you use
+irqbalance with kernels between 2.6.19 and 2.6.21. If such problems are 
+encountered, you may disable the irqbalance daemon or upgrade to a newer 
+kernel. 
+ 
 
 Support
 =======
@@ -589,7 +609,7 @@ For general information, go to the Intel support website at:
 
 or the Intel Wired Networking project hosted by Sourceforge at:
 
-    http://sourceforge.net/projects/igb
+    http://sourceforge.net/projects/e1000
 
 If an issue is identified with the released source code on the supported
 kernel with a supported adapter, email the specific information related

@@ -27,6 +27,9 @@
 
 #include "e1000_api.h"
 
+static void e1000_stop_nvm(struct e1000_hw *hw);
+static void e1000_reload_nvm_generic(struct e1000_hw *hw);
+
 /**
  *  e1000_init_nvm_ops_generic - Initialize NVM function pointers
  *  @hw: pointer to the HW structure
@@ -91,9 +94,7 @@ static void e1000_shift_out_eec_bits(struct e1000_hw *hw, u16 data, u16 count)
 	DEBUGFUNC("e1000_shift_out_eec_bits");
 
 	mask = 0x01 << (count - 1);
-	if (nvm->type == e1000_nvm_eeprom_microwire)
-		eecd &= ~E1000_EECD_DO;
-	else if (nvm->type == e1000_nvm_eeprom_spi)
+	if (nvm->type == e1000_nvm_eeprom_spi)
 		eecd |= E1000_EECD_DO;
 
 	do {
@@ -240,22 +241,7 @@ static void e1000_standby_nvm(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_standby_nvm");
 
-	if (nvm->type == e1000_nvm_eeprom_microwire) {
-		eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
-		E1000_WRITE_REG(hw, E1000_EECD, eecd);
-		E1000_WRITE_FLUSH(hw);
-		usec_delay(nvm->delay_usec);
-
-		e1000_raise_eec_clk(hw, &eecd);
-
-		/* Select EEPROM */
-		eecd |= E1000_EECD_CS;
-		E1000_WRITE_REG(hw, E1000_EECD, eecd);
-		E1000_WRITE_FLUSH(hw);
-		usec_delay(nvm->delay_usec);
-
-		e1000_lower_eec_clk(hw, &eecd);
-	} else if (nvm->type == e1000_nvm_eeprom_spi) {
+	if (nvm->type == e1000_nvm_eeprom_spi) {
 		/* Toggle CS to flush commands */
 		eecd |= E1000_EECD_CS;
 		E1000_WRITE_REG(hw, E1000_EECD, eecd);
@@ -274,7 +260,7 @@ static void e1000_standby_nvm(struct e1000_hw *hw)
  *
  *  Terminates the current command by inverting the EEPROM's chip select pin.
  **/
-void e1000_stop_nvm(struct e1000_hw *hw)
+static void e1000_stop_nvm(struct e1000_hw *hw)
 {
 	u32 eecd;
 
@@ -284,12 +270,6 @@ void e1000_stop_nvm(struct e1000_hw *hw)
 	if (hw->nvm.type == e1000_nvm_eeprom_spi) {
 		/* Pull CS high */
 		eecd |= E1000_EECD_CS;
-		e1000_lower_eec_clk(hw, &eecd);
-	} else if (hw->nvm.type == e1000_nvm_eeprom_microwire) {
-		/* CS on Microwire is active-high */
-		eecd &= ~(E1000_EECD_CS | E1000_EECD_DI);
-		E1000_WRITE_REG(hw, E1000_EECD, eecd);
-		e1000_raise_eec_clk(hw, &eecd);
 		e1000_lower_eec_clk(hw, &eecd);
 	}
 }
@@ -329,14 +309,7 @@ static s32 e1000_ready_nvm_eeprom(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_ready_nvm_eeprom");
 
-	if (nvm->type == e1000_nvm_eeprom_microwire) {
-		/* Clear SK and DI */
-		eecd &= ~(E1000_EECD_DI | E1000_EECD_SK);
-		E1000_WRITE_REG(hw, E1000_EECD, eecd);
-		/* Set CS */
-		eecd |= E1000_EECD_CS;
-		E1000_WRITE_REG(hw, E1000_EECD, eecd);
-	} else if (nvm->type == e1000_nvm_eeprom_spi) {
+	if (nvm->type == e1000_nvm_eeprom_spi) {
 		/* Clear SK and CS */
 		eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
 		E1000_WRITE_REG(hw, E1000_EECD, eecd);
@@ -367,129 +340,6 @@ static s32 e1000_ready_nvm_eeprom(struct e1000_hw *hw)
 			goto out;
 		}
 	}
-
-out:
-	return ret_val;
-}
-
-/**
- *  e1000_read_nvm_spi - Read EEPROM's using SPI
- *  @hw: pointer to the HW structure
- *  @offset: offset of word in the EEPROM to read
- *  @words: number of words to read
- *  @data: word read from the EEPROM
- *
- *  Reads a 16 bit word from the EEPROM.
- **/
-s32 e1000_read_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
-{
-	struct e1000_nvm_info *nvm = &hw->nvm;
-	u32 i = 0;
-	s32 ret_val;
-	u16 word_in;
-	u8 read_opcode = NVM_READ_OPCODE_SPI;
-
-	DEBUGFUNC("e1000_read_nvm_spi");
-
-	/*
-	 * A check for invalid values:  offset too large, too many words,
-	 * and not enough words.
-	 */
-	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
-	    (words == 0)) {
-		DEBUGOUT("nvm parameter(s) out of bounds\n");
-		ret_val = -E1000_ERR_NVM;
-		goto out;
-	}
-
-	ret_val = nvm->ops.acquire(hw);
-	if (ret_val)
-		goto out;
-
-	ret_val = e1000_ready_nvm_eeprom(hw);
-	if (ret_val)
-		goto release;
-
-	e1000_standby_nvm(hw);
-
-	if ((nvm->address_bits == 8) && (offset >= 128))
-		read_opcode |= NVM_A8_OPCODE_SPI;
-
-	/* Send the READ command (opcode + addr) */
-	e1000_shift_out_eec_bits(hw, read_opcode, nvm->opcode_bits);
-	e1000_shift_out_eec_bits(hw, (u16)(offset*2), nvm->address_bits);
-
-	/*
-	 * Read the data.  SPI NVMs increment the address with each byte
-	 * read and will roll over if reading beyond the end.  This allows
-	 * us to read the whole NVM from any offset
-	 */
-	for (i = 0; i < words; i++) {
-		word_in = e1000_shift_in_eec_bits(hw, 16);
-		data[i] = (word_in >> 8) | (word_in << 8);
-	}
-
-release:
-	nvm->ops.release(hw);
-
-out:
-	return ret_val;
-}
-
-/**
- *  e1000_read_nvm_microwire - Reads EEPROM's using microwire
- *  @hw: pointer to the HW structure
- *  @offset: offset of word in the EEPROM to read
- *  @words: number of words to read
- *  @data: word read from the EEPROM
- *
- *  Reads a 16 bit word from the EEPROM.
- **/
-s32 e1000_read_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
-                             u16 *data)
-{
-	struct e1000_nvm_info *nvm = &hw->nvm;
-	u32 i = 0;
-	s32 ret_val;
-	u8 read_opcode = NVM_READ_OPCODE_MICROWIRE;
-
-	DEBUGFUNC("e1000_read_nvm_microwire");
-
-	/*
-	 * A check for invalid values:  offset too large, too many words,
-	 * and not enough words.
-	 */
-	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
-	    (words == 0)) {
-		DEBUGOUT("nvm parameter(s) out of bounds\n");
-		ret_val = -E1000_ERR_NVM;
-		goto out;
-	}
-
-	ret_val = nvm->ops.acquire(hw);
-	if (ret_val)
-		goto out;
-
-	ret_val = e1000_ready_nvm_eeprom(hw);
-	if (ret_val)
-		goto release;
-
-	for (i = 0; i < words; i++) {
-		/* Send the READ command (opcode + addr) */
-		e1000_shift_out_eec_bits(hw, read_opcode, nvm->opcode_bits);
-		e1000_shift_out_eec_bits(hw, (u16)(offset + i),
-					nvm->address_bits);
-
-		/*
-		 * Read the data.  For microwire, each word requires the
-		 * overhead of setup and tear-down.
-		 */
-		data[i] = e1000_shift_in_eec_bits(hw, 16);
-		e1000_standby_nvm(hw);
-	}
-
-release:
-	nvm->ops.release(hw);
 
 out:
 	return ret_val;
@@ -616,97 +466,7 @@ s32 e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		}
 	}
 
-	msec_delay(nvm->semaphore_delay);
-release:
-	nvm->ops.release(hw);
-
-out:
-	return ret_val;
-}
-
-/**
- *  e1000_write_nvm_microwire - Writes EEPROM using microwire
- *  @hw: pointer to the HW structure
- *  @offset: offset within the EEPROM to be written to
- *  @words: number of words to write
- *  @data: 16 bit word(s) to be written to the EEPROM
- *
- *  Writes data to EEPROM at offset using microwire interface.
- *
- *  If e1000_update_nvm_checksum is not called after this function , the
- *  EEPROM will most likely contain an invalid checksum.
- **/
-s32 e1000_write_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
-                              u16 *data)
-{
-	struct e1000_nvm_info *nvm = &hw->nvm;
-	s32  ret_val;
-	u32 eecd;
-	u16 words_written = 0;
-	u16 widx = 0;
-
-	DEBUGFUNC("e1000_write_nvm_microwire");
-
-	/*
-	 * A check for invalid values:  offset too large, too many words,
-	 * and not enough words.
-	 */
-	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
-	    (words == 0)) {
-		DEBUGOUT("nvm parameter(s) out of bounds\n");
-		ret_val = -E1000_ERR_NVM;
-		goto out;
-	}
-
-	ret_val = nvm->ops.acquire(hw);
-	if (ret_val)
-		goto out;
-
-	ret_val = e1000_ready_nvm_eeprom(hw);
-	if (ret_val)
-		goto release;
-
-	e1000_shift_out_eec_bits(hw, NVM_EWEN_OPCODE_MICROWIRE,
-	                         (u16)(nvm->opcode_bits + 2));
-
-	e1000_shift_out_eec_bits(hw, 0, (u16)(nvm->address_bits - 2));
-
-	e1000_standby_nvm(hw);
-
-	while (words_written < words) {
-		e1000_shift_out_eec_bits(hw, NVM_WRITE_OPCODE_MICROWIRE,
-		                         nvm->opcode_bits);
-
-		e1000_shift_out_eec_bits(hw, (u16)(offset + words_written),
-		                         nvm->address_bits);
-
-		e1000_shift_out_eec_bits(hw, data[words_written], 16);
-
-		e1000_standby_nvm(hw);
-
-		for (widx = 0; widx < 200; widx++) {
-			eecd = E1000_READ_REG(hw, E1000_EECD);
-			if (eecd & E1000_EECD_DO)
-				break;
-			usec_delay(50);
-		}
-
-		if (widx == 200) {
-			DEBUGOUT("NVM Write did not complete\n");
-			ret_val = -E1000_ERR_NVM;
-			goto release;
-		}
-
-		e1000_standby_nvm(hw);
-
-		words_written++;
-	}
-
-	e1000_shift_out_eec_bits(hw, NVM_EWDS_OPCODE_MICROWIRE,
-	                         (u16)(nvm->opcode_bits + 2));
-
-	e1000_shift_out_eec_bits(hw, 0, (u16)(nvm->address_bits - 2));
-
+	msec_delay(10);
 release:
 	nvm->ops.release(hw);
 
@@ -859,7 +619,7 @@ out:
  *  Reloads the EEPROM by setting the "Reinitialize from EEPROM" bit in the
  *  extended control register.
  **/
-void e1000_reload_nvm_generic(struct e1000_hw *hw)
+static void e1000_reload_nvm_generic(struct e1000_hw *hw)
 {
 	u32 ctrl_ext;
 

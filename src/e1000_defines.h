@@ -382,7 +382,8 @@
 #define E1000_CTRL_SW2FW_INT 0x02000000  /* Initiate an interrupt to manageability engine */
 #define E1000_CTRL_I2C_ENA  0x02000000  /* I2C enable */
 
-/* Bit definitions for the Management Data IO (MDIO) and Management Data
+/*
+ * Bit definitions for the Management Data IO (MDIO) and Management Data
  * Clock (MDC) pins in the Device Control Register.
  */
 #define E1000_CTRL_PHY_RESET_DIR  E1000_CTRL_SWDPIO0
@@ -757,6 +758,7 @@
 #define E1000_IMS_TXDW      E1000_ICR_TXDW      /* Transmit desc written back */
 #define E1000_IMS_TXQE      E1000_ICR_TXQE      /* Transmit Queue empty */
 #define E1000_IMS_LSC       E1000_ICR_LSC       /* Link Status Change */
+#define E1000_IMS_VMMB      E1000_ICR_VMMB      /* Mail box activity */
 #define E1000_IMS_RXSEQ     E1000_ICR_RXSEQ     /* rx sequence error */
 #define E1000_IMS_RXDMT0    E1000_ICR_RXDMT0    /* rx desc min. threshold */
 #define E1000_IMS_RXO       E1000_ICR_RXO       /* rx overrun */
@@ -1129,13 +1131,6 @@
 #define NVM_WORD_SIZE_BASE_SHIFT   6
 #define NVM_SWDPIO_EXT_SHIFT       4
 
-/* NVM Commands - Microwire */
-#define NVM_READ_OPCODE_MICROWIRE  0x6  /* NVM read opcode */
-#define NVM_WRITE_OPCODE_MICROWIRE 0x5  /* NVM write opcode */
-#define NVM_ERASE_OPCODE_MICROWIRE 0x7  /* NVM erase opcode */
-#define NVM_EWEN_OPCODE_MICROWIRE  0x13 /* NVM erase/write enable */
-#define NVM_EWDS_OPCODE_MICROWIRE  0x10 /* NVM erase/write disable */
-
 /* NVM Commands - SPI */
 #define NVM_MAX_RETRY_SPI          5000 /* Max wait of 5ms, for RDY signal */
 #define NVM_READ_OPCODE_SPI        0x03 /* NVM read opcode */
@@ -1175,19 +1170,9 @@
 #define IGP_LED3_MODE           0x07000000
 
 /* PCI/PCI-X/PCI-EX Config space */
-#define PCIX_COMMAND_REGISTER        0xE6
-#define PCIX_STATUS_REGISTER_LO      0xE8
-#define PCIX_STATUS_REGISTER_HI      0xEA
 #define PCI_HEADER_TYPE_REGISTER     0x0E
 #define PCIE_LINK_STATUS             0x12
 
-#define PCIX_COMMAND_MMRBC_MASK      0x000C
-#define PCIX_COMMAND_MMRBC_SHIFT     0x2
-#define PCIX_STATUS_HI_MMRBC_MASK    0x0060
-#define PCIX_STATUS_HI_MMRBC_SHIFT   0x5
-#define PCIX_STATUS_HI_MMRBC_4K      0x3
-#define PCIX_STATUS_HI_MMRBC_2K      0x2
-#define PCIX_STATUS_LO_FUNC_MASK     0x7
 #define PCI_HEADER_TYPE_MULTIFUNC    0x80
 #define PCIE_LINK_WIDTH_MASK         0x3F0
 #define PCIE_LINK_WIDTH_SHIFT        4
@@ -1438,4 +1423,4 @@
 #define E1000_LSECRXCTRL_RP             0x00000080
 #define E1000_LSECRXCTRL_RSV_MASK       0xFFFFFF33
 
-#endif
+#endif /* _E1000_DEFINES_H_ */

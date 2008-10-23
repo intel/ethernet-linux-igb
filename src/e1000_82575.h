@@ -38,9 +38,8 @@
  * Registers) holds the directed and multicast addresses that we monitor.
  * These entries are also used for MAC-based filtering.
  */
-/* FIXME: Remove "Kawela" code name!! */
 /*
- * For Kawela, there are an additional set of RARs that begin at an offset
+ * For 82576, there are an additional set of RARs that begin at an offset
  * separate from the first set of RARs.
  */
 #define E1000_RAR_ENTRIES_82575   16
@@ -128,9 +127,16 @@ struct e1000_adv_context_desc {
 #define E1000_TX_SEQNUM_WB_ENABLE 0x2
 
 #define E1000_MRQC_ENABLE_RSS_4Q            0x00000002
+#define E1000_MRQC_ENABLE_VMDQ              0x00000003
 #define E1000_MRQC_RSS_FIELD_IPV4_UDP       0x00400000
 #define E1000_MRQC_RSS_FIELD_IPV6_UDP       0x00800000
 #define E1000_MRQC_RSS_FIELD_IPV6_UDP_EX    0x01000000
+
+#define E1000_VMRCTL_MIRROR_PORT_SHIFT      8
+#define E1000_VMRCTL_MIRROR_DSTPORT_MASK    (7 << E1000_VMRCTL_MIRROR_PORT_SHIFT)
+#define E1000_VMRCTL_POOL_MIRROR_ENABLE     (1 << 0)
+#define E1000_VMRCTL_UPLINK_MIRROR_ENABLE   (1 << 1)
+#define E1000_VMRCTL_DOWNLINK_MIRROR_ENABLE (1 << 2)
 
 #define E1000_EICR_TX_QUEUE ( \
     E1000_EICR_TX_QUEUE0 |    \
@@ -203,7 +209,7 @@ union e1000_adv_rx_desc {
 #define E1000_RXDADV_HDRBUFLEN_SHIFT     5
 #define E1000_RXDADV_SPLITHEADER_EN      0x00001000
 #define E1000_RXDADV_SPH                 0x8000
-#define E1000_RXDADV_HBO                 0x00800000
+#define E1000_RXDADV_ERR_HBO             0x00800000
 
 /* RSS Hash results */
 #define E1000_RXDADV_RSSTYPE_NONE        0x00000000
@@ -228,6 +234,9 @@ union e1000_adv_rx_desc {
 #define E1000_RXDADV_PKTTYPE_SCTP        0x00000400 /* SCTP hdr present */
 #define E1000_RXDADV_PKTTYPE_NFS         0x00000800 /* NFS hdr present */
 
+#define E1000_RXDADV_PKTTYPE_IPSEC_ESP   0x00001000 /* IPSec ESP */
+#define E1000_RXDADV_PKTTYPE_IPSEC_AH    0x00002000 /* IPSec AH */
+#define E1000_RXDADV_PKTTYPE_LINKSEC     0x00004000 /* LinkSec Encap */
 #define E1000_RXDADV_PKTTYPE_ETQF        0x00008000 /* PKTTYPE is ETQF index */
 #define E1000_RXDADV_PKTTYPE_ETQF_MASK   0x00000070 /* ETQF has 8 indices */
 #define E1000_RXDADV_PKTTYPE_ETQF_SHIFT  4          /* Right-shift 4 bits */
@@ -246,8 +255,6 @@ union e1000_adv_rx_desc {
 #define E1000_RXDADV_IPSEC_ERROR_INVALID_LENGTH         0x10000000
 #define E1000_RXDADV_IPSEC_ERROR_AUTHENTICATION_FAILED  0x18000000
 
-#define E1000_RXDADV_IPSEC_PACKET_TYPE_INDICATION_IPSEC_ESP     0x1000
-#define E1000_RXDADV_IPSEC_PACKET_TYPE_INDICATION_IPSEC_AH      0x2000
 /* Transmit Descriptor - Advanced */
 union e1000_adv_tx_desc {
 	struct {
@@ -345,6 +352,19 @@ struct e1000_adv_tx_context_desc {
 #define E1000_IMS_LSECPNS       E1000_ICR_LSECPNS   /* PN threshold - server */
 #define E1000_ICS_LSECPNS       E1000_ICR_LSECPNS   /* PN threshold - server */
 
+/* ETQF register bit definitions */
+#define E1000_ETQF_FILTER_ENABLE   (1 << 26)
+#define E1000_ETQF_IMM_INT         (1 << 29)
+/*
+ * ETQF filter list: one static filter per filter consumer. This is
+ *                   to avoid filter collisions later. Add new filters
+ *                   here!!
+ *
+ * Current filters:
+ *    EAPOL 802.1x (0x888e): Filter 0
+ */
+#define E1000_ETQF_FILTER_EAPOL          0
+
 #define E1000_NVM_APME_82575          0x0400
 #define MAX_NUM_VFS                   8
 
@@ -354,20 +374,13 @@ struct e1000_adv_tx_context_desc {
 #define E1000_DTXSWC_VMDQ_LOOPBACK_EN (1 << 31)  /* global VF LB enable */
 
 /* Easy defines for setting default pool, would normally be left a zero */
-#define E1000_VMD_CTL_DEFAULT_POOL_MASK 0x00000380
-#define E1000_VMD_CTL_DEFAULT_POOL_0    (0 << 9)
-#define E1000_VMD_CTL_DEFAULT_POOL_1    (1 << 9)
-#define E1000_VMD_CTL_DEFAULT_POOL_2    (2 << 9)
-#define E1000_VMD_CTL_DEFAULT_POOL_3    (3 << 9)
-#define E1000_VMD_CTL_DEFAULT_POOL_4    (4 << 9)
-#define E1000_VMD_CTL_DEFAULT_POOL_5    (5 << 9)
-#define E1000_VMD_CTL_DEFAULT_POOL_6    (6 << 9)
-#define E1000_VMD_CTL_DEFAULT_POOL_7    (7 << 9)
+#define E1000_VT_CTL_DEFAULT_POOL_SHIFT 7
+#define E1000_VT_CTL_DEFAULT_POOL_MASK  (0x7 << E1000_VT_CTL_DEFAULT_POOL_SHIFT)
 
 /* Other useful VMD_CTL register defines */
-#define E1000_VMD_CTL_IGNORE_MAC        (1 << 28)
-#define E1000_VMD_CTL_DISABLE_DEF_POOL  (1 << 29)
-#define E1000_VMD_CTL_VM_REPL_EN        (1 << 30)
+#define E1000_VT_CTL_IGNORE_MAC         (1 << 28)
+#define E1000_VT_CTL_DISABLE_DEF_POOL   (1 << 29)
+#define E1000_VT_CTL_VM_REPL_EN         (1 << 30)
 
 /* Per VM Offload register setup */
 #define E1000_VMOLR_LPE        0x00010000 /* Accept Long packet */
@@ -392,7 +405,34 @@ struct e1000_adv_tx_context_desc {
 
 #define E1000_VFMAILBOX_SIZE   16 /* 16 32 bit words - 64 bytes */
 
-u32  e1000_translate_register_82576(u32 reg);
+/* If it's a E1000_VF_* msg then it originates in the VF and is sent to the
+ * PF.  The reverse is true if it is E1000_PF_*.
+ * Message ACK's are the value or'd with 0xF0000000
+ */
+#define E1000_VT_MSGTYPE_ACK      0xF0000000  /* Messages below or'd with
+                                               * this are the ACK */
+#define E1000_VT_MSGTYPE_NACK     0xFF000000  /* Messages below or'd with
+                                               * this are the NACK */
+#define E1000_VT_MSGINFO_SHIFT    16
+/* bits 23:16 are used for exra info for certain messages */
+#define E1000_VT_MSGINFO_MASK     (0xFF << E1000_VT_MSGINFO_SHIFT)
+
+#define E1000_VF_MSGTYPE_REQ_MAC  1 /* VF needs to know its MAC */
+#define E1000_VF_MSGTYPE_VFLR     2 /* VF notifies VFLR to PF */
+#define E1000_VF_SET_MULTICAST    3 /* VF requests PF to set MC addr */
+#define E1000_VF_SET_VLAN         4 /* VF requests PF to set VLAN */
+
+/* Add 100h to all PF msgs, leaves room for up to 255 discrete message types
+ * from VF to PF - way more than we'll ever need */
+#define E1000_PF_MSGTYPE_RESET    (1 + 0x100) /* PF notifies global reset
+                                               * imminent to VF */
+#define E1000_PF_MSGTYPE_LSC      (2 + 0x100) /* PF notifies VF of LSC... VF
+                                               * will see extra msg info for
+                                               * status */
+
+#define E1000_PF_MSG_LSCDOWN      (1 << E1000_VT_MSGINFO_SHIFT)
+#define E1000_PF_MSG_LSCUP        (2 << E1000_VT_MSGINFO_SHIFT)
+
 s32  e1000_send_mail_to_pf_vf(struct e1000_hw *hw, u32 *msg,
                               s16 size);
 s32  e1000_receive_mail_from_pf_vf(struct e1000_hw *hw,
@@ -405,9 +445,8 @@ void e1000_vmdq_loopback_enable_vf(struct e1000_hw *hw);
 void e1000_vmdq_loopback_disable_vf(struct e1000_hw *hw);
 void e1000_vmdq_replication_enable_vf(struct e1000_hw *hw, u32 enables);
 void e1000_vmdq_replication_disable_vf(struct e1000_hw *hw);
-void e1000_init_vfnumber_index_vf(struct e1000_hw *hw, u32 vf_number);
 bool e1000_check_for_pf_ack_vf(struct e1000_hw *hw);
-bool e1000_check_for_pf_mail_vf(struct e1000_hw *hw);
+bool e1000_check_for_pf_mail_vf(struct e1000_hw *hw, u32*);
 
 
 #endif

@@ -25,8 +25,11 @@
 
 *******************************************************************************/
 
-/* e1000_82575
- * e1000_82576
+/*
+ * 82575EB Gigabit Network Connection
+ * 82575EB Gigabit Backplane Connection
+ * 82575GB Gigabit Network Connection
+ * 82576 Gigabit Network Connection
  */
 
 #include "e1000_api.h"
@@ -70,18 +73,11 @@ static void e1000_init_rx_addrs_82575(struct e1000_hw *hw, u16 rar_count);
 static void e1000_update_mc_addr_list_82575(struct e1000_hw *hw,
                                            u8 *mc_addr_list, u32 mc_addr_count,
                                            u32 rar_used_count, u32 rar_count);
-void e1000_remove_device_82575(struct e1000_hw *hw);
 void e1000_shutdown_fiber_serdes_link_82575(struct e1000_hw *hw);
-
-struct e1000_dev_spec_82575 {
-	bool sgmii_active;
-};
 
 /**
  *  e1000_init_phy_params_82575 - Init PHY func ptrs.
  *  @hw: pointer to the HW structure
- *
- *  This is a function pointer entry point called by the api module.
  **/
 static s32 e1000_init_phy_params_82575(struct e1000_hw *hw)
 {
@@ -151,8 +147,6 @@ out:
 /**
  *  e1000_init_nvm_params_82575 - Init NVM func ptrs.
  *  @hw: pointer to the HW structure
- *
- *  This is a function pointer entry point called by the api module.
  **/
 static s32 e1000_init_nvm_params_82575(struct e1000_hw *hw)
 {
@@ -210,26 +204,14 @@ static s32 e1000_init_nvm_params_82575(struct e1000_hw *hw)
 /**
  *  e1000_init_mac_params_82575 - Init MAC func ptrs.
  *  @hw: pointer to the HW structure
- *
- *  This is a function pointer entry point called by the api module.
  **/
 static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_dev_spec_82575 *dev_spec;
+	struct e1000_dev_spec_82575 *dev_spec = &hw->dev_spec._82575;
 	u32 ctrl_ext = 0;
-	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_init_mac_params_82575");
-
-	hw->dev_spec_size = sizeof(struct e1000_dev_spec_82575);
-
-	/* Device-specific structure allocation */
-	ret_val = e1000_alloc_zeroed_dev_spec_struct(hw, hw->dev_spec_size);
-	if (ret_val)
-		goto out;
-
-	dev_spec = (struct e1000_dev_spec_82575 *)hw->dev_spec;
 
 	/* Set media type */
         /*
@@ -308,23 +290,19 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	/* turn on/off LED */
 	mac->ops.led_on = e1000_led_on_generic;
 	mac->ops.led_off = e1000_led_off_generic;
-	/* remove device */
-	mac->ops.remove_device = e1000_remove_device_82575;
 	/* clear hardware counters */
 	mac->ops.clear_hw_cntrs = e1000_clear_hw_cntrs_82575;
 	/* link info */
 	mac->ops.get_link_up_info = e1000_get_link_up_info_82575;
 
-out:
-	return ret_val;
+	return E1000_SUCCESS;
 }
 
 /**
  *  e1000_init_function_pointers_82575 - Init func ptrs.
  *  @hw: pointer to the HW structure
  *
- *  The only function explicitly called by the api module to initialize
- *  all function pointers and parameters.
+ *  Called to initialize all function pointers and parameters.
  **/
 void e1000_init_function_pointers_82575(struct e1000_hw *hw)
 {
@@ -339,8 +317,7 @@ void e1000_init_function_pointers_82575(struct e1000_hw *hw)
  *  e1000_acquire_phy_82575 - Acquire rights to access PHY
  *  @hw: pointer to the HW structure
  *
- *  Acquire access rights to the correct PHY.  This is a
- *  function pointer entry point called by the api module.
+ *  Acquire access rights to the correct PHY.
  **/
 static s32 e1000_acquire_phy_82575(struct e1000_hw *hw)
 {
@@ -357,8 +334,7 @@ static s32 e1000_acquire_phy_82575(struct e1000_hw *hw)
  *  e1000_release_phy_82575 - Release rights to access PHY
  *  @hw: pointer to the HW structure
  *
- *  A wrapper to release access rights to the correct PHY.  This is a
- *  function pointer entry point called by the api module.
+ *  A wrapper to release access rights to the correct PHY.
  **/
 static void e1000_release_phy_82575(struct e1000_hw *hw)
 {
@@ -1025,7 +1001,7 @@ static void e1000_update_mc_addr_list_82575(struct e1000_hw *hw,
 
 	/* Load any remaining multicast addresses into the hash table. */
 	for (; mc_addr_count > 0; mc_addr_count--) {
-		hash_value = e1000_hash_mc_addr_generic(hw, mc_addr_list);
+		hash_value = e1000_hash_mc_addr(hw, mc_addr_list);
 		DEBUGOUT1("Hash value = 0x%03X\n", hash_value);
 		hw->mac.ops.mta_set(hw, hash_value);
 		mc_addr_list += ETH_ADDR_LEN;
@@ -1042,14 +1018,22 @@ static void e1000_update_mc_addr_list_82575(struct e1000_hw *hw,
 void e1000_shutdown_fiber_serdes_link_82575(struct e1000_hw *hw)
 {
 	u32 reg;
+	u16 eeprom_data = 0;
 
 	if (hw->mac.type != e1000_82576 ||
 	   (hw->phy.media_type != e1000_media_type_fiber &&
 	    hw->phy.media_type != e1000_media_type_internal_serdes))
 		return;
 
-	/* if the management interface is not enabled, then power down */
-	if (!e1000_enable_mng_pass_thru(hw)) {
+	if (hw->bus.func == 0)
+		hw->nvm.ops.read(hw, NVM_INIT_CONTROL3_PORT_A, 1, &eeprom_data);
+
+	/*
+	 * If APM is not enabled in the EEPROM and management interface is
+	 * not enabled, then power down.
+	 */
+	if (!(eeprom_data & E1000_NVM_APME_82575) &&
+	    !e1000_enable_mng_pass_thru(hw)) {
 		/* Disable PCS to turn off link */
 		reg = E1000_READ_REG(hw, E1000_PCS_CFG0);
 		reg &= ~E1000_PCS_CFG_PCS_EN;
@@ -1072,8 +1056,7 @@ void e1000_shutdown_fiber_serdes_link_82575(struct e1000_hw *hw)
  *  e1000_reset_hw_82575 - Reset hardware
  *  @hw: pointer to the HW structure
  *
- *  This resets the hardware into a known state.  This is a
- *  function pointer entry point called by the api module.
+ *  This resets the hardware into a known state.
  **/
 static s32 e1000_reset_hw_82575(struct e1000_hw *hw)
 {
@@ -1337,6 +1320,7 @@ static s32 e1000_setup_fiber_serdes_link_82575(struct e1000_hw *hw)
 		reg |= E1000_PCS_LCTL_FORCE_FCTRL;
 		e1000_force_mac_fc_generic(hw);
 	}
+
 	E1000_WRITE_REG(hw, E1000_PCS_LCTL, reg);
 
 	return E1000_SUCCESS;
@@ -1454,86 +1438,14 @@ out:
  **/
 static bool e1000_sgmii_active_82575(struct e1000_hw *hw)
 {
-	struct e1000_dev_spec_82575 *dev_spec;
-	bool ret_val;
+	struct e1000_dev_spec_82575 *dev_spec = &hw->dev_spec._82575;
 
 	DEBUGFUNC("e1000_sgmii_active_82575");
 
-	if (hw->mac.type != e1000_82575 && hw->mac.type != e1000_82576) {
-		ret_val = false;
-		goto out;
-	}
+	if (hw->mac.type != e1000_82575 && hw->mac.type != e1000_82576)
+		return false;
 
-	dev_spec = (struct e1000_dev_spec_82575 *)hw->dev_spec;
-
-	ret_val = dev_spec->sgmii_active;
-
-out:
-	return ret_val;
-}
-
-/**
- *  e1000_translate_register_82576 - Translate the proper register offset
- *  @reg: e1000 register to be read
- *
- *  Registers in 82576 are located in different offsets than other adapters
- *  even though they function in the same manner.  This function takes in
- *  the name of the register to read and returns the correct offset for
- *  82576 silicon.
- **/
-u32 e1000_translate_register_82576(u32 reg)
-{
-	/*
-	 * Some of the Kawela registers are located at different
-	 * offsets than they are in older adapters.
-	 * Despite the difference in location, the registers
-	 * function in the same manner.
-	 */
-	switch (reg) {
-	case E1000_TDBAL(0):
-		reg = 0x0E000;
-		break;
-	case E1000_TDBAH(0):
-		reg = 0x0E004;
-		break;
-	case E1000_TDLEN(0):
-		reg = 0x0E008;
-		break;
-	case E1000_TDH(0):
-		reg = 0x0E010;
-		break;
-	case E1000_TDT(0):
-		reg = 0x0E018;
-		break;
-	case E1000_TXDCTL(0):
-		reg = 0x0E028;
-		break;
-	case E1000_RDBAL(0):
-		reg = 0x0C000;
-		break;
-	case E1000_RDBAH(0):
-		reg = 0x0C004;
-		break;
-	case E1000_RDLEN(0):
-		reg = 0x0C008;
-		break;
-	case E1000_RDH(0):
-		reg = 0x0C010;
-		break;
-	case E1000_RDT(0):
-		reg = 0x0C018;
-		break;
-	case E1000_RXDCTL(0):
-		reg = 0x0C028;
-		break;
-	case E1000_SRRCTL(0):
-		reg = 0x0C00C;
-		break;
-	default:
-		break;
-	}
-
-	return reg;
+	return dev_spec->sgmii_active;
 }
 
 /**
@@ -1609,30 +1521,6 @@ static void e1000_power_down_phy_copper_82575(struct e1000_hw *hw)
 		e1000_power_down_phy_copper(hw);
 
 	return;
-}
-
-/**
- *  e1000_remove_device_82575 - Free device specific structure
- *  @hw: pointer to the HW structure
- *
- *  If a device specific structure was allocated, this function will
- *  free it after shutting down the serdes interface if available.
- **/
-void e1000_remove_device_82575(struct e1000_hw *hw)
-{
-	u16 eeprom_data = 0;
-
-	/*
-	 * If APM is enabled in the EEPROM then leave the port on for fiber
-	 * serdes adapters.
-	 */
-	if (hw->bus.func == 0)
-		hw->nvm.ops.read(hw, NVM_INIT_CONTROL3_PORT_A, 1, &eeprom_data);
-
-	if (!(eeprom_data & E1000_NVM_APME_82575))
-		e1000_shutdown_fiber_serdes_link_82575(hw);
-
-	e1000_remove_device_generic(hw);
 }
 
 /**

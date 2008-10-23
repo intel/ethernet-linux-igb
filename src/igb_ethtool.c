@@ -445,7 +445,7 @@ static void igb_get_regs(struct net_device *netdev,
 	regs_buff[34] = E1000_READ_REG(hw, E1000_RLPML);
 	regs_buff[35] = E1000_READ_REG(hw, E1000_RFCTL);
 	regs_buff[36] = E1000_READ_REG(hw, E1000_MRQC);
-	regs_buff[37] = E1000_READ_REG(hw, E1000_VMD_CTL);
+	regs_buff[37] = E1000_READ_REG(hw, E1000_VT_CTL);
 
 	/* Transmit */
 	regs_buff[38] = E1000_READ_REG(hw, E1000_TCTL);
@@ -1788,26 +1788,26 @@ static int igb_set_coalesce(struct net_device *netdev,
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
+	int i;
 
 	if ((ec->rx_coalesce_usecs > IGB_MAX_ITR_USECS) ||
 	    ((ec->rx_coalesce_usecs > 3) &&
 	     (ec->rx_coalesce_usecs < IGB_MIN_ITR_USECS)) ||
-	    (ec->rx_coalesce_usecs == 2) ||
-	    (ec->stats_block_coalesce_usecs > (10 * 1000000)))
+	    (ec->rx_coalesce_usecs == 2))
 		return -EINVAL;
 
-	adapter->stats_freq_us = ec->stats_block_coalesce_usecs;
-
 	/* convert to rate of irq's per second */
-	if (ec->rx_coalesce_usecs <= 3) {
+	if (ec->rx_coalesce_usecs && ec->rx_coalesce_usecs <= 3) {
 		adapter->itr = IGB_START_ITR;
 		adapter->itr_setting = ec->rx_coalesce_usecs;
 	} else {
-		adapter->itr = (1000000 / ec->rx_coalesce_usecs);
-		adapter->itr_setting = adapter->itr & ~3;
+		adapter->itr = ec->rx_coalesce_usecs << 2;
+		adapter->itr_setting = adapter->itr;
 	}
 
-	E1000_WRITE_REG(hw, E1000_ITR, 1000000000 / (adapter->itr * 256));
+	for (i = 0; i < adapter->num_rx_queues; i++)
+		writel(adapter->itr,
+		       hw->hw_addr + adapter->rx_ring[i].itr_register);
 
 	return 0;
 }
@@ -1820,9 +1820,7 @@ static int igb_get_coalesce(struct net_device *netdev,
 	if (adapter->itr_setting <= 3)
 		ec->rx_coalesce_usecs = adapter->itr_setting;
 	else
-		ec->rx_coalesce_usecs = 1000000 / adapter->itr_setting;
-
-	ec->stats_block_coalesce_usecs = adapter->stats_freq_us;
+		ec->rx_coalesce_usecs = adapter->itr_setting >> 2;
 
 	return 0;
 }

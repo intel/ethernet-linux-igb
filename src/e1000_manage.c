@@ -111,8 +111,8 @@ bool e1000_check_mng_mode_generic(struct e1000_hw *hw)
 
 	fwsm = E1000_READ_REG(hw, E1000_FWSM);
 
-	return ((fwsm & E1000_FWSM_MODE_MASK) ==
-	        (E1000_MNG_IAMT_MODE << E1000_FWSM_MODE_SHIFT));
+	return (fwsm & E1000_FWSM_MODE_MASK) ==
+	        (E1000_MNG_IAMT_MODE << E1000_FWSM_MODE_SHIFT);
 }
 
 /**

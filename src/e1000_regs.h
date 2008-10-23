@@ -264,8 +264,8 @@
 #define E1000_LSECRXCAP       0x0B300  /* LinkSec Rx Capabilities Register - RO */
 #define E1000_LSECTXCTRL      0x0B004  /* LinkSec Tx Control - RW */
 #define E1000_LSECRXCTRL      0x0B304  /* LinkSec Rx Control - RW */
-#define E1000_LSECTXSCIL      0x0B008  /* LinkSec Tx SCI Low - RW */
-#define E1000_LSECTXSCIH      0x0B00C  /* LinkSec Tx SCI High - RW */
+#define E1000_LSECTXSCL       0x0B008  /* LinkSec Tx SCI Low - RW */
+#define E1000_LSECTXSCH       0x0B00C  /* LinkSec Tx SCI High - RW */
 #define E1000_LSECTXSA        0x0B010  /* LinkSec Tx SA0 - RW */
 #define E1000_LSECTXPN0       0x0B018  /* LinkSec Tx SA PN 0 - RW */
 #define E1000_LSECTXPN1       0x0B01C  /* LinkSec Tx SA PN 1 - RW */
@@ -321,7 +321,7 @@
 #define E1000_RA       0x05400  /* Receive Address - RW Array */
 #define E1000_RA2      0x054E0  /* 2nd half of receive address array - RW Array */
 #define E1000_VFTA     0x05600  /* VLAN Filter Table Array - RW Array */
-#define E1000_VMD_CTL  0x0581C  /* VMDq Control - RW */
+#define E1000_VT_CTL   0x0581C  /* VMDq Control - RW */
 #define E1000_VFQA0    0x0B000  /* VLAN Filter Queue Array 0 - RW Array */
 #define E1000_VFQA1    0x0B200  /* VLAN Filter Queue Array 1 - RW Array */
 #define E1000_WUC      0x05800  /* Wakeup Control - RW */
@@ -381,6 +381,7 @@
 /* VT Registers */
 #define E1000_SWPBS     0x03004 /* Switch Packet Buffer Size - RW */
 #define E1000_MBVFICR   0x00C80 /* Mailbox VF Cause - RWC */
+#define E1000_MBVFIMR   0x00C84 /* Mailbox VF int Mask - RW */
 #define E1000_VFLRE     0x00C88 /* VF Register Events - RWC */
 #define E1000_VFRE      0x00C8C /* VF Receive Enables */
 #define E1000_VFTE      0x00C90 /* VF Transmit Enables */
@@ -390,10 +391,12 @@
 #define E1000_RPLOLR    0x05AF0 /* Replication Offload - RW */
 #define E1000_UTA       0x0A000 /* Unicast Table Array - RW */
 #define E1000_IOVTCL    0x05BBC /* IOV Control Register */
+#define E1000_VMRCTL    0X05D80 /* Virtual Mirror Rule Control */
 /* These act per VF so an array friendly macro is used */
 #define E1000_V2PMAILBOX(_n)   (0x00C40 + (4 * (_n)))
 #define E1000_P2VMAILBOX(_n)   (0x00C00 + (4 * (_n)))
 #define E1000_VMBMEM(_n)       (0x00800 + (64 * (_n)))
+#define E1000_VFVMBMEM(_n)     (0x00800 + (_n))
 #define E1000_VMOLR(_n)        (0x05AD0 + (4 * (_n)))
 
 /* Filtering Registers */

@@ -27,6 +27,11 @@
 
 #include "e1000_api.h"
 
+static s32 e1000_set_default_fc_generic(struct e1000_hw *hw);
+static s32 e1000_commit_fc_settings_generic(struct e1000_hw *hw);
+static s32 e1000_poll_fiber_serdes_link_generic(struct e1000_hw *hw);
+static s32 e1000_validate_mdi_setting_generic(struct e1000_hw *hw);
+
 /**
  *  e1000_init_mac_ops_generic - Initialize MAC function pointers
  *  @hw: pointer to the HW structure
@@ -40,7 +45,6 @@ void e1000_init_mac_ops_generic(struct e1000_hw *hw)
 
 	/* General Setup */
 	mac->ops.read_mac_addr = e1000_read_mac_addr_generic;
-	mac->ops.remove_device = e1000_remove_device_generic;
 	mac->ops.config_collision_dist = e1000_config_collision_dist_generic;
 	/* LINK */
 	mac->ops.wait_autoneg = e1000_wait_autoneg_generic;
@@ -51,21 +55,6 @@ void e1000_init_mac_ops_generic(struct e1000_hw *hw)
 	/* VLAN, MC, etc. */
 	mac->ops.rar_set = e1000_rar_set_generic;
 	mac->ops.validate_mdi_setting = e1000_validate_mdi_setting_generic;
-}
-
-/**
- *  e1000_remove_device_generic - Free device specific structure
- *  @hw: pointer to the HW structure
- *
- *  If a device specific structure was allocated, this function will
- *  free it.
- **/
-void e1000_remove_device_generic(struct e1000_hw *hw)
-{
-	DEBUGFUNC("e1000_remove_device_generic");
-
-	/* Freeing the dev_spec member of e1000_hw structure */
-	e1000_free_dev_spec_struct(hw);
 }
 
 /**
@@ -94,7 +83,7 @@ s32 e1000_get_bus_info_pcie_generic(struct e1000_hw *hw)
 	if (ret_val)
 		bus->width = e1000_bus_width_unknown;
 	else
-		bus->width = (e1000_bus_width)((pcie_link_status &
+		bus->width = (enum e1000_bus_width)((pcie_link_status &
 		                                PCIE_LINK_WIDTH_MASK) >>
 		                               PCIE_LINK_WIDTH_SHIFT);
 
@@ -264,10 +253,8 @@ void e1000_rar_set_generic(struct e1000_hw *hw, u8 *addr, u32 index)
 	rar_high = ((u32) addr[4] | ((u32) addr[5] << 8));
 
 	/* If MAC address zero, no need to set the AV bit */
-	if (rar_low || rar_high) {
-		if (!hw->mac.disable_av)
-			rar_high |= E1000_RAH_AV;
-	}
+	if (rar_low || rar_high)
+		rar_high |= E1000_RAH_AV;
 
 	E1000_WRITE_REG(hw, E1000_RAL(index), rar_low);
 	E1000_WRITE_REG(hw, E1000_RAH(index), rar_high);
@@ -707,22 +694,42 @@ s32 e1000_check_for_serdes_link_generic(struct e1000_hw *hw)
 		 */
 		/* SYNCH bit and IV bit are sticky. */
 		usec_delay(10);
-		if (E1000_RXCW_SYNCH & E1000_READ_REG(hw, E1000_RXCW)) {
+		rxcw = E1000_READ_REG(hw, E1000_RXCW);
+		if (rxcw & E1000_RXCW_SYNCH) {
 			if (!(rxcw & E1000_RXCW_IV)) {
 				mac->serdes_has_link = true;
-				DEBUGOUT("SERDES: Link is up.\n");
+				DEBUGOUT("SERDES: Link up - forced.\n");
 			}
 		} else {
 			mac->serdes_has_link = false;
-			DEBUGOUT("SERDES: Link is down.\n");
+			DEBUGOUT("SERDES: Link down - force failed.\n");
 		}
 	}
 
 	if (E1000_TXCW_ANE & E1000_READ_REG(hw, E1000_TXCW)) {
 		status = E1000_READ_REG(hw, E1000_STATUS);
-		mac->serdes_has_link = (status & E1000_STATUS_LU)
-					? true
-					: false;
+		if (status & E1000_STATUS_LU) {
+			/* SYNCH bit and IV bit are sticky, so reread rxcw. */
+			usec_delay(10);
+			rxcw = E1000_READ_REG(hw, E1000_RXCW);
+			if (rxcw & E1000_RXCW_SYNCH) {
+				if (!(rxcw & E1000_RXCW_IV)) {
+					mac->serdes_has_link = true;
+					DEBUGOUT("SERDES: Link up - autoneg "
+					   "completed sucessfully.\n");
+				} else {
+					mac->serdes_has_link = false;
+					DEBUGOUT("SERDES: Link down - invalid"
+					   "codewords detected in autoneg.\n");
+				}
+			} else {
+				mac->serdes_has_link = false;
+				DEBUGOUT("SERDES: Link down - no sync.\n");
+			}
+		} else {
+			mac->serdes_has_link = false;
+			DEBUGOUT("SERDES: Link down - autoneg failed\n");
+		}
 	}
 
 out:
@@ -932,7 +939,7 @@ out:
  *  Write the flow control settings to the Transmit Config Word Register (TXCW)
  *  base on the flow control settings in e1000_mac_info.
  **/
-s32 e1000_commit_fc_settings_generic(struct e1000_hw *hw)
+static s32 e1000_commit_fc_settings_generic(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	u32 txcw;
@@ -1048,7 +1055,7 @@ s32 e1000_set_fc_watermarks_generic(struct e1000_hw *hw)
  *  Read the EEPROM for the default values for flow control and store the
  *  values.
  **/
-s32 e1000_set_default_fc_generic(struct e1000_hw *hw)
+static s32 e1000_set_default_fc_generic(struct e1000_hw *hw)
 {
 	s32 ret_val = E1000_SUCCESS;
 	u16 nvm_data;
@@ -1162,7 +1169,6 @@ out:
 s32 e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val = E1000_SUCCESS;
 	u16 mii_status_reg, mii_nway_adv_reg, mii_nway_lp_ability_reg;
 	u16 speed, duplex;
@@ -1200,10 +1206,10 @@ s32 e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		 * has completed.  We read this twice because this reg has
 		 * some "sticky" (latched) bits.
 		 */
-		ret_val = phy->ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
+		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
 		if (ret_val)
 			goto out;
-		ret_val = phy->ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
+		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
 		if (ret_val)
 			goto out;
 
@@ -1220,11 +1226,11 @@ s32 e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		 * Page Ability Register (Address 5) to determine how
 		 * flow control was negotiated.
 		 */
-		ret_val = phy->ops.read_reg(hw, PHY_AUTONEG_ADV,
+		ret_val = hw->phy.ops.read_reg(hw, PHY_AUTONEG_ADV,
 		                             &mii_nway_adv_reg);
 		if (ret_val)
 			goto out;
-		ret_val = phy->ops.read_reg(hw, PHY_LP_ABILITY,
+		ret_val = hw->phy.ops.read_reg(hw, PHY_LP_ABILITY,
 		                             &mii_nway_lp_ability_reg);
 		if (ret_val)
 			goto out;
@@ -1846,13 +1852,11 @@ void e1000_reset_adaptive_generic(struct e1000_hw *hw)
 		goto out;
 	}
 
-	if (!mac->ifs_params_forced) {
-		mac->current_ifs_val = 0;
-		mac->ifs_min_val = IFS_MIN;
-		mac->ifs_max_val = IFS_MAX;
-		mac->ifs_step_size = IFS_STEP;
-		mac->ifs_ratio = IFS_RATIO;
-	}
+	mac->current_ifs_val = 0;
+	mac->ifs_min_val = IFS_MIN;
+	mac->ifs_max_val = IFS_MAX;
+	mac->ifs_step_size = IFS_STEP;
+	mac->ifs_ratio = IFS_RATIO;
 
 	mac->in_ifs_mode = false;
 	E1000_WRITE_REG(hw, E1000_AIT, 0);

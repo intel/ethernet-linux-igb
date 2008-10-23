@@ -11,10 +11,13 @@
 	10a9  82575EB Gigabit Backplane Connection
 	10c9  82576 Gigabit Network Connection
 		8086 a01c  Gigabit ET Dual Port Server Adapter
+		8086 a03c  Gigabit ET Dual Port Server Adapter
 	10d6  82575GB Gigabit Network Connection
 		8086 10d6  Gigabit VT Quad Port Server Adapter
 		8086 145a  Gigabit VT Quad Port Server Adapter
+		8086 147a  Gigabit VT Quad Port Server Adapter
 	10e6  82576 Gigabit Network Connection
 		8086 a01f  Gigabit EF Dual Port Server Adapter
+		8086 a02f  Gigabit EF Dual Port Server Adapter
 	10e7  82576 Gigabit Network Connection
 
