@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2008 Intel Corporation.
+  Copyright(c) 2007-2009 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -25,13 +25,7 @@
 
 *******************************************************************************/
 
-
-
-
 #include "igb.h"
-
-
-
 #include "kcompat.h"
 
 /*****************************************************************************/
@@ -356,12 +350,25 @@ void _kc_free_netdev(struct net_device *netdev)
 #endif /* <= 2.6.18 */
 
 /*****************************************************************************/
-#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23) )
-#endif /* < 2.6.23 */
-
-/*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
 #ifdef NAPI
+/* this function returns the true netdev of the napi struct */
+struct net_device * napi_to_netdev(struct napi_struct *napi)
+{
+	struct adapter_q_vector *q_vector = container_of(napi,
+	                                                struct adapter_q_vector,
+	                                                napi);
+	struct adapter_struct *adapter = q_vector->adapter;
+
+	return adapter->netdev;
+}
+
+int _kc_napi_schedule_prep(struct napi_struct *napi)
+{
+	return (netif_running(napi_to_netdev(napi)) &&
+	        netif_rx_schedule_prep(napi_to_poll_dev(napi)));
+}
+
 int __kc_adapter_clean(struct net_device *netdev, int *budget)
 {
 	int work_done;
@@ -371,7 +378,7 @@ int __kc_adapter_clean(struct net_device *netdev, int *budget)
 	work_done = napi->poll(napi, work_to_do);
 	*budget -= work_done;
 	netdev->quota -= work_done;
-	return work_done ? 1 : 0;
+	return (work_done >= work_to_do) ? 1 : 0;
 }
 #endif /* NAPI */
 #endif /* <= 2.6.24 */
@@ -410,4 +417,8 @@ void _kc_netif_tx_start_all_queues(struct net_device *netdev)
 			netif_start_subqueue(netdev, i);
 }
 #endif /* HAVE_TX_MQ */
-#endif /* <= 2.6.27 */
+#endif /* < 2.6.27 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29) )
+#endif /* < 2.6.29 */

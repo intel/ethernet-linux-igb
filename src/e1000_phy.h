@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2008 Intel Corporation.
+  Copyright(c) 2007-2009 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -62,6 +62,7 @@ s32  e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
                                 u32 usec_interval, bool *success);
 s32  e1000_phy_init_script_igp3(struct e1000_hw *hw);
 enum e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id);
+s32 e1000_determine_phy_address(struct e1000_hw *hw);
 void e1000_power_up_phy_copper(struct e1000_hw *hw);
 void e1000_power_down_phy_copper(struct e1000_hw *hw);
 s32 e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data);

@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Network Connection
 ==================================================
 
-September 6, 2008
+February 24, 2009
 
 
 Contents
@@ -11,7 +11,6 @@ Contents
 - Identifying Your Adapter
 - Building and Installation
 - Command Line Parameters
-- Speed and Duplex Configuration
 - Additional Configurations
 - Known Issues/Troubleshooting
 - Support
@@ -176,11 +175,7 @@ For example:
 The default value for each parameter is generally the recommended setting,
 unless otherwise noted.
 
-NOTES:  For more information about the AutoNeg, Duplex, and Speed
-        parameters, see the "Speed and Duplex Configuration" section in
-        this document.
-
-        For more information about the InterruptThrottleRate,
+NOTES:  For more information about the InterruptThrottleRate,
         parameter, see the application note at:
         http://www.intel.com/design/network/applnots/ap450.htm
 
@@ -340,13 +335,13 @@ Additional Configurations
   asked for the driver or module name, the name for the Linux Base Driver
   for the Gigabit Family of Adapters is igb.
 
-  As an example, if you install the igb driver for two Gigabit adapters
-  (eth0 and eth1) and set the speed and duplex to 10full and 100half, add
-  the following to modules.conf or or modprobe.conf:
+  As an example, if you install the igb driver for two Gigabit adapters 
+  (eth0 and eth1) and want to set the interrupt mode to MSI-X and MSI 
+  respectively, add the following to modules.conf or /etc/modprobe.conf:
 
        alias eth0 igb
        alias eth1 igb
-       options igb Speed=10,100 Duplex=2,1
+       options igb IntMode=2,1
 
 
   Viewing Link Messages
@@ -483,121 +478,126 @@ Known Issues/Troubleshooting
   working, verify in the "In This Release" section of the readme that you have 
   installed the correct driver.
 
-Using the igb driver on 2.4 or older 2.6 based kernels
-------------------------------------------------------
-Due to limited support for PCI-Express in 2.4 kernels and older 2.6 kernels,
-the igb driver may run into interrupt related problems on some systems, 
-such as no link or hang when bringing up the device.
+  Using the igb driver on 2.4 or older 2.6 based kernels
+  ------------------------------------------------------
+  Due to limited support for PCI-Express in 2.4 kernels and older 2.6 kernels,
+  the igb driver may run into interrupt related problems on some systems, 
+  such as no link or hang when bringing up the device.
 
-We recommend the newer 2.6 based kernels, as these kernels correctly
-configure the PCI-Express configuration space of the adapter and all
-intervening bridges. If you are required to use a 2.4 kernel, use a 2.4 kernel 
-newer than 2.4.30. For 2.6 kernels we recommend using the 2.6.21 kernel or 
-newer.
+  We recommend the newer 2.6 based kernels, as these kernels correctly
+  configure the PCI-Express configuration space of the adapter and all
+  intervening bridges. If you are required to use a 2.4 kernel, use a 2.4 kernel 
+  newer than 2.4.30. For 2.6 kernels we recommend using the 2.6.21 kernel or 
+  newer.
 
-Alternatively, on 2.6 kernels you may disable MSI support in the kernel by 
-booting with the "pci=nomsi" option or permanently disable MSI support in 
-your kernel by configuring your kernel with CONFIG_PCI_MSI unset.
+  Alternatively, on 2.6 kernels you may disable MSI support in the kernel by 
+  booting with the "pci=nomsi" option or permanently disable MSI support in 
+  your kernel by configuring your kernel with CONFIG_PCI_MSI unset.
 
-Intel(R) Active Management Technology 2.0, 2.1, 2.5 not supported in 
-conjunction with Linux driver
----------------------------------------------------------------------
+  Intel(R) Active Management Technology 2.0, 2.1, 2.5 not supported in 
+  conjunction with Linux driver
+  ---------------------------------------------------------------------
 
-Driver Compilation
-------------------
-When trying to compile the driver by running make install, the following
-error may occur:
+  Driver Compilation
+  ------------------
+  When trying to compile the driver by running make install, the following
+  error may occur:
 
     "Linux kernel source not configured - missing version.h"
 
-To solve this issue, create the version.h file by going to the Linux source
-tree and entering:
+  To solve this issue, create the version.h file by going to the Linux source
+  tree and entering:
 
     make include/linux/version.h.
 
-Performance Degradation with Jumbo Frames
------------------------------------------
-Degradation in throughput performance may be observed in some Jumbo frames
-environments.  If this is observed, increasing the application's socket
-buffer size and/or increasing the /proc/sys/net/ipv4/tcp_*mem entry values
-may help.  See the specific application manual and
-/usr/src/linux*/Documentation/
-networking/ip-sysctl.txt for more details.
+  Performance Degradation with Jumbo Frames
+  -----------------------------------------
+  Degradation in throughput performance may be observed in some Jumbo frames 
+  environments. If this is observed, increasing the application's socket buffer
+  size and/or increasing the /proc/sys/net/ipv4/tcp_*mem entry values may help.
+  See the specific application manual and 
+  /usr/src/linux*/Documentation/networking/ip-sysctl.txt for more details.
 
-Jumbo Frames on Foundry BigIron 8000 switch
--------------------------------------------
-There is a known issue using Jumbo frames when connected to a Foundry
-BigIron 8000 switch.  This is a 3rd party limitation.  If you experience
-loss of packets, lower the MTU size.
+  Jumbo Frames on Foundry BigIron 8000 switch
+  -------------------------------------------
+  There is a known issue using Jumbo frames when connected to a Foundry
+  BigIron 8000 switch.  This is a 3rd party limitation.  If you experience
+  loss of packets, lower the MTU size.
 
-Multiple Interfaces on Same Ethernet Broadcast Network
-------------------------------------------------------
-Due to the default ARP behavior on Linux, it is not possible to have
-one system on two IP networks in the same Ethernet broadcast domain
-(non-partitioned switch) behave as expected.  All Ethernet interfaces
-will respond to IP traffic for any IP address assigned to the system.
-This results in unbalanced receive traffic.
+  Multiple Interfaces on Same Ethernet Broadcast Network
+  ------------------------------------------------------
+  Due to the default ARP behavior on Linux, it is not possible to have
+  one system on two IP networks in the same Ethernet broadcast domain
+  (non-partitioned switch) behave as expected.  All Ethernet interfaces
+  will respond to IP traffic for any IP address assigned to the system.
+  This results in unbalanced receive traffic.
 
-If you have multiple interfaces in a server, either turn on ARP
-filtering by entering:
+  If you have multiple interfaces in a server, either turn on ARP
+  filtering by entering:
 
     echo 1 > /proc/sys/net/ipv4/conf/all/arp_filter
-(this only works if your kernel's version is higher than 2.4.5),
+  (this only works if your kernel's version is higher than 2.4.5),
 
-NOTE: This setting is not saved across reboots.  The configuration
-change can be made permanent by adding the line:
+  NOTE: This setting is not saved across reboots.  The configuration
+  change can be made permanent by adding the line:
     net.ipv4.conf.all.arp_filter = 1
-to the file /etc/sysctl.conf
+  to the file /etc/sysctl.conf
 
       or,
 
-install the interfaces in separate broadcast domains (either in
-different switches or in a switch partitioned to VLANs).
+  install the interfaces in separate broadcast domains (either in
+  different switches or in a switch partitioned to VLANs).
 
-Disable rx flow control with ethtool
-------------------------------------
-In order to disable receive flow control using ethtool, you must turn
-off auto-negotiation on the same command line.
+  Disable rx flow control with ethtool
+  ------------------------------------
+  In order to disable receive flow control using ethtool, you must turn
+  off auto-negotiation on the same command line.
 
-For example:
+  For example:
 
    ethtool -A eth? autoneg off rx off
 
-Unplugging network cable while ethtool -p is running
-----------------------------------------------------
-In kernel versions 2.5.50 and later (including 2.6 kernel), unplugging 
-the network cable while ethtool -p is running will cause the system to 
-become unresponsive to keyboard commands, except for control-alt-delete.  
-Restarting the system appears to be the only remedy.
+  Unplugging network cable while ethtool -p is running
+  ----------------------------------------------------
+  In kernel versions 2.5.50 and later (including 2.6 kernel), unplugging 
+  the network cable while ethtool -p is running will cause the system to 
+  become unresponsive to keyboard commands, except for control-alt-delete.  
+  Restarting the system appears to be the only remedy.
 
-Trouble passing traffic with on ports 1 and 2 using RHEL3
----------------------------------------------------------
-There is a known hardware compatibility issue on some systems with RHEL3 
-kernels. Traffic on ports 1 and 2 may be slower than expected and ping times
-higher than expected. 
+  Trouble passing traffic with on ports 1 and 2 using RHEL3
+  ---------------------------------------------------------
+  There is a known hardware compatibility issue on some systems with RHEL3 
+  kernels. Traffic on ports 1 and 2 may be slower than expected and ping times
+  higher than expected. 
 
-This issue MAY be resolved by updating to the latest kernel and BIOS. You can 
-check your system's BIOS by downloading the Linux Firmware Developer Kit that 
-can be obtained at http://www.linuxfirmwarekit.org/
+  This issue MAY be resolved by updating to the latest kernel and BIOS. You can 
+  check your system's BIOS by downloading the Linux Firmware Developer Kit that 
+  can be obtained at http://www.linuxfirmwarekit.org/
 
-Do Not Use LRO When Routing Packets
------------------------------------
-Due to a known general compatibility issue with LRO and routing, do not use
-LRO when routing packets.
+  Do Not Use LRO When Routing Packets
+  -----------------------------------
+  Due to a known general compatibility issue with LRO and routing, do not use
+  LRO when routing packets.
 
-Build error with Asianux 3.0 - redefinition of typedef 'irq_handler_t'
----------------------------------------------------------------------
-Some systems may experience build issues due to redefinition of irq_handler_t.  
-To resolve this issue build the driver (step 4 above) using the command:
+  Build error with Asianux 3.0 - redefinition of typedef 'irq_handler_t'
+  ---------------------------------------------------------------------
+  Some systems may experience build issues due to redefinition of irq_handler_t.  
+  To resolve this issue build the driver (step 4 above) using the command:
 
     make CFLAGS_EXTRA=-DAX_RELEASE_CODE=1 install
 
-MSI-X Issues with Kernels between 2.6.19 - 2.6.21 (inclusive)
--------------------------------------------------------------
-Kernel panics and instability may be observed on any MSI-X hardware if you use
-irqbalance with kernels between 2.6.19 and 2.6.21. If such problems are 
-encountered, you may disable the irqbalance daemon or upgrade to a newer 
-kernel. 
+  MSI-X Issues with Kernels between 2.6.19 - 2.6.21 (inclusive)
+  -------------------------------------------------------------
+  Kernel panics and instability may be observed on any MSI-X hardware if you 
+  use irqbalance with kernels between 2.6.19 and 2.6.21. If such problems are 
+  encountered, you may disable the irqbalance daemon or upgrade to a newer 
+  kernel.
+
+  Rx Page Allocation Errors
+  -------------------------
+  Page allocation failure. order:0 errors may occur under stress with kernels 
+  2.6.25 and above. This is caused by the way the Linux kernel reports this 
+  stressed condition.
  
 
 Support

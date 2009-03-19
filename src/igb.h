@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2008 Intel Corporation.
+  Copyright(c) 2007-2009 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -97,13 +97,12 @@ struct igb_adapter;
 /* Transmit and receive queues */
 #ifndef CONFIG_IGB_SEPARATE_TX_HANDLER
 #define IGB_MAX_RX_QUEUES                  (hw->mac.type > e1000_82575 ? 8 : 4)
-#define IGB_MAX_TX_QUEUES                  (hw->mac.type > e1000_82575 ? 8 : 4)
 #define IGB_ABS_MAX_TX_QUEUES              8
 #else /* CONFIG_IGB_SEPARATE_TX_HANDLER */
 #define IGB_MAX_RX_QUEUES                  4
-#define IGB_MAX_TX_QUEUES                  4
 #define IGB_ABS_MAX_TX_QUEUES              4
 #endif  /* CONFIG_IGB_SEPARATE_TX_HANDLER */
+#define IGB_MAX_TX_QUEUES                  IGB_MAX_RX_QUEUES
 
 /* RX descriptor control thresholds.
  * PTHRESH - MAC will consider prefetch if it has fewer than this number of
@@ -164,7 +163,8 @@ struct igb_buffer {
 		/* TX */
 		struct {
 			unsigned long time_stamp;
-			u32 length;
+			u16 length;
+			u16 next_to_watch;
 		};
 
 #ifndef CONFIG_IGB_DISABLE_PACKET_SPLIT
@@ -200,11 +200,13 @@ struct igb_ring {
 	u16 itr_register;
 	u16 cpu;
 
-	int queue_index;
+	u16 queue_index;
+	u16 reg_idx;
+	
 	unsigned int total_bytes;
 	unsigned int total_packets;
 
-	char name[IFNAMSIZ + 5];
+	char name[IFNAMSIZ + 9];
 	union {
 		/* TX */
 		struct {
@@ -288,13 +290,11 @@ struct igb_adapter {
 
 	u64 hw_csum_err;
 	u64 hw_csum_good;
-	u64 rx_hdr_split;
 	u32 alloc_rx_buff_failed;
 	bool rx_csum;
 	u16 rx_ps_hdr_size;
 	u32 max_frame_size;
 	u32 min_frame_size;
-
 
 	/* OS defined structs */
 	struct net_device *netdev;

@@ -20,4 +20,7 @@
 		8086 a01f  Gigabit EF Dual Port Server Adapter
 		8086 a02f  Gigabit EF Dual Port Server Adapter
 	10e7  82576 Gigabit Network Connection
+	10e8  82576 Gigabit Network Connection
+		8086 a02c  Gigabit ET Quad Port Server Adapter
+	150a  82576NS Gigabit Network Connection
 

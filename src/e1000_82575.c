@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2008 Intel Corporation.
+  Copyright(c) 2007-2009 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -281,6 +281,8 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	mac->ops.clear_vfta = e1000_clear_vfta_generic;
 	/* setting MTA */
 	mac->ops.mta_set = e1000_mta_set_generic;
+	/* ID LED init */
+	mac->ops.id_led_init = e1000_id_led_init_generic;
 	/* blink LED */
 	mac->ops.blink_led = e1000_blink_led_generic;
 	/* setup LED */
@@ -847,11 +849,18 @@ static s32 e1000_check_for_link_82575(struct e1000_hw *hw)
 
 	/* SGMII link check is done through the PCS register. */
 	if ((hw->phy.media_type != e1000_media_type_copper) ||
-	    (e1000_sgmii_active_82575(hw)))
+	    (e1000_sgmii_active_82575(hw))) {
 		ret_val = e1000_get_pcs_speed_and_duplex_82575(hw, &speed,
 		                                               &duplex);
-	else
+		/*
+		 * Use this flag to determine if link needs to be checked or
+		 * not.  If we have link clear the flag so that we do not
+		 * continue to check for link.
+		 */
+		hw->mac.get_link_status = !hw->mac.serdes_has_link;
+	} else {
 		ret_val = e1000_check_for_copper_link_generic(hw);
+	}
 
 	return ret_val;
 }
@@ -1053,6 +1062,253 @@ void e1000_shutdown_fiber_serdes_link_82575(struct e1000_hw *hw)
 }
 
 /**
+ *  e1000_vmdq_loopback_enable_pf- Enables VM to VM queue loopback replication
+ *  @hw: pointer to the HW structure
+ **/
+void e1000_vmdq_loopback_enable_pf(struct e1000_hw *hw)
+{
+	u32 reg;
+
+	reg = E1000_READ_REG(hw, E1000_DTXSWC);
+	reg |= E1000_DTXSWC_VMDQ_LOOPBACK_EN;
+	E1000_WRITE_REG(hw, E1000_DTXSWC, reg);
+}
+
+/**
+ *  e1000_vmdq_loopback_disable_pf - Disable VM to VM queue loopbk replication
+ *  @hw: pointer to the HW structure
+ **/
+void e1000_vmdq_loopback_disable_pf(struct e1000_hw *hw)
+{
+	u32 reg;
+
+	reg = E1000_READ_REG(hw, E1000_DTXSWC);
+	reg &= ~(E1000_DTXSWC_VMDQ_LOOPBACK_EN);
+	E1000_WRITE_REG(hw, E1000_DTXSWC, reg);
+}
+
+/**
+ *  e1000_vmdq_replication_enable_pf - Enable replication of brdcst & multicst
+ *  @hw: pointer to the HW structure
+ *
+ *  Enables replication of broadcast and multicast packets from the network
+ *  to VM's which have their respective broadcast and multicast accept
+ *  bits set in the VM Offload Register.  This gives the PF driver per
+ *  VM granularity control over which VM's get replicated broadcast traffic.
+ **/
+void e1000_vmdq_replication_enable_pf(struct e1000_hw *hw, u32 enables)
+{
+	u32 reg;
+	u32 i;
+
+	for (i = 0; i < MAX_NUM_VFS; i++) {
+		if (enables & (1 << i)) {
+			reg = E1000_READ_REG(hw, E1000_VMOLR(i));
+			reg |= (E1000_VMOLR_AUPE |
+				E1000_VMOLR_BAM |
+				E1000_VMOLR_MPME);
+			E1000_WRITE_REG(hw, E1000_VMOLR(i), reg);
+		}
+	}
+
+	reg = E1000_READ_REG(hw, E1000_VT_CTL);
+	reg |= E1000_VT_CTL_VM_REPL_EN;
+	E1000_WRITE_REG(hw, E1000_VT_CTL, reg);
+}
+
+/**
+ *  e1000_vmdq_replication_disable_pf - Disable replication of brdcst & multicst
+ *  @hw: pointer to the HW structure
+ *
+ *  Disables replication of broadcast and multicast packets to the VM's.
+ **/
+void e1000_vmdq_replication_disable_pf(struct e1000_hw *hw)
+{
+	u32 reg;
+
+	reg = E1000_READ_REG(hw, E1000_VT_CTL);
+	reg &= ~(E1000_VT_CTL_VM_REPL_EN);
+	E1000_WRITE_REG(hw, E1000_VT_CTL, reg);
+}
+
+/**
+ *  e1000_vmdq_enable_replication_mode_pf - Enables replication mode in the device
+ *  @hw: pointer to the HW structure
+ **/
+void e1000_vmdq_enable_replication_mode_pf(struct e1000_hw *hw)
+{
+	u32 reg;
+
+	reg = E1000_READ_REG(hw, E1000_VT_CTL);
+	reg |= E1000_VT_CTL_VM_REPL_EN;
+	E1000_WRITE_REG(hw, E1000_VT_CTL, reg);
+}
+
+/**
+ *  e1000_vmdq_broadcast_replication_enable_pf - Enable replication of brdcst
+ *  @hw: pointer to the HW structure
+ *  @enables: PoolSet Bit - if set to ALL_QUEUES, apply to all pools.
+ *
+ *  Enables replication of broadcast packets from the network
+ *  to VM's which have their respective broadcast accept
+ *  bits set in the VM Offload Register.  This gives the PF driver per
+ *  VM granularity control over which VM's get replicated broadcast traffic.
+ **/
+void e1000_vmdq_broadcast_replication_enable_pf(struct e1000_hw *hw,
+						u32 enables)
+{
+	u32 reg;
+	u32 i;
+
+	for (i = 0; i < MAX_NUM_VFS; i++) {
+		if ((enables == ALL_QUEUES) || (enables & (1 << i))) {
+			reg = E1000_READ_REG(hw, E1000_VMOLR(i));
+			reg |= E1000_VMOLR_BAM;
+			E1000_WRITE_REG(hw, E1000_VMOLR(i), reg);
+		}
+	}
+}
+
+/**
+ *  e1000_vmdq_broadcast_replication_disable_pf - Disable replication
+ *  of broadcast packets
+ *  @hw: pointer to the HW structure
+ *  @disables: PoolSet Bit - if set to ALL_QUEUES, apply to all pools.
+ *
+ *  Disables replication of broadcast packets for specific pools.
+ *  If bam/mpe is disabled on all pools then replication mode is
+ *  turned off.
+ **/
+void e1000_vmdq_broadcast_replication_disable_pf(struct e1000_hw *hw,
+						 u32 disables)
+{
+	u32 reg;
+	u32 i;
+	u32 oneenabled = 0;
+
+	for (i = 0; i < MAX_NUM_VFS; i++) {
+		reg = E1000_READ_REG(hw, E1000_VMOLR(i));
+		if ((disables == ALL_QUEUES) || (disables & (1 << i))) {
+			reg &= ~(E1000_VMOLR_BAM);
+			E1000_WRITE_REG(hw, E1000_VMOLR(i), reg);
+		}
+		if (!oneenabled && (reg & (E1000_VMOLR_AUPE |
+				E1000_VMOLR_BAM |
+				E1000_VMOLR_MPME)))
+				oneenabled = 1;
+	}
+	if (!oneenabled) {
+		reg = E1000_READ_REG(hw, E1000_VT_CTL);
+		reg &= ~(E1000_VT_CTL_VM_REPL_EN);
+		E1000_WRITE_REG(hw, E1000_VT_CTL, reg);
+	}
+}
+
+/**
+ *  e1000_vmdq_multicast_promiscuous_enable_pf - Enable promiscuous reception
+ *  @hw: pointer to the HW structure
+ *  @enables: PoolSet Bit - if set to ALL_QUEUES, apply to all pools.
+ *
+ *  Enables promiscuous reception of multicast packets from the network
+ *  to VM's which have their respective multicast promiscuous mode enable
+ *  bits set in the VM Offload Register.  This gives the PF driver per
+ *  VM granularity control over which VM's get all multicast traffic.
+ **/
+void e1000_vmdq_multicast_promiscuous_enable_pf(struct e1000_hw *hw,
+						u32 enables)
+{
+	u32 reg;
+	u32 i;
+
+	for (i = 0; i < MAX_NUM_VFS; i++) {
+		if ((enables == ALL_QUEUES) || (enables & (1 << i))) {
+			reg = E1000_READ_REG(hw, E1000_VMOLR(i));
+			reg |= E1000_VMOLR_MPME;
+			E1000_WRITE_REG(hw, E1000_VMOLR(i), reg);
+		}
+	}
+}
+
+/**
+ *  e1000_vmdq_multicast_promiscuous_disable_pf - Disable promiscuous
+ *  reception of multicast packets
+ *  @hw: pointer to the HW structure
+ *  @disables: PoolSet Bit - if set to ALL_QUEUES, apply to all pools.
+ *
+ *  Disables promiscuous reception of multicast packets for specific pools.
+ *  If bam/mpe is disabled on all pools then replication mode is
+ *  turned off.
+ **/
+void e1000_vmdq_multicast_promiscuous_disable_pf(struct e1000_hw *hw,
+						 u32 disables)
+{
+	u32 reg;
+	u32 i;
+	u32 oneenabled = 0;
+
+	for (i = 0; i < MAX_NUM_VFS; i++) {
+		reg = E1000_READ_REG(hw, E1000_VMOLR(i));
+		if ((disables == ALL_QUEUES) || (disables & (1 << i))) {
+			reg &= ~(E1000_VMOLR_MPME);
+			E1000_WRITE_REG(hw, E1000_VMOLR(i), reg);
+		}
+		if (!oneenabled && (reg & (E1000_VMOLR_AUPE |
+				E1000_VMOLR_BAM |
+				E1000_VMOLR_MPME)))
+				oneenabled = 1;
+	}
+	if (!oneenabled) {
+		reg = E1000_READ_REG(hw, E1000_VT_CTL);
+		reg &= ~(E1000_VT_CTL_VM_REPL_EN);
+		E1000_WRITE_REG(hw, E1000_VT_CTL, reg);
+	}
+}
+
+/**
+ *  e1000_vmdq_aupe_enable_pf - Enable acceptance of untagged packets
+ *  @hw: pointer to the HW structure
+ *  @enables: PoolSet Bit - if set to ALL_QUEUES, apply to all pools.
+ *
+ *  Enables acceptance of packets from the network which do not have
+ *  a VLAN tag but match the exact MAC filter of a given VM.
+ **/
+void e1000_vmdq_aupe_enable_pf(struct e1000_hw *hw, u32 enables)
+{
+	u32 reg;
+	u32 i;
+
+	for (i = 0; i < MAX_NUM_VFS; i++) {
+	if ((enables == ALL_QUEUES) || (enables & (1 << i))) {
+			reg = E1000_READ_REG(hw, E1000_VMOLR(i));
+			reg |= E1000_VMOLR_AUPE;
+			E1000_WRITE_REG(hw, E1000_VMOLR(i), reg);
+		}
+	}
+}
+
+/**
+ *  e1000_vmdq_aupe_disable_pf - Disable acceptance of untagged packets
+ *  @hw: pointer to the HW structure
+ *  @disables: PoolSet Bit - if set to ALL_QUEUES, apply to all pools.
+ *
+ *  Disables acceptance of packets from the network which do not have
+ *  a VLAN tag but match the exact MAC filter of a given VM.
+ **/
+void e1000_vmdq_aupe_disable_pf(struct e1000_hw *hw, u32 disables)
+{
+	u32 reg;
+	u32 i;
+
+	for (i = 0; i < MAX_NUM_VFS; i++) {
+		if ((disables == ALL_QUEUES) || (disables & (1 << i))) {
+			reg = E1000_READ_REG(hw, E1000_VMOLR(i));
+			reg &= ~E1000_VMOLR_AUPE;
+			E1000_WRITE_REG(hw, E1000_VMOLR(i), reg);
+		}
+	}
+}
+
+/**
  *  e1000_reset_hw_82575 - Reset hardware
  *  @hw: pointer to the HW structure
  *
@@ -1126,7 +1382,7 @@ static s32 e1000_init_hw_82575(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_init_hw_82575");
 
 	/* Initialize identification LED */
-	ret_val = e1000_id_led_init_generic(hw);
+	ret_val = mac->ops.id_led_init(hw);
 	if (ret_val) {
 		DEBUGOUT("Error initializing identification LED\n");
 		/* This is not fatal and we should not stop init due to this */
@@ -1531,62 +1787,60 @@ static void e1000_power_down_phy_copper_82575(struct e1000_hw *hw)
  **/
 static void e1000_clear_hw_cntrs_82575(struct e1000_hw *hw)
 {
-	volatile u32 temp;
-
 	DEBUGFUNC("e1000_clear_hw_cntrs_82575");
 
 	e1000_clear_hw_cntrs_base_generic(hw);
 
-	temp = E1000_READ_REG(hw, E1000_PRC64);
-	temp = E1000_READ_REG(hw, E1000_PRC127);
-	temp = E1000_READ_REG(hw, E1000_PRC255);
-	temp = E1000_READ_REG(hw, E1000_PRC511);
-	temp = E1000_READ_REG(hw, E1000_PRC1023);
-	temp = E1000_READ_REG(hw, E1000_PRC1522);
-	temp = E1000_READ_REG(hw, E1000_PTC64);
-	temp = E1000_READ_REG(hw, E1000_PTC127);
-	temp = E1000_READ_REG(hw, E1000_PTC255);
-	temp = E1000_READ_REG(hw, E1000_PTC511);
-	temp = E1000_READ_REG(hw, E1000_PTC1023);
-	temp = E1000_READ_REG(hw, E1000_PTC1522);
+	E1000_READ_REG(hw, E1000_PRC64);
+	E1000_READ_REG(hw, E1000_PRC127);
+	E1000_READ_REG(hw, E1000_PRC255);
+	E1000_READ_REG(hw, E1000_PRC511);
+	E1000_READ_REG(hw, E1000_PRC1023);
+	E1000_READ_REG(hw, E1000_PRC1522);
+	E1000_READ_REG(hw, E1000_PTC64);
+	E1000_READ_REG(hw, E1000_PTC127);
+	E1000_READ_REG(hw, E1000_PTC255);
+	E1000_READ_REG(hw, E1000_PTC511);
+	E1000_READ_REG(hw, E1000_PTC1023);
+	E1000_READ_REG(hw, E1000_PTC1522);
 
-	temp = E1000_READ_REG(hw, E1000_ALGNERRC);
-	temp = E1000_READ_REG(hw, E1000_RXERRC);
-	temp = E1000_READ_REG(hw, E1000_TNCRS);
-	temp = E1000_READ_REG(hw, E1000_CEXTERR);
-	temp = E1000_READ_REG(hw, E1000_TSCTC);
-	temp = E1000_READ_REG(hw, E1000_TSCTFC);
+	E1000_READ_REG(hw, E1000_ALGNERRC);
+	E1000_READ_REG(hw, E1000_RXERRC);
+	E1000_READ_REG(hw, E1000_TNCRS);
+	E1000_READ_REG(hw, E1000_CEXTERR);
+	E1000_READ_REG(hw, E1000_TSCTC);
+	E1000_READ_REG(hw, E1000_TSCTFC);
 
-	temp = E1000_READ_REG(hw, E1000_MGTPRC);
-	temp = E1000_READ_REG(hw, E1000_MGTPDC);
-	temp = E1000_READ_REG(hw, E1000_MGTPTC);
+	E1000_READ_REG(hw, E1000_MGTPRC);
+	E1000_READ_REG(hw, E1000_MGTPDC);
+	E1000_READ_REG(hw, E1000_MGTPTC);
 
-	temp = E1000_READ_REG(hw, E1000_IAC);
-	temp = E1000_READ_REG(hw, E1000_ICRXOC);
+	E1000_READ_REG(hw, E1000_IAC);
+	E1000_READ_REG(hw, E1000_ICRXOC);
 
-	temp = E1000_READ_REG(hw, E1000_ICRXPTC);
-	temp = E1000_READ_REG(hw, E1000_ICRXATC);
-	temp = E1000_READ_REG(hw, E1000_ICTXPTC);
-	temp = E1000_READ_REG(hw, E1000_ICTXATC);
-	temp = E1000_READ_REG(hw, E1000_ICTXQEC);
-	temp = E1000_READ_REG(hw, E1000_ICTXQMTC);
-	temp = E1000_READ_REG(hw, E1000_ICRXDMTC);
+	E1000_READ_REG(hw, E1000_ICRXPTC);
+	E1000_READ_REG(hw, E1000_ICRXATC);
+	E1000_READ_REG(hw, E1000_ICTXPTC);
+	E1000_READ_REG(hw, E1000_ICTXATC);
+	E1000_READ_REG(hw, E1000_ICTXQEC);
+	E1000_READ_REG(hw, E1000_ICTXQMTC);
+	E1000_READ_REG(hw, E1000_ICRXDMTC);
 
-	temp = E1000_READ_REG(hw, E1000_CBTMPC);
-	temp = E1000_READ_REG(hw, E1000_HTDPMC);
-	temp = E1000_READ_REG(hw, E1000_CBRMPC);
-	temp = E1000_READ_REG(hw, E1000_RPTHC);
-	temp = E1000_READ_REG(hw, E1000_HGPTC);
-	temp = E1000_READ_REG(hw, E1000_HTCBDPC);
-	temp = E1000_READ_REG(hw, E1000_HGORCL);
-	temp = E1000_READ_REG(hw, E1000_HGORCH);
-	temp = E1000_READ_REG(hw, E1000_HGOTCL);
-	temp = E1000_READ_REG(hw, E1000_HGOTCH);
-	temp = E1000_READ_REG(hw, E1000_LENERRS);
+	E1000_READ_REG(hw, E1000_CBTMPC);
+	E1000_READ_REG(hw, E1000_HTDPMC);
+	E1000_READ_REG(hw, E1000_CBRMPC);
+	E1000_READ_REG(hw, E1000_RPTHC);
+	E1000_READ_REG(hw, E1000_HGPTC);
+	E1000_READ_REG(hw, E1000_HTCBDPC);
+	E1000_READ_REG(hw, E1000_HGORCL);
+	E1000_READ_REG(hw, E1000_HGORCH);
+	E1000_READ_REG(hw, E1000_HGOTCL);
+	E1000_READ_REG(hw, E1000_HGOTCH);
+	E1000_READ_REG(hw, E1000_LENERRS);
 
 	/* This register should not be read in copper configurations */
 	if (hw->phy.media_type == e1000_media_type_internal_serdes)
-		temp = E1000_READ_REG(hw, E1000_SCVPC);
+		E1000_READ_REG(hw, E1000_SCVPC);
 }
 /**
  *  e1000_rx_fifo_flush_82575 - Clean rx fifo after RX enable
@@ -1661,3 +1915,4 @@ void e1000_rx_fifo_flush_82575(struct e1000_hw *hw)
 	E1000_READ_REG(hw, E1000_RNBC);
 	E1000_READ_REG(hw, E1000_MPC);
 }
+

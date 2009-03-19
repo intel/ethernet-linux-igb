@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2008 Intel Corporation.
+  Copyright(c) 2007-2009 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -884,7 +884,7 @@ static s32 e1000_phy_setup_autoneg(struct e1000_hw *hw)
 	 *  other:  No software override.  The flow control configuration
 	 *          in the EEPROM is used.
 	 */
-	switch (hw->fc.type) {
+	switch (hw->fc.current_mode) {
 	case e1000_fc_none:
 		/*
 		 * Flow control (Rx & Tx) is completely disabled by a
@@ -1204,7 +1204,7 @@ void e1000_phy_force_speed_duplex_setup(struct e1000_hw *hw, u16 *phy_ctrl)
 	DEBUGFUNC("e1000_phy_force_speed_duplex_setup");
 
 	/* Turn off flow control when forcing speed/duplex */
-	hw->fc.type = e1000_fc_none;
+	hw->fc.current_mode = e1000_fc_none;
 
 	/* Force speed/duplex on the mac */
 	ctrl = E1000_READ_REG(hw, E1000_CTRL);
@@ -1568,6 +1568,11 @@ s32 e1000_get_cable_length_m88(struct e1000_hw *hw)
 
 	index = (phy_data & M88E1000_PSSR_CABLE_LENGTH) >>
 	        M88E1000_PSSR_CABLE_LENGTH_SHIFT;
+	if (index >= M88E1000_CABLE_LENGTH_TABLE_SIZE + 1) {
+		ret_val = E1000_ERR_PHY;
+		goto out;
+	}
+
 	phy->min_cable_length = e1000_m88_cable_length_table[index];
 	phy->max_cable_length = e1000_m88_cable_length_table[index+1];
 
@@ -2012,6 +2017,48 @@ enum e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id)
 		break;
 	}
 	return phy_type;
+}
+
+/**
+ *  e1000_determine_phy_address - Determines PHY address.
+ *  @hw: pointer to the HW structure
+ *
+ *  This uses a trial and error method to loop through possible PHY
+ *  addresses. It tests each by reading the PHY ID registers and
+ *  checking for a match.
+ **/
+s32 e1000_determine_phy_address(struct e1000_hw *hw)
+{
+	s32 ret_val = -E1000_ERR_PHY_TYPE;
+	u32 phy_addr = 0;
+	u32 i;
+	enum e1000_phy_type phy_type = e1000_phy_unknown;
+
+	hw->phy.id = phy_type;
+
+	for (phy_addr = 0; phy_addr < E1000_MAX_PHY_ADDR; phy_addr++) {
+		hw->phy.addr = phy_addr;
+		i = 0;
+
+		do {
+			e1000_get_phy_id(hw);
+			phy_type = e1000_get_phy_type_from_id(hw->phy.id);
+
+			/*
+			 * If phy_type is valid, break - we found our
+			 * PHY address
+			 */
+			if (phy_type  != e1000_phy_unknown) {
+				ret_val = E1000_SUCCESS;
+				goto out;
+			}
+			msec_delay(1);
+			i++;
+		} while (i < 10);
+	}
+
+out:
+	return ret_val;
 }
 
 /**

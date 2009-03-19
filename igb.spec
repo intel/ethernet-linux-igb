@@ -1,6 +1,6 @@
 Name: igb
 Summary: Intel(R) Gigabit Ethernet Connection
-Version: 1.3.8.6
+Version: 1.3.19.3
 Release: 1
 Source: %{name}-%{version}.tar.gz
 Vendor: Intel Corporation
@@ -8,7 +8,7 @@ License: GPL
 ExclusiveOS: linux
 Group: System Environment/Kernel
 Provides: %{name}
-URL: http://support.intel.com/support/go/linux/e1000.htm
+URL: http://support.intel.com
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
 # do not generate debugging packages by default - older versions of rpmbuild
 # may instead need:
