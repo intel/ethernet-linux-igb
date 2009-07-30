@@ -56,8 +56,7 @@ void e1000_rar_set(struct e1000_hw *hw, u8 *addr, u32 index);
 void e1000_mta_set(struct e1000_hw *hw, u32 hash_value);
 u32  e1000_hash_mc_addr(struct e1000_hw *hw, u8 *mc_addr);
 void e1000_update_mc_addr_list(struct e1000_hw *hw,
-                               u8 *mc_addr_list, u32 mc_addr_count,
-                               u32 rar_used_count, u32 rar_count);
+                               u8 *mc_addr_list, u32 mc_addr_count);
 s32  e1000_setup_led(struct e1000_hw *hw);
 s32  e1000_cleanup_led(struct e1000_hw *hw);
 s32  e1000_check_reset_block(struct e1000_hw *hw);

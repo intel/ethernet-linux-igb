@@ -93,7 +93,7 @@ static struct igb_reg_test reg_test_82576[] = {
 						0xFFFFFFFF, 0xFFFFFFFF },
 	{ E1000_RA2,	   0, 8, TABLE64_TEST_HI,
 						0x83FFFFFF, 0xFFFFFFFF },
-	{ E1000_MTA,	   0, 128,TABLE32_TEST,
+	{ E1000_MTA,	   0, 128, TABLE32_TEST,
 						0xFFFFFFFF, 0xFFFFFFFF },
 	{ 0, 0, 0, 0 }
 };

@@ -198,10 +198,11 @@ void e1000_init_rx_addrs_generic(struct e1000_hw *hw, u16 rar_count)
  *
  *  Checks the nvm for an alternate MAC address.  An alternate MAC address
  *  can be setup by pre-boot software and must be treated like a permanent
- *  address and must override the actual permanent MAC address.  If an
- *  alternate MAC address is found it is saved in the hw struct and
- *  programmed into RAR0 and the function returns success, otherwise the
- *  function returns an error.
+ *  address and must override the actual permanent MAC address. If an
+ *  alternate MAC address is found it is programmed into RAR0, replacing
+ *  the permanent address that was installed into RAR0 by the Si on reset.
+ *  This function will return SUCCESS unless it encounters an error while
+ *  reading the EEPROM.
  **/
 s32 e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 {
@@ -220,7 +221,7 @@ s32 e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 	}
 
 	if (nvm_alt_mac_addr_offset == 0xFFFF) {
-		ret_val = -(E1000_NOT_IMPLEMENTED);
+		/* There is no Alternate MAC Address */
 		goto out;
 	}
 
@@ -240,14 +241,16 @@ s32 e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 
 	/* if multicast bit is set, the alternate address will not be used */
 	if (alt_mac_addr[0] & 0x01) {
-		ret_val = -(E1000_NOT_IMPLEMENTED);
+		DEBUGOUT("Ignoring Alternate Mac Address with MC bit set\n");
 		goto out;
 	}
 
-	for (i = 0; i < ETH_ADDR_LEN; i++)
-		hw->mac.addr[i] = hw->mac.perm_addr[i] = alt_mac_addr[i];
-
-	hw->mac.ops.rar_set(hw, hw->mac.perm_addr, 0);
+	/*
+	 * We have a valid alternate MAC address, and we want to treat it the
+	 * same as the normal permanent MAC address stored by the HW into the
+	 * RAR. Do this by mapping this address into RAR0.
+	 */
+	hw->mac.ops.rar_set(hw, alt_mac_addr, 0);
 
 out:
 	return ret_val;
@@ -334,53 +337,36 @@ void e1000_mta_set_generic(struct e1000_hw *hw, u32 hash_value)
  *  @hw: pointer to the HW structure
  *  @mc_addr_list: array of multicast addresses to program
  *  @mc_addr_count: number of multicast addresses to program
- *  @rar_used_count: the first RAR register free to program
- *  @rar_count: total number of supported Receive Address Registers
  *
- *  Updates the Receive Address Registers and Multicast Table Array.
+ *  Updates entire Multicast Table Array.
  *  The caller must have a packed mc_addr_list of multicast addresses.
- *  The parameter rar_count will usually be hw->mac.rar_entry_count
- *  unless there are workarounds that change this.
  **/
 void e1000_update_mc_addr_list_generic(struct e1000_hw *hw,
-                                       u8 *mc_addr_list, u32 mc_addr_count,
-                                       u32 rar_used_count, u32 rar_count)
+                                       u8 *mc_addr_list, u32 mc_addr_count)
 {
-	u32 hash_value;
-	u32 i;
-	u8 mac_addr[ETH_ADDR_LEN] = {0};
+	u32 hash_value, hash_bit, hash_reg;
+	int i;
 
 	DEBUGFUNC("e1000_update_mc_addr_list_generic");
 
-	/*
-	 * Load the first set of multicast addresses into the exact
-	 * filters (RAR).  If there are not enough to fill the RAR
-	 * array, clear the filters.
-	 */
-	for (i = rar_used_count; i < rar_count; i++) {
-		if (mc_addr_count) {
-			hw->mac.ops.rar_set(hw, mc_addr_list, i);
-			mc_addr_count--;
-			mc_addr_list += ETH_ADDR_LEN;
-		} else {
-			hw->mac.ops.rar_set(hw, mac_addr, i);
-		}
-	}
+	/* clear mta_shadow */
+	memset(&hw->mac.mta_shadow, 0, sizeof(hw->mac.mta_shadow));
 
-	/* Clear the old settings from the MTA */
-	DEBUGOUT("Clearing MTA\n");
-	for (i = 0; i < hw->mac.mta_reg_count; i++) {
-		E1000_WRITE_REG_ARRAY(hw, E1000_MTA, i, 0);
-		E1000_WRITE_FLUSH(hw);
-	}
-
-	/* Load any remaining multicast addresses into the hash table. */
-	for (; mc_addr_count > 0; mc_addr_count--) {
+	/* update mta_shadow from mc_addr_list */
+	for (i = 0; (u32) i < mc_addr_count; i++) {
 		hash_value = e1000_hash_mc_addr_generic(hw, mc_addr_list);
-		DEBUGOUT1("Hash value = 0x%03X\n", hash_value);
-		hw->mac.ops.mta_set(hw, hash_value);
-		mc_addr_list += ETH_ADDR_LEN;
+
+		hash_reg = (hash_value >> 5) & (hw->mac.mta_reg_count - 1);
+		hash_bit = hash_value & 0x1F;
+
+		hw->mac.mta_shadow[hash_reg] |= (1 << hash_bit);
+		mc_addr_list += (ETH_ADDR_LEN);
 	}
+
+	/* replace the entire MTA table */
+	for (i = hw->mac.mta_reg_count - 1; i >= 0; i--)
+		E1000_WRITE_REG_ARRAY(hw, E1000_MTA, i, hw->mac.mta_shadow[i]);
+	E1000_WRITE_FLUSH(hw);
 }
 
 /**
@@ -1941,7 +1927,7 @@ out:
  *  Verify that when not using auto-negotiation that MDI/MDIx is correctly
  *  set, which is forced to MDI mode only.
  **/
-s32 e1000_validate_mdi_setting_generic(struct e1000_hw *hw)
+static s32 e1000_validate_mdi_setting_generic(struct e1000_hw *hw)
 {
 	s32 ret_val = E1000_SUCCESS;
 

@@ -111,7 +111,7 @@ static const struct igb_stats igb_gstrings_stats[] = {
 	  ((struct igb_adapter *)netdev_priv(netdev))->num_tx_queues) * \
 	(sizeof(struct igb_queue_stats) / sizeof(u64)))
 #define IGB_GLOBAL_STATS_LEN	\
-	sizeof(igb_gstrings_stats) / sizeof(struct igb_stats)
+	(sizeof(igb_gstrings_stats) / sizeof(struct igb_stats))
 #define IGB_STATS_LEN (IGB_GLOBAL_STATS_LEN + IGB_QUEUE_STATS_LEN)
 #endif /* ETHTOOL_GSTATS */
 #ifdef ETHTOOL_TEST
@@ -120,7 +120,7 @@ static const char igb_gstrings_test[][ETH_GSTRING_LEN] = {
 	"Interrupt test (offline)", "Loopback test  (offline)",
 	"Link test   (on/offline)"
 };
-#define IGB_TEST_LEN sizeof(igb_gstrings_test) / ETH_GSTRING_LEN
+#define IGB_TEST_LEN (sizeof(igb_gstrings_test) / ETH_GSTRING_LEN)
 #endif /* ETHTOOL_TEST */
 
 static int igb_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
@@ -184,8 +184,7 @@ static int igb_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 		ecmd->duplex = -1;
 	}
 
-	ecmd->autoneg = ((hw->phy.media_type == e1000_media_type_fiber) ||
-			 hw->mac.autoneg) ? AUTONEG_ENABLE : AUTONEG_DISABLE;
+	ecmd->autoneg = hw->mac.autoneg ? AUTONEG_ENABLE : AUTONEG_DISABLE;
 	return 0;
 }
 
@@ -207,14 +206,9 @@ static int igb_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 
 	if (ecmd->autoneg == AUTONEG_ENABLE) {
 		hw->mac.autoneg = 1;
-		if (hw->phy.media_type == e1000_media_type_fiber)
-			hw->phy.autoneg_advertised = ADVERTISED_1000baseT_Full |
-			                             ADVERTISED_FIBRE |
-			                             ADVERTISED_Autoneg;
-		else
-			hw->phy.autoneg_advertised = ecmd->advertising |
-			                             ADVERTISED_TP |
-			                             ADVERTISED_Autoneg;
+		hw->phy.autoneg_advertised = ecmd->advertising |
+		                             ADVERTISED_TP |
+		                             ADVERTISED_Autoneg;
 		ecmd->advertising = hw->phy.autoneg_advertised;
 		if (adapter->fc_autoneg)
 			hw->fc.requested_mode = e1000_fc_default;
@@ -298,13 +292,17 @@ static int igb_set_pauseparam(struct net_device *netdev,
 static u32 igb_get_rx_csum(struct net_device *netdev)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
-	return adapter->rx_csum;
+	return !(adapter->flags & IGB_FLAG_RX_CSUM_DISABLED);
 }
 
 static int igb_set_rx_csum(struct net_device *netdev, u32 data)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
-	adapter->rx_csum = data;
+	
+	if (data)
+		adapter->flags &= ~IGB_FLAG_RX_CSUM_DISABLED;
+	else
+		adapter->flags |= IGB_FLAG_RX_CSUM_DISABLED;
 
 	return 0;
 }
@@ -1035,7 +1033,7 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	struct net_device *netdev = adapter->netdev;
-	u32 mask, ics_mask, i=0, shared_int = TRUE;
+	u32 mask, ics_mask, i = 0, shared_int = TRUE;
 	u32 irq = adapter->pdev->irq;
 
 	*data = 0;
@@ -1054,8 +1052,7 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 	} else if (!request_irq(irq, &igb_test_intr, IRQF_PROBE_SHARED,
 	                        netdev->name, netdev)) {
 		shared_int = FALSE;
-	}
-	else if (request_irq(irq, &igb_test_intr, IRQF_SHARED,
+	} else if (request_irq(irq, &igb_test_intr, IRQF_SHARED,
 	         netdev->name, netdev)) {
 		*data = 1;
 		return -1;
@@ -1068,7 +1065,7 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 	msleep(10);
 
 	/* Define all writable bits for ICS */
-	switch(hw->mac.type) {
+	switch (hw->mac.type) {
 	case e1000_82575:
 		ics_mask = 0x37F47EDD;
 		break;
@@ -1079,7 +1076,7 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 		ics_mask = 0x7FFFFFFF;
 		break;
 	}
-		
+
 	/* Test each interrupt */
 	for (; i < 31; i++) {
 		/* Interrupt to test */
@@ -1226,17 +1223,19 @@ static int igb_setup_desc_rings(struct igb_adapter *adapter)
 	if (!tx_ring->count)
 		tx_ring->count = IGB_DEFAULT_TXD;
 
-	if (!(tx_ring->buffer_info = kcalloc(tx_ring->count,
-	                                     sizeof(struct igb_buffer),
-	                                     GFP_KERNEL))) {
+	tx_ring->buffer_info = kcalloc(tx_ring->count,
+	                               sizeof(struct igb_buffer),
+	                               GFP_KERNEL);
+	if (!tx_ring->buffer_info) {
 		ret_val = 1;
 		goto err_nomem;
 	}
 
 	tx_ring->size = tx_ring->count * sizeof(struct e1000_tx_desc);
 	tx_ring->size = ALIGN(tx_ring->size, 4096);
-	if (!(tx_ring->desc = pci_alloc_consistent(pdev, tx_ring->size,
-	                                           &tx_ring->dma))) {
+	tx_ring->desc = pci_alloc_consistent(pdev, tx_ring->size,
+	                                     &tx_ring->dma);
+	if (!tx_ring->desc) {
 		ret_val = 2;
 		goto err_nomem;
 	}
@@ -1259,10 +1258,10 @@ static int igb_setup_desc_rings(struct igb_adapter *adapter)
 
 	for (i = 0; i < tx_ring->count; i++) {
 		struct e1000_tx_desc *tx_desc = E1000_TX_DESC(*tx_ring, i);
-		struct sk_buff *skb;
 		unsigned int size = 1024;
+		struct sk_buff *skb = alloc_skb(size, GFP_KERNEL);
 
-		if (!(skb = alloc_skb(size, GFP_KERNEL))) {
+		if (!skb) {
 			ret_val = 3;
 			goto err_nomem;
 		}
@@ -1285,16 +1284,18 @@ static int igb_setup_desc_rings(struct igb_adapter *adapter)
 	if (!rx_ring->count)
 		rx_ring->count = IGB_DEFAULT_RXD;
 
-	if (!(rx_ring->buffer_info = kcalloc(rx_ring->count,
-	                                     sizeof(struct igb_buffer),
-	                                     GFP_KERNEL))) {
+	rx_ring->buffer_info = kcalloc(rx_ring->count,
+	                               sizeof(struct igb_buffer),
+	                               GFP_KERNEL);
+	if (!rx_ring->buffer_info) {
 		ret_val = 4;
 		goto err_nomem;
 	}
 
 	rx_ring->size = rx_ring->count * sizeof(struct e1000_rx_desc);
-	if (!(rx_ring->desc = pci_alloc_consistent(pdev, rx_ring->size,
-	                                           &rx_ring->dma))) {
+	rx_ring->desc = pci_alloc_consistent(pdev, rx_ring->size,
+	                                     &rx_ring->dma);
+	if (!rx_ring->desc) {
 		ret_val = 5;
 		goto err_nomem;
 	}
@@ -1357,7 +1358,6 @@ static int igb_integrated_phy_loopback(struct igb_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	u32 ctrl_reg = 0;
-	u32 stat_reg = 0;
 
 	hw->mac.autoneg = FALSE;
 
@@ -1381,18 +1381,11 @@ static int igb_integrated_phy_loopback(struct igb_adapter *adapter)
 	ctrl_reg |= (E1000_CTRL_FRCSPD | /* Set the Force Speed Bit */
 		     E1000_CTRL_FRCDPX | /* Set the Force Duplex Bit */
 		     E1000_CTRL_SPD_1000 |/* Force Speed to 1000 */
-		     E1000_CTRL_FD);	 /* Force Duplex to FULL */
+		     E1000_CTRL_FD |	 /* Force Duplex to FULL */
+		     E1000_CTRL_SLU);	 /* Set link up enable bit */
 
-	if (hw->phy.media_type == e1000_media_type_copper &&
-	    hw->phy.type == e1000_phy_m88)
+	if (hw->phy.type == e1000_phy_m88)
 		ctrl_reg |= E1000_CTRL_ILOS; /* Invert Loss of Signal */
-	else {
-		/* Set the ILOS bit on the fiber Nic if half duplex link is
-		 * detected. */
-		stat_reg = E1000_READ_REG(hw, E1000_STATUS);
-		if ((stat_reg & E1000_STATUS_FD) == 0)
-			ctrl_reg |= (E1000_CTRL_ILOS | E1000_CTRL_SLU);
-	}
 
 	E1000_WRITE_REG(hw, E1000_CTRL, ctrl_reg);
 
@@ -1417,8 +1410,7 @@ static int igb_setup_loopback_test(struct igb_adapter *adapter)
 	struct e1000_hw *hw = &adapter->hw;
 	u32 reg;
 
-	if (hw->phy.media_type == e1000_media_type_fiber ||
-	    hw->phy.media_type == e1000_media_type_internal_serdes) {
+	if (hw->phy.media_type == e1000_media_type_internal_serdes) {
 
 		reg = E1000_READ_REG(hw, E1000_RCTL);
 		reg |= E1000_RCTL_LBM_TCVR;
@@ -1505,7 +1497,7 @@ static int igb_run_loopback_test(struct igb_adapter *adapter)
 	struct igb_ring *tx_ring = &adapter->test_tx_ring;
 	struct igb_ring *rx_ring = &adapter->test_rx_ring;
 	struct pci_dev *pdev = adapter->pdev;
-	int i, j, k, l, lc, good_cnt, ret_val=0;
+	int i, j, k, l, lc, good_cnt, ret_val = 0;
 	unsigned long time;
 
 	E1000_WRITE_REG(hw, E1000_RDT(0), rx_ring->count - 1);
@@ -1529,7 +1521,8 @@ static int igb_run_loopback_test(struct igb_adapter *adapter)
 				tx_ring->buffer_info[k].dma,
 				tx_ring->buffer_info[k].length,
 				PCI_DMA_TODEVICE);
-			if (unlikely(++k == tx_ring->count)) k = 0;
+			if (unlikely(++k == tx_ring->count))
+				k = 0;
 		}
 		E1000_WRITE_REG(hw, E1000_TDT(0), k);
 		msleep(200);
@@ -1546,7 +1539,8 @@ static int igb_run_loopback_test(struct igb_adapter *adapter)
 			                     rx_ring->buffer_info[l].skb, 1024);
 			if (!ret_val)
 				good_cnt++;
-			if (unlikely(++l == rx_ring->count)) l = 0;
+			if (unlikely(++l == rx_ring->count))
+				l = 0;
 			/* time + 20 msecs (200 msecs on 2.4) is more than
 			 * enough time to complete the receives, if it's
 			 * exceeded, break and error off
@@ -1780,18 +1774,12 @@ static void igb_get_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 static int igb_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
-	struct e1000_hw *hw = &adapter->hw;
 
 	if (wol->wolopts & (WAKE_PHY | WAKE_ARP | WAKE_MAGICSECURE))
 		return -EOPNOTSUPP;
 
 	if (igb_wol_exclusion(adapter, wol))
 		return wol->wolopts ? -EOPNOTSUPP : 0;
-
-	switch (hw->device_id) {
-	default:
-		break;
-	}
 
 	/* these settings will always override what we currently have */
 	adapter->wol = 0;
@@ -1804,7 +1792,6 @@ static int igb_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 		adapter->wol |= E1000_WUFC_BC;
 	if (wol->wolopts & WAKE_MAGIC)
 		adapter->wol |= E1000_WUFC_MAG;
-
 	device_set_wakeup_enable(&adapter->pdev->dev, adapter->wol);
 
 	return 0;

@@ -64,7 +64,7 @@
 #else
 #define IGB_PARAM(X, desc) \
 	static int __devinitdata X[IGB_MAX_NIC+1] = IGB_PARAM_INIT; \
-	static unsigned int num_##X = 0; \
+	static unsigned int num_##X; \
 	module_param_array_named(X, X, int, &num_##X, 0); \
 	MODULE_PARM_DESC(X, desc);
 #endif
@@ -235,7 +235,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			.err  = "using default of " __MODULE_STRING(DEFAULT_ITR),
 			.def  = DEFAULT_ITR,
 			.arg  = { .r = { .min = MIN_ITR,
-					 .max = MAX_ITR }}
+					 .max = MAX_ITR } }
 		};
 
 #ifdef module_param_array
@@ -263,15 +263,15 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			default:
 				igb_validate_option(&adapter->itr, &opt,
 				        adapter);
-				/* save the setting, because the dynamic bits change itr */
-				/* in case of invalid user value, default to conservative mode,
- 				 * else need to clear the lower two bits because they are
+				/* Save the setting, because the dynamic bits
+				 * change itr.  In case of invalid user value,
+				 * default to conservative mode, else need to
+				 * clear the lower two bits because they are
 				 * used as control */
 				if (adapter->itr == 3) {
 					adapter->itr_setting = adapter->itr;
 					adapter->itr = IGB_START_ITR;
-				}
-				else {
+				} else {
 					adapter->itr = 1000000000 / (adapter->itr * 256);
 					adapter->itr_setting = adapter->itr & ~3;
 				}
@@ -291,7 +291,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			.err  = "defaulting to 2 (MSI-X single queue)",
 			.def  = IGB_INT_MODE_MSIX_1Q,
 			.arg  = { .r = { .min = MIN_INTMODE,
-					 .max = MAX_INTMODE }}
+					 .max = MAX_INTMODE } }
 		};
 
 #ifdef module_param_array
@@ -313,7 +313,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			.err  = "using default of " __MODULE_STRING(DEFAULT_LLIPORT),
 			.def  = DEFAULT_LLIPORT,
 			.arg  = { .r = { .min = MIN_LLIPORT,
-					 .max = MAX_LLIPORT }}
+					 .max = MAX_LLIPORT } }
 		};
 
 #ifdef module_param_array
@@ -340,7 +340,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			.err  = "using default of " __MODULE_STRING(DEFAULT_LLISIZE),
 			.def  = DEFAULT_LLISIZE,
 			.arg  = { .r = { .min = MIN_LLISIZE,
-					 .max = MAX_LLISIZE }}
+					 .max = MAX_LLISIZE } }
 		};
 
 #ifdef module_param_array
@@ -388,7 +388,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			.err  = "using default of " __MODULE_STRING(DEFAULT_LRO_AGGR),
 			.def  = DEFAULT_LRO_AGGR,
 			.arg  = { .r = { .min = MIN_LRO_AGGR,
-					 .max = MAX_LRO_AGGR }}
+					 .max = MAX_LRO_AGGR } }
 		};
 
 #ifdef module_param_array

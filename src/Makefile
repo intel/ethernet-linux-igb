@@ -188,6 +188,14 @@ ifeq ($(KKVER), 0)
           *** This driver is not supported on kernel versions older than 2.4.0)
 endif
 
+# look for PCI in config.h
+PCI := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(CONFIG_FILE) | \
+         grep -w CONFIG_PCI | awk '{ print $$3 }')
+ifneq ($(PCI),1)
+  $(error *** Aborting the build. \
+          *** This driver requires that CONFIG_PCI is enabled)
+endif
+
 # set the install path
 INSTDIR := /lib/modules/$(KVER)/kernel/drivers/net/$(DRIVER_NAME)
 

@@ -378,6 +378,7 @@
 #define E1000_FACTPS    0x05B30 /* Function Active and Power State to MNG */
 #define E1000_SWSM      0x05B50 /* SW Semaphore */
 #define E1000_FWSM      0x05B54 /* FW Semaphore */
+#define E1000_SWSM2     0x05B58 /* Driver-only SW semaphore (not used by BOOT agents) */
 #define E1000_DCA_ID    0x05B70 /* DCA Requester ID Information - RO */
 #define E1000_DCA_CTRL  0x05B74 /* DCA Control - RW */
 #define E1000_FFLT_DBG  0x05F04 /* Debug Register */
@@ -431,6 +432,7 @@
 #define E1000_DAQF(_n)  (0x059A0 + (4 * (_n))) /* Dest Address Queue Fltr */
 #define E1000_SPQF(_n)  (0x059C0 + (4 * (_n))) /* Source Port Queue Fltr */
 #define E1000_FTQF(_n)  (0x059E0 + (4 * (_n))) /* 5-tuple Queue Fltr */
+#define E1000_TTQF(_n)  (0x059E0 + (4 * (_n))) /* 2-tuple Queue Fltr */
 #define E1000_SYNQF(_n) (0x055FC + (4 * (_n))) /* SYN Packet Queue Fltr */
 #define E1000_ETQF(_n)  (0x05CB0 + (4 * (_n))) /* EType Queue Fltr */
 

@@ -159,6 +159,7 @@ struct igb_adapter;
 struct igb_buffer {
 	struct sk_buff *skb;
 	dma_addr_t dma;
+	dma_addr_t page_dma;
 	union {
 		/* TX */
 		struct {
@@ -170,9 +171,8 @@ struct igb_buffer {
 #ifndef CONFIG_IGB_DISABLE_PACKET_SPLIT
 		/* RX */
 		struct {
+			unsigned long page_offset;
 			struct page *page;
-			u64 page_dma;
-			unsigned int page_offset;
 		};
 #endif
 	};
@@ -202,7 +202,7 @@ struct igb_ring {
 
 	u16 queue_index;
 	u16 reg_idx;
-	
+
 	unsigned int total_bytes;
 	unsigned int total_packets;
 
@@ -291,7 +291,6 @@ struct igb_adapter {
 	u64 hw_csum_err;
 	u64 hw_csum_good;
 	u32 alloc_rx_buff_failed;
-	bool rx_csum;
 	u16 rx_ps_hdr_size;
 	u32 max_frame_size;
 	u32 min_frame_size;
@@ -348,6 +347,7 @@ struct igb_adapter {
 #define IGB_FLAG_IN_NETPOLL        (1 << 5)
 #define IGB_FLAG_QUAD_PORT_A       (1 << 6)
 #define IGB_FLAG_NEED_CTX_IDX      (1 << 7)
+#define IGB_FLAG_RX_CSUM_DISABLED  (1 << 8)
 
 enum e1000_state_t {
 	__IGB_TESTING,

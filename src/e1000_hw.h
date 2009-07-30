@@ -39,6 +39,7 @@ struct e1000_hw;
 #define E1000_DEV_ID_82576_SERDES             0x10E7
 #define E1000_DEV_ID_82576_QUAD_COPPER        0x10E8
 #define E1000_DEV_ID_82576_NS                 0x150A
+#define E1000_DEV_ID_82576_SERDES_QUAD	      0x150D
 #define E1000_DEV_ID_82575EB_COPPER           0x10A7
 #define E1000_DEV_ID_82575EB_FIBER_SERDES     0x10A9
 #define E1000_DEV_ID_82575GB_QUAD_COPPER      0x10D6
@@ -449,7 +450,7 @@ struct e1000_mac_operations {
 	s32  (*get_link_up_info)(struct e1000_hw *, u16 *, u16 *);
 	s32  (*led_on)(struct e1000_hw *);
 	s32  (*led_off)(struct e1000_hw *);
-	void (*update_mc_addr_list)(struct e1000_hw *, u8 *, u32, u32, u32);
+	void (*update_mc_addr_list)(struct e1000_hw *, u8 *, u32);
 	s32  (*reset_hw)(struct e1000_hw *);
 	s32  (*init_hw)(struct e1000_hw *);
 	void (*shutdown_serdes)(struct e1000_hw *);
@@ -522,6 +523,10 @@ struct e1000_mac_info {
 	u16 ifs_ratio;
 	u16 ifs_step_size;
 	u16 mta_reg_count;
+
+	/* Maximum size of the MTA register table in all supported adapters */
+	#define MAX_MTA_REG 128
+	u32 mta_shadow[MAX_MTA_REG];
 	u16 rar_entry_count;
 
 	u8  forced_speed_duplex;
@@ -608,12 +613,14 @@ struct e1000_fc_info {
 
 struct e1000_dev_spec_82575 {
 	bool sgmii_active;
+	bool global_device_reset;
 };
 
 struct e1000_dev_spec_vf {
 	u32	vf_number;
 	u32	v2p_mailbox;
 };
+
 
 struct e1000_hw {
 	void *back;
@@ -646,5 +653,6 @@ struct e1000_hw {
 
 /* These functions must be implemented by drivers */
 s32  e1000_read_pcie_cap_reg(struct e1000_hw *hw, u32 reg, u16 *value);
+s32  e1000_write_pcie_cap_reg(struct e1000_hw *hw, u32 reg, u16 *value);
 
 #endif

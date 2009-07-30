@@ -142,12 +142,6 @@ struct msix_entry {
 #endif
 #endif
 
-#ifndef IRQ_HANDLED
-#define irqreturn_t void
-#define IRQ_HANDLED
-#define IRQ_NONE
-#endif
-
 #ifndef SET_NETDEV_DEV
 #define SET_NETDEV_DEV(net, pdev)
 #endif
@@ -807,12 +801,17 @@ extern void _kc_pci_unmap_page(struct pci_dev *dev, u64 dma_addr, size_t size, i
 
 /* we won't support NAPI on less than 2.4.20 */
 #ifdef NAPI
-#undef CONFIG_E1000_NAPI
-#undef CONFIG_E1000E_NAPI
-#undef CONFIG_IXGB_NAPI
 #endif
 
 #endif /* 2.4.20 => 2.4.19 */
+
+/*****************************************************************************/
+/* < 2.4.21 */
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,21) )
+#define skb_pad(x,y) _kc_skb_pad(x, y)
+struct sk_buff * _kc_skb_pad(struct sk_buff *skb, int pad);
+#endif  /* < 2.4.21 */
+
 /*****************************************************************************/
 /* 2.4.22 => 2.4.17 */
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,22) )
@@ -1193,6 +1192,7 @@ static inline int _kc_pci_dma_mapping_error(struct pci_dev *pdev,
 #define PCI_D2      2
 #define PCI_D3hot   3
 #define PCI_D3cold  4
+typedef int pci_power_t;
 #define pci_choose_state(pdev,state) state
 #define PMSG_SUSPEND 3
 #define PCI_EXP_LNKCTL	16
@@ -1289,6 +1289,12 @@ extern void *_kc_kzalloc(size_t size, int flags);
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18) )
 
+#ifndef IRQ_HANDLED
+#define irqreturn_t void
+#define IRQ_HANDLED
+#define IRQ_NONE
+#endif
+
 #ifndef IRQF_PROBE_SHARED
 #ifdef SA_PROBEIRQ
 #define IRQF_PROBE_SHARED SA_PROBEIRQ
@@ -1350,6 +1356,10 @@ typedef irqreturn_t (*irq_handler_t)(int, void*, struct pt_regs *);
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(6,0))
 #undef CONFIG_INET_LRO
 #undef CONFIG_INET_LRO_MODULE
+#ifdef IXGBE_FCOE
+#undef CONFIG_FCOE
+#undef CONFIG_FCOE_MODULE
+#endif /* IXGBE_FCOE */
 #endif
 typedef irqreturn_t (*new_handler_t)(int, void*);
 static inline irqreturn_t _kc_request_irq(unsigned int irq, new_handler_t handler, unsigned long flags, const char *devname, void *dev_id)
@@ -1478,6 +1488,11 @@ static inline struct udphdr *_udp_hdr(const struct sk_buff *skb)
 #endif /* > 2.6.22 */
 
 /*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23) )
+#define netif_subqueue_stopped(_a, _b) 0
+#endif /* < 2.6.23 */
+
+/*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
 /* NAPI API changes in 2.6.24 break everything */
 struct napi_struct {
@@ -1546,6 +1561,7 @@ extern int _kc_napi_schedule_prep(struct napi_struct *napi);
 #undef dev_get_by_name
 #define dev_get_by_name(_a, _b) dev_get_by_name(_b)
 #define __netif_subqueue_stopped(_a, _b) netif_subqueue_stopped(_a, _b)
+#define DMA_BIT_MASK(n)	(((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
 #else /* < 2.6.24 */
 #define HAVE_NETDEV_NAPI_LIST
 #endif /* < 2.6.24 */
@@ -1593,6 +1609,7 @@ extern int _kc_napi_schedule_prep(struct napi_struct *napi);
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27) )
 #if ( LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,15) )
+#if (((LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)) && defined(CONFIG_PM)) || ((LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26)) && defined(CONFIG_PM_SLEEP)))
 #undef device_set_wakeup_enable
 #define device_set_wakeup_enable(dev, val) \
 	do { \
@@ -1605,6 +1622,7 @@ extern int _kc_napi_schedule_prep(struct napi_struct *napi);
 		(dev)->power.can_wakeup = !!(pmc >> 11); \
 		(dev)->power.should_wakeup = (val && (pmc >> 11)); \
 	} while (0)
+#endif /* 2.6.15-2.6.22 and CONFIG_PM or 2.6.23-2.6.25 and CONFIG_PM_SLEEP */
 #endif /* 2.6.15 through 2.6.27 */
 #ifndef netif_napi_del
 #define netif_napi_del(_a) do {} while (0)
@@ -1644,7 +1662,7 @@ extern void _kc_netif_tx_start_all_queues(struct net_device *);
 	else \
 		netif_start_queue((_ndev)); \
 	} while (0)
-#else /* CONFIG_NETDEVICES_MULTIQUEUE */
+#else /* HAVE_TX_MQ */
 #define netif_tx_stop_all_queues(a) netif_stop_queue(a)
 #define netif_tx_wake_all_queues(a) netif_wake_queue(a)
 #if ( LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12) )
@@ -1654,7 +1672,7 @@ extern void _kc_netif_tx_start_all_queues(struct net_device *);
 #endif
 #define netif_stop_subqueue(_ndev,_qi) netif_stop_queue((_ndev))
 #define netif_start_subqueue(_ndev,_qi) netif_start_queue((_ndev))
-#endif /* CONFIG_NETDEVICES_MULTIQUEUE */
+#endif /* HAVE_TX_MQ */
 #ifndef NETIF_F_MULTI_QUEUE
 #define NETIF_F_MULTI_QUEUE 0
 #define netif_is_multiqueue(a) 0
@@ -1669,14 +1687,41 @@ extern void _kc_netif_tx_start_all_queues(struct net_device *);
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28) )
 #define pci_ioremap_bar(pdev, bar)	ioremap(pci_resource_start(pdev, bar), \
 					        pci_resource_len(pdev, bar))
+#define pci_wake_from_d3 _kc_pci_wake_from_d3
+#define pci_prepare_to_sleep _kc_pci_prepare_to_sleep
+extern int _kc_pci_wake_from_d3(struct pci_dev *dev, bool enable);
+extern int _kc_pci_prepare_to_sleep(struct pci_dev *dev);
 #endif /* < 2.6.28 */
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29) )
 #define pci_request_selected_regions_exclusive(pdev, bars, name) \
 		pci_request_selected_regions(pdev, bars, name)
-#ifdef CONFIG_FCOE
-#undef CONFIG_FCOE
-#endif /* CONFIG_FCOE */
+extern void _kc_pci_disable_link_state(struct pci_dev *dev, int state);
+#define pci_disable_link_state(p, s) _kc_pci_disable_link_state(p, s)
+#else /* < 2.6.29 */
+#ifdef CONFIG_DCB
+#define HAVE_PFC_MODE_ENABLE
+#endif /* CONFIG_DCB */
 #endif /* < 2.6.29 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30) )
+#ifdef IXGBE_FCOE
+#undef CONFIG_FCOE
+#undef CONFIG_FCOE_MODULE
+#endif /* IXGBE_FCOE */
+extern u16 _kc_skb_tx_hash(struct net_device *dev, struct sk_buff *skb);
+#define skb_tx_hash(n, s) _kc_skb_tx_hash(n, s)
+#else
+#define HAVE_ASPM_QUIRKS
+#endif /* < 2.6.30 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31) )
+#else
+#ifndef HAVE_NETDEV_STORAGE_ADDRESS
+#define HAVE_NETDEV_STORAGE_ADDRESS
+#endif
+#endif /* < 2.6.31 */
 #endif /* _KCOMPAT_H_ */

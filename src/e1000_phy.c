@@ -86,18 +86,18 @@ s32 e1000_get_phy_id(struct e1000_hw *hw)
 	if (!(phy->ops.read_reg))
 		goto out;
 
-	ret_val = phy->ops.read_reg(hw, PHY_ID1, &phy_id);
-	if (ret_val)
-		goto out;
+		ret_val = phy->ops.read_reg(hw, PHY_ID1, &phy_id);
+		if (ret_val)
+			goto out;
 
-	phy->id = (u32)(phy_id << 16);
-	usec_delay(20);
-	ret_val = phy->ops.read_reg(hw, PHY_ID2, &phy_id);
-	if (ret_val)
-		goto out;
+		phy->id = (u32)(phy_id << 16);
+		usec_delay(20);
+		ret_val = phy->ops.read_reg(hw, PHY_ID2, &phy_id);
+		if (ret_val)
+			goto out;
 
-	phy->id |= (u32)(phy_id & PHY_REVISION_MASK);
-	phy->revision = (u32)(phy_id & ~PHY_REVISION_MASK);
+		phy->id |= (u32)(phy_id & PHY_REVISION_MASK);
+		phy->revision = (u32)(phy_id & ~PHY_REVISION_MASK);
 
 out:
 	return ret_val;
@@ -1185,6 +1185,80 @@ out:
 }
 
 /**
+ *  e1000_phy_force_speed_duplex_ife - Force PHY speed & duplex
+ *  @hw: pointer to the HW structure
+ *
+ *  Forces the speed and duplex settings of the PHY.
+ *  This is a function pointer entry point only called by
+ *  PHY setup routines.
+ **/
+s32 e1000_phy_force_speed_duplex_ife(struct e1000_hw *hw)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	s32 ret_val;
+	u16 data;
+	bool link;
+
+	DEBUGFUNC("e1000_phy_force_speed_duplex_ife");
+
+	if (phy->type != e1000_phy_ife) {
+		ret_val = e1000_phy_force_speed_duplex_igp(hw);
+		goto out;
+	}
+
+	ret_val = phy->ops.read_reg(hw, PHY_CONTROL, &data);
+	if (ret_val)
+		goto out;
+
+	e1000_phy_force_speed_duplex_setup(hw, &data);
+
+	ret_val = phy->ops.write_reg(hw, PHY_CONTROL, data);
+	if (ret_val)
+		goto out;
+
+	/* Disable MDI-X support for 10/100 */
+	ret_val = phy->ops.read_reg(hw, IFE_PHY_MDIX_CONTROL, &data);
+	if (ret_val)
+		goto out;
+
+	data &= ~IFE_PMC_AUTO_MDIX;
+	data &= ~IFE_PMC_FORCE_MDIX;
+
+	ret_val = phy->ops.write_reg(hw, IFE_PHY_MDIX_CONTROL, data);
+	if (ret_val)
+		goto out;
+
+	DEBUGOUT1("IFE PMC: %X\n", data);
+
+	usec_delay(1);
+
+	if (phy->autoneg_wait_to_complete) {
+		DEBUGOUT("Waiting for forced speed/duplex link on IFE phy.\n");
+
+		ret_val = e1000_phy_has_link_generic(hw,
+		                                     PHY_FORCE_LIMIT,
+		                                     100000,
+		                                     &link);
+		if (ret_val)
+			goto out;
+
+		if (!link)
+			DEBUGOUT("Link taking longer than expected.\n");
+
+		/* Try once more */
+		ret_val = e1000_phy_has_link_generic(hw,
+		                                     PHY_FORCE_LIMIT,
+		                                     100000,
+		                                     &link);
+		if (ret_val)
+			goto out;
+	}
+
+out:
+	return ret_val;
+}
+
+/**
  *  e1000_phy_force_speed_duplex_setup - Configure forced PHY speed/duplex
  *  @hw: pointer to the HW structure
  *  @phy_ctrl: pointer to current value of PHY_CONTROL
@@ -1458,6 +1532,41 @@ out:
 }
 
 /**
+ *  e1000_check_polarity_ife - Check cable polarity for IFE PHY
+ *  @hw: pointer to the HW structure
+ *
+ *  Polarity is determined on the polarity reversal feature being enabled.
+ **/
+s32 e1000_check_polarity_ife(struct e1000_hw *hw)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	s32 ret_val;
+	u16 phy_data, offset, mask;
+
+	DEBUGFUNC("e1000_check_polarity_ife");
+
+	/*
+	 * Polarity is determined based on the reversal feature being enabled.
+	 */
+	if (phy->polarity_correction) {
+		offset = IFE_PHY_EXTENDED_STATUS_CONTROL;
+		mask = IFE_PESC_POLARITY_REVERSED;
+	} else {
+		offset = IFE_PHY_SPECIAL_CONTROL;
+		mask = IFE_PSC_FORCE_POLARITY;
+	}
+
+	ret_val = phy->ops.read_reg(hw, offset, &phy_data);
+
+	if (!ret_val)
+		phy->cable_polarity = (phy_data & mask)
+		                       ? e1000_rev_polarity_reversed
+		                       : e1000_rev_polarity_normal;
+
+	return ret_val;
+}
+
+/**
  *  e1000_wait_autoneg_generic - Wait for auto-neg completion
  *  @hw: pointer to the HW structure
  *
@@ -1521,8 +1630,14 @@ s32 e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
 		 * it across the board.
 		 */
 		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS, &phy_status);
-		if (ret_val)
-			break;
+		if (ret_val) {
+			/*
+			 * If the first read fails, another entity may have
+			 * ownership of the resources, wait and try again to
+			 * see if they have relinquished the resources yet.
+			 */
+			usec_delay(usec_interval);
+		}
 		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS, &phy_status);
 		if (ret_val)
 			break;

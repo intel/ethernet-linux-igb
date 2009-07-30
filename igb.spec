@@ -1,6 +1,6 @@
 Name: igb
 Summary: Intel(R) Gigabit Ethernet Connection
-Version: 1.3.19.3
+Version: 1.3.28.4
 Release: 1
 Source: %{name}-%{version}.tar.gz
 Vendor: Intel Corporation
@@ -43,6 +43,11 @@ if [ -e /usr/src/kernels ] && [ $(echo $KV_BASE | grep "^2.6") ]; then
 			   [ $(echo $K | grep hugemem) ]; then
 				# Include path for x86_64 hugemem is broken
 				# on RHEL4
+				continue
+			fi
+			if [ -e /lib/modules/$K/build/.config ] && \
+			   !(grep -w CONFIG_PCI /lib/modules/$K/build/.config | grep -i y) ; then
+				# Exclude kernels that don't support PCI
 				continue
 			fi
 			make -C src clean

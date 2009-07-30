@@ -133,6 +133,7 @@ s32 e1000_set_mac_type(struct e1000_hw *hw)
 	case E1000_DEV_ID_82576_SERDES:
 	case E1000_DEV_ID_82576_QUAD_COPPER:
 	case E1000_DEV_ID_82576_NS:
+	case E1000_DEV_ID_82576_SERDES_QUAD:
 		mac->type = e1000_82576;
 		break;
 	default:
@@ -267,26 +268,16 @@ void e1000_write_vfta(struct e1000_hw *hw, u32 offset, u32 value)
  *  @hw: pointer to the HW structure
  *  @mc_addr_list: array of multicast addresses to program
  *  @mc_addr_count: number of multicast addresses to program
- *  @rar_used_count: the first RAR register free to program
- *  @rar_count: total number of supported Receive Address Registers
  *
- *  Updates the Receive Address Registers and Multicast Table Array.
+ *  Updates the Multicast Table Array.
  *  The caller must have a packed mc_addr_list of multicast addresses.
- *  The parameter rar_count will usually be hw->mac.rar_entry_count
- *  unless there are workarounds that change this.  Currently no func pointer
- *  exists and all implementations are handled in the generic version of this
- *  function.
  **/
 void e1000_update_mc_addr_list(struct e1000_hw *hw, u8 *mc_addr_list,
-                               u32 mc_addr_count, u32 rar_used_count,
-                               u32 rar_count)
+                               u32 mc_addr_count)
 {
 	if (hw->mac.ops.update_mc_addr_list)
-		hw->mac.ops.update_mc_addr_list(hw,
-		                                mc_addr_list,
-		                                mc_addr_count,
-		                                rar_used_count,
-		                                rar_count);
+		hw->mac.ops.update_mc_addr_list(hw, mc_addr_list,
+		                                mc_addr_count);
 }
 
 /**
