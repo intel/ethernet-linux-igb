@@ -53,7 +53,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION "1.3.28.4" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION "1.3.28.5" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
@@ -1242,7 +1242,6 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 	if (!hw->hw_addr)
 		goto err_ioremap;
 
-
 #ifdef HAVE_NET_DEVICE_OPS
 	netdev->netdev_ops = &igb_netdev_ops;
 #else /* HAVE_NET_DEVICE_OPS */
@@ -1274,6 +1273,7 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 	adapter->bd_number = cards_found;
 
 	igb_check_options(adapter);
+
 
 	/* setup the private structure */
 	err = igb_sw_init(adapter);

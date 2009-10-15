@@ -374,21 +374,12 @@ void _kc_free_netdev(struct net_device *netdev)
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
 #ifdef NAPI
-/* this function returns the true netdev of the napi struct */
-struct net_device * napi_to_netdev(struct napi_struct *napi)
+struct net_device *napi_to_poll_dev(struct napi_struct *napi)
 {
 	struct adapter_q_vector *q_vector = container_of(napi,
 	                                                struct adapter_q_vector,
 	                                                napi);
-	struct adapter_struct *adapter = q_vector->adapter;
-
-	return adapter->netdev;
-}
-
-int _kc_napi_schedule_prep(struct napi_struct *napi)
-{
-	return (netif_running(napi_to_netdev(napi)) &&
-	        netif_rx_schedule_prep(napi_to_poll_dev(napi)));
+	return &q_vector->poll_dev;
 }
 
 int __kc_adapter_clean(struct net_device *netdev, int *budget)
@@ -502,8 +493,8 @@ void _kc_pci_disable_link_state(struct pci_dev *pdev, int state)
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30) )
 #ifdef HAVE_NETDEV_SELECT_QUEUE
 #include <net/ip.h>
-u32 _kc_simple_tx_hashrnd;
-u32 _kc_simple_tx_hashrnd_initialized = 0;
+static u32 _kc_simple_tx_hashrnd;
+static u32 _kc_simple_tx_hashrnd_initialized;
 
 u16 _kc_skb_tx_hash(struct net_device *dev, struct sk_buff *skb)
 {
@@ -524,12 +515,14 @@ u16 _kc_skb_tx_hash(struct net_device *dev, struct sk_buff *skb)
 		addr2 = ip_hdr(skb)->daddr;
 		ihl = ip_hdr(skb)->ihl;
 		break;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	case htons(ETH_P_IPV6):
 		ip_proto = ipv6_hdr(skb)->nexthdr;
 		addr1 = ipv6_hdr(skb)->saddr.s6_addr32[3];
 		addr2 = ipv6_hdr(skb)->daddr.s6_addr32[3];
 		ihl = (40 >> 2);
 		break;
+#endif
 	default:
 		return 0;
 	}

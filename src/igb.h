@@ -225,6 +225,9 @@ struct igb_ring {
 #endif
 		};
 	};
+#ifndef HAVE_NETDEV_NAPI_LIST
+	struct net_device poll_dev;
+#endif
 };
 
 

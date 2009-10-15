@@ -79,9 +79,13 @@ struct msix_entry {
 	u16 entry;  /* driver uses to specify entry, OS writes */
 };
 #endif
+#undef pci_enable_msi
 #define pci_enable_msi(a) -ENOTSUPP
+#undef pci_disable_msi
 #define pci_disable_msi(a) do {} while (0)
+#undef pci_enable_msix
 #define pci_enable_msix(a, b, c) -ENOTSUPP
+#undef pci_disable_msix
 #define pci_disable_msix(a) do {} while (0)
 #define msi_remove_pci_irq_vectors(a) do {} while (0)
 #endif /* CONFIG_PCI_MSI */
@@ -106,6 +110,8 @@ struct msix_entry {
 #if ( GCC_VERSION < 3000 )
 #define _Bool char
 #endif
+#else
+#define _Bool char
 #endif
 #ifndef bool
 #define bool _Bool
@@ -181,6 +187,14 @@ struct msix_entry {
 #define vlan_gro_receive(_napi, _vlgrp, _vlan, _skb) \
 		vlan_hwaccel_receive_skb(_skb, _vlgrp, _vlan)
 #define napi_gro_receive(_napi, _skb) netif_receive_skb(_skb)
+#endif
+
+#ifndef NETIF_F_SCTP_CSUM
+#define NETIF_F_SCTP_CSUM 0
+#endif
+
+#ifndef IPPROTO_SCTP
+#define IPPROTO_SCTP 132
 #endif
 
 #ifndef CHECKSUM_PARTIAL
@@ -801,6 +815,7 @@ extern void _kc_pci_unmap_page(struct pci_dev *dev, u64 dma_addr, size_t size, i
 
 /* we won't support NAPI on less than 2.4.20 */
 #ifdef NAPI
+#undef NAPI
 #endif
 
 #endif /* 2.4.20 => 2.4.19 */
@@ -1076,6 +1091,13 @@ static inline void _kc_bitmap_zero(unsigned long *dst, int nbits)
                 memset(dst, 0, len);
         }
 }
+#define random_ether_addr _kc_random_ether_addr
+static inline void _kc_random_ether_addr(u8 *addr)
+{
+        get_random_bytes(addr, ETH_ALEN);
+        addr[0] &= 0xfe; /* clear multicast */
+        addr[0] |= 0x02; /* set local assignment */
+} 
 #endif /* < 2.6.6 */
 
 /*****************************************************************************/
@@ -1158,6 +1180,9 @@ static inline unsigned long _kc_msleep_interruptible(unsigned int msecs)
 #endif
 #ifndef __le64
 #define __le64 u64
+#endif
+#ifndef __be16
+#define __be16 u16
 #endif
 
 #ifdef pci_dma_mapping_error
@@ -1267,6 +1292,12 @@ extern void *_kc_kzalloc(size_t size, int flags);
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15) )
+#define setup_timer(_timer, _function, _data) \
+do { \
+	(_timer)->function = _function; \
+	(_timer)->data = _data; \
+	init_timer(_timer); \
+} while (0)
 #ifndef device_can_wakeup
 #define device_can_wakeup(dev)	(1)
 #endif
@@ -1280,6 +1311,11 @@ extern void *_kc_kzalloc(size_t size, int flags);
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16) )
+#undef DEFINE_MUTEX
+#define DEFINE_MUTEX(x)	DECLARE_MUTEX(x)
+#define mutex_lock(x)	down_interruptible(x)
+#define mutex_unlock(x)	up(x)
+
 #undef HAVE_PCI_ERS
 #else /* 2.6.16 and above */
 #undef HAVE_PCI_ERS
@@ -1478,6 +1514,8 @@ static inline struct udphdr *_udp_hdr(const struct sk_buff *skb)
 	return (struct udphdr *)skb_transport_header(skb);
 }
 #endif
+#else /* 2.6.22 */
+#define ETH_TYPE_TRANS_SETS_DEV
 #endif /* < 2.6.22 */
 
 /*****************************************************************************/
@@ -1494,58 +1532,73 @@ static inline struct udphdr *_udp_hdr(const struct sk_buff *skb)
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
+/* if GRO is supported then the napi struct must already exist */
+#ifndef NETIF_F_GRO
 /* NAPI API changes in 2.6.24 break everything */
 struct napi_struct {
 	/* used to look up the real NAPI polling routine */
 	int (*poll)(struct napi_struct *, int);
-	struct net_device poll_dev;
+	struct net_device *dev;
 	int weight;
 };
+#endif
+
 #ifdef NAPI
 extern int __kc_adapter_clean(struct net_device *, int *);
-extern struct net_device * napi_to_netdev(struct napi_struct *);
-#define napi_to_poll_dev(_napi) &(_napi)->poll_dev
+extern struct net_device *napi_to_poll_dev(struct napi_struct *napi);
 #define napi_enable(napi) do { \
+	struct napi_struct *_napi = (napi); \
 	/* abuse if_port as a counter */ \
-	if (!adapter->netdev->if_port) { \
-		netif_poll_enable(adapter->netdev); \
+	if (!_napi->dev->if_port) { \
+		netif_poll_enable(_napi->dev); \
 	} \
-	++adapter->netdev->if_port; \
-	netif_poll_enable(&(napi)->poll_dev); \
+	++_napi->dev->if_port; \
+	netif_poll_enable(napi_to_poll_dev(_napi)); \
 	} while (0)
-#define napi_disable(_napi) do { \
-	netif_poll_disable(&(_napi)->poll_dev); \
-	--adapter->netdev->if_port; \
-	if (!adapter->netdev->if_port) \
-		netif_poll_disable(adapter->netdev); \
+#define napi_disable(napi) do { \
+	struct napi_struct *_napi = (napi); \
+	netif_poll_disable(napi_to_poll_dev(_napi)); \
+	--_napi->dev->if_port; \
+	if (!_napi->dev->if_port) \
+		netif_poll_disable(_napi->dev); \
 	} while (0)
-
 #define netif_napi_add(_netdev, _napi, _poll, _weight) \
 	do { \
 		struct napi_struct *__napi = (_napi); \
-		__napi->poll_dev.poll = &(__kc_adapter_clean); \
-		__napi->poll_dev.priv = (_napi); \
-		__napi->poll_dev.weight = (_weight); \
-		dev_hold(&__napi->poll_dev); \
-		set_bit(__LINK_STATE_START, &__napi->poll_dev.state);\
+		struct net_device *poll_dev = napi_to_poll_dev(__napi); \
+		poll_dev->poll = &(__kc_adapter_clean); \
+		poll_dev->priv = (_napi); \
+		poll_dev->weight = (_weight); \
+		set_bit(__LINK_STATE_RX_SCHED, &poll_dev->state); \
+		set_bit(__LINK_STATE_START, &poll_dev->state);\
+		dev_hold(poll_dev); \
 		_netdev->poll = &(__kc_adapter_clean); \
 		_netdev->weight = (_weight); \
 		__napi->poll = &(_poll); \
 		__napi->weight = (_weight); \
+		__napi->dev = (_netdev); \
 		set_bit(__LINK_STATE_RX_SCHED, &(_netdev)->state); \
-		set_bit(__LINK_STATE_RX_SCHED, &__napi->poll_dev.state); \
 	} while (0)
 #define netif_napi_del(_napi) \
 	do { \
-		WARN_ON(!test_bit(__LINK_STATE_RX_SCHED, &(_napi)->poll_dev.state)); \
-		dev_put(&(_napi)->poll_dev); \
-		memset(&(_napi)->poll_dev, 0, sizeof(struct napi_struct));\
+		struct net_device *poll_dev = napi_to_poll_dev(_napi); \
+		WARN_ON(!test_bit(__LINK_STATE_RX_SCHED, &poll_dev->state)); \
+		dev_put(poll_dev); \
+		memset(poll_dev, 0, sizeof(struct net_device));\
 	} while (0)
-extern int _kc_napi_schedule_prep(struct napi_struct *napi);
-#define napi_schedule_prep _kc_napi_schedule_prep
-#define napi_schedule(napi) netif_rx_schedule(napi_to_poll_dev(napi))
-#define __napi_schedule(napi) __netif_rx_schedule(napi_to_poll_dev(napi))
-#define napi_complete(napi) netif_rx_complete(napi_to_poll_dev(napi))
+#define napi_schedule_prep(_napi) \
+	(netif_running((_napi)->dev) && netif_rx_schedule_prep(napi_to_poll_dev(_napi)))
+#define napi_schedule(_napi) netif_rx_schedule(napi_to_poll_dev(_napi))
+#define __napi_schedule(_napi) __netif_rx_schedule(napi_to_poll_dev(_napi))
+#ifndef NETIF_F_GRO
+#define napi_complete(_napi) netif_rx_complete(napi_to_poll_dev(_napi))
+#else
+#define napi_complete(_napi) \
+	do { \
+		napi_gro_flush(_napi); \
+		netif_rx_complete(napi_to_poll_dev(_napi)); \
+	} while (0)
+#endif /* NETIF_F_GRO */
 #else /* NAPI */
 #define netif_napi_add(_netdev, _napi, _poll, _weight) \
 	do { \
@@ -1554,6 +1607,7 @@ extern int _kc_napi_schedule_prep(struct napi_struct *napi);
 		_netdev->weight = (_weight); \
 		__napi->poll = &(_poll); \
 		__napi->weight = (_weight); \
+		__napi->dev = (_netdev); \
 	} while (0)
 #define netif_napi_del(_a) do {} while (0)
 #endif /* NAPI */
@@ -1713,6 +1767,7 @@ extern void _kc_pci_disable_link_state(struct pci_dev *dev, int state);
 #endif /* IXGBE_FCOE */
 extern u16 _kc_skb_tx_hash(struct net_device *dev, struct sk_buff *skb);
 #define skb_tx_hash(n, s) _kc_skb_tx_hash(n, s)
+#define skb_record_rx_queue(a, b) do {} while (0)
 #else
 #define HAVE_ASPM_QUIRKS
 #endif /* < 2.6.30 */
