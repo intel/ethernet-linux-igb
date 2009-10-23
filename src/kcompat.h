@@ -52,7 +52,7 @@
 #define NAPI
 
 #define adapter_struct igb_adapter
-#define adapter_q_vector igb_ring
+#define adapter_q_vector igb_q_vector
 #define NAPI
 
 /* and finally set defines so that the code sees the changes */
@@ -79,13 +79,9 @@ struct msix_entry {
 	u16 entry;  /* driver uses to specify entry, OS writes */
 };
 #endif
-#undef pci_enable_msi
 #define pci_enable_msi(a) -ENOTSUPP
-#undef pci_disable_msi
 #define pci_disable_msi(a) do {} while (0)
-#undef pci_enable_msix
 #define pci_enable_msix(a, b, c) -ENOTSUPP
-#undef pci_disable_msix
 #define pci_disable_msix(a) do {} while (0)
 #define msi_remove_pci_irq_vectors(a) do {} while (0)
 #endif /* CONFIG_PCI_MSI */
@@ -172,6 +168,12 @@ struct msix_entry {
 #define NETDEV_TX_LOCKED -1
 #endif
 
+#ifdef CONFIG_PCI_IOV
+#define VMDQ_P(p)   ((p) + adapter->num_vfs)
+#else
+#define VMDQ_P(p)   (p)
+#endif
+
 #ifndef SKB_DATAREF_SHIFT
 /* if we do not have the infrastructure to detect if skb_header is cloned
    just return false in all cases */
@@ -254,6 +256,7 @@ enum {
 #define num_online_cpus() smp_num_cpus
 #endif
 
+
 #ifndef _LINUX_RANDOM_H
 #include <linux/random.h>
 #endif
@@ -280,7 +283,6 @@ enum {
 #ifndef DCA_GET_TAG_TWO_ARGS
 #define dca3_get_tag(a,b) dca_get_tag(b)
 #endif
-
 
 /*****************************************************************************/
 /* Installations with ethtool version without eeprom, adapter id, or statistics
@@ -797,6 +799,13 @@ extern void _kc_pci_unmap_page(struct pci_dev *dev, u64 dma_addr, size_t size, i
 #define cpu_relax()	rep_nop()
 #endif
 
+struct vlan_ethhdr {
+	unsigned char h_dest[ETH_ALEN];
+	unsigned char h_source[ETH_ALEN];
+	unsigned short h_vlan_proto;
+	unsigned short h_vlan_TCI;
+	unsigned short h_vlan_encapsulated_proto;
+};
 #endif /* 2.4.13 => 2.4.10 */
 
 /*****************************************************************************/
@@ -850,7 +859,6 @@ static inline void _kc_netif_poll_disable(struct net_device *netdev)
 	}
 }
 #endif
-
 #ifndef netif_poll_enable
 #define netif_poll_enable(x) _kc_netif_poll_enable(x)
 static inline void _kc_netif_poll_enable(struct net_device *netdev)
@@ -881,9 +889,7 @@ static inline void _kc_netif_tx_disable(struct net_device *dev)
 /*****************************************************************************/
 /* 2.5.71 => 2.4.x */
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,5,71) )
-#include <net/sock.h>
 #define sk_protocol protocol
-
 #define pci_get_device pci_find_device
 #endif /* 2.5.70 => 2.4.x */
 
@@ -922,7 +928,7 @@ static inline u32 _kc_netif_msg_init(int debug_value, int default_msg_enable_bit
 #define pci_register_driver pci_module_init
 
 #define dev_err(__unused_dev, format, arg...)            \
-	printk(KERN_ERR "%s: " format, pci_name(adapter->pdev) , ## arg)
+	printk(KERN_ERR "%s: " format, pci_name(pdev) , ## arg)
 #define dev_warn(__unused_dev, format, arg...)            \
 	printk(KERN_WARNING "%s: " format, pci_name(pdev) , ## arg)
 
@@ -1194,7 +1200,6 @@ static inline int _kc_pci_dma_mapping_error(struct pci_dev *pdev,
 {
 	return dma_addr == 0;
 }
-
 #endif /* < 2.6.9 */
 
 /*****************************************************************************/
@@ -1292,12 +1297,6 @@ extern void *_kc_kzalloc(size_t size, int flags);
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15) )
-#define setup_timer(_timer, _function, _data) \
-do { \
-	(_timer)->function = _function; \
-	(_timer)->data = _data; \
-	init_timer(_timer); \
-} while (0)
 #ifndef device_can_wakeup
 #define device_can_wakeup(dev)	(1)
 #endif
@@ -1617,6 +1616,7 @@ extern struct net_device *napi_to_poll_dev(struct napi_struct *napi);
 #define __netif_subqueue_stopped(_a, _b) netif_subqueue_stopped(_a, _b)
 #define DMA_BIT_MASK(n)	(((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
 #else /* < 2.6.24 */
+#define HAVE_ETHTOOL_GET_SSET_COUNT
 #define HAVE_NETDEV_NAPI_LIST
 #endif /* < 2.6.24 */
 
@@ -1745,6 +1745,7 @@ extern void _kc_netif_tx_start_all_queues(struct net_device *);
 #define pci_prepare_to_sleep _kc_pci_prepare_to_sleep
 extern int _kc_pci_wake_from_d3(struct pci_dev *dev, bool enable);
 extern int _kc_pci_prepare_to_sleep(struct pci_dev *dev);
+#define netdev_alloc_page(a) alloc_page(GFP_ATOMIC)
 #endif /* < 2.6.28 */
 
 /*****************************************************************************/
@@ -1774,9 +1775,19 @@ extern u16 _kc_skb_tx_hash(struct net_device *dev, struct sk_buff *skb);
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31) )
+#define ETH_P_1588 0x88F7
 #else
 #ifndef HAVE_NETDEV_STORAGE_ADDRESS
 #define HAVE_NETDEV_STORAGE_ADDRESS
 #endif
+#ifndef HAVE_NETDEV_HW_ADDR
+#define HAVE_NETDEV_HW_ADDR
+#endif
 #endif /* < 2.6.31 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,32) )
+#undef netdev_tx_t
+#define netdev_tx_t int
+#endif /* < 2.6.32 */
 #endif /* _KCOMPAT_H_ */

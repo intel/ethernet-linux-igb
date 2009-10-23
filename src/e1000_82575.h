@@ -424,8 +424,16 @@ struct e1000_adv_tx_context_desc {
 #define E1000_RPLOLR_STRVLAN   0x40000000
 #define E1000_RPLOLR_STRCRC    0x80000000
 
+#define E1000_DTXCTL_8023LL     0x0004
+#define E1000_DTXCTL_VLAN_ADDED 0x0008
+#define E1000_DTXCTL_OOS_ENABLE 0x0010
+#define E1000_DTXCTL_MDP_EN     0x0020
+#define E1000_DTXCTL_SPOOF_INT  0x0040
+
 #define ALL_QUEUES   0xFFFF
 
+/* RX packet buffer size defines */
+#define E1000_RXPBS_SIZE_MASK_82576  0x0000007F
 void e1000_vmdq_set_loopback_pf(struct e1000_hw *hw, bool enable);
 void e1000_vmdq_set_replication_pf(struct e1000_hw *hw, bool enable);
 #endif /* _E1000_82575_H_ */

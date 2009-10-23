@@ -110,11 +110,6 @@
 #define E1000_RDPUCTL  0x025DC  /* DMA Rx Descriptor uC Control - RW */
 #define E1000_PBDIAG   0x02458  /* Packet Buffer Diagnostic - RW */
 #define E1000_RXPBS    0x02404  /* Rx Packet Buffer Size - RW */
-#define E1000_RXCTL(_n)   (0x0C014 + (0x40 * (_n)))
-#define E1000_RQDPC(_n)   (0x0C030 + (0x40 * (_n)))
-#define E1000_TXCTL(_n)   (0x0E014 + (0x40 * (_n)))
-#define E1000_RXCTL(_n)   (0x0C014 + (0x40 * (_n)))
-#define E1000_RQDPC(_n)   (0x0C030 + (0x40 * (_n)))
 #define E1000_RDTR     0x02820  /* Rx Delay Timer - RW */
 #define E1000_RADV     0x0282C  /* Rx Interrupt Absolute Delay Timer - RW */
 /*
@@ -135,10 +130,15 @@
                                          (0x0C00C + ((_n) * 0x40)))
 #define E1000_RDH(_n)        ((_n) < 4 ? (0x02810 + ((_n) * 0x100)) : \
                                          (0x0C010 + ((_n) * 0x40)))
+#define E1000_RXCTL(_n)      ((_n) < 4 ? (0x02814 + ((_n) * 0x100)) : \
+                                         (0x0C014 + ((_n) * 0x40)))
+#define E1000_DCA_RXCTRL(_n) E1000_RXCTL(_n)
 #define E1000_RDT(_n)        ((_n) < 4 ? (0x02818 + ((_n) * 0x100)) : \
                                          (0x0C018 + ((_n) * 0x40)))
 #define E1000_RXDCTL(_n)     ((_n) < 4 ? (0x02828 + ((_n) * 0x100)) : \
                                          (0x0C028 + ((_n) * 0x40)))
+#define E1000_RQDPC(_n)      ((_n) < 4 ? (0x02830 + ((_n) * 0x100)) : \
+                                         (0x0C030 + ((_n) * 0x40)))
 #define E1000_TDBAL(_n)      ((_n) < 4 ? (0x03800 + ((_n) * 0x100)) : \
                                          (0x0E000 + ((_n) * 0x40)))
 #define E1000_TDBAH(_n)      ((_n) < 4 ? (0x03804 + ((_n) * 0x100)) : \
@@ -147,17 +147,18 @@
                                          (0x0E008 + ((_n) * 0x40)))
 #define E1000_TDH(_n)        ((_n) < 4 ? (0x03810 + ((_n) * 0x100)) : \
                                          (0x0E010 + ((_n) * 0x40)))
+#define E1000_TXCTL(_n)      ((_n) < 4 ? (0x03814 + ((_n) * 0x100)) : \
+                                         (0x0E014 + ((_n) * 0x40)))
+#define E1000_DCA_TXCTRL(_n) E1000_TXCTL(_n)
 #define E1000_TDT(_n)        ((_n) < 4 ? (0x03818 + ((_n) * 0x100)) : \
                                          (0x0E018 + ((_n) * 0x40)))
 #define E1000_TXDCTL(_n)     ((_n) < 4 ? (0x03828 + ((_n) * 0x100)) : \
                                          (0x0E028 + ((_n) * 0x40)))
-#define E1000_TARC(_n)       (0x03840 + (_n << 8))
-#define E1000_DCA_TXCTRL(_n) (0x03814 + (_n << 8))
-#define E1000_DCA_RXCTRL(_n) (0x02814 + (_n << 8))
 #define E1000_TDWBAL(_n)     ((_n) < 4 ? (0x03838 + ((_n) * 0x100)) : \
                                          (0x0E038 + ((_n) * 0x40)))
 #define E1000_TDWBAH(_n)     ((_n) < 4 ? (0x0383C + ((_n) * 0x100)) : \
                                          (0x0E03C + ((_n) * 0x40)))
+#define E1000_TARC(_n)                   (0x03840 + ((_n) * 0x100))
 #define E1000_RSRPD    0x02C00  /* Rx Small Packet Detect - RW */
 #define E1000_RAID     0x02C08  /* Receive Ack Interrupt Delay - RW */
 #define E1000_TXDMAC   0x03000  /* Tx DMA Control - RW */
@@ -426,6 +427,19 @@
 #define E1000_VMOLR(_n)        (0x05AD0 + (4 * (_n)))
 #define E1000_VLVF(_n)         (0x05D00 + (4 * (_n))) /* VLAN Virtual Machine
                                                        * Filter - RW */
+/* Time Sync */
+#define E1000_TSYNCRXCTL 0x0B620 /* Rx Time Sync Control register - RW */
+#define E1000_TSYNCTXCTL 0x0B614 /* Tx Time Sync Control register - RW */
+#define E1000_TSYNCRXCFG 0x05F50 /* Time Sync Rx Configuration - RW */
+#define E1000_RXSTMPL    0x0B624 /* Rx timestamp Low - RO */
+#define E1000_RXSTMPH    0x0B628 /* Rx timestamp High - RO */
+#define E1000_RXSATRL    0x0B62C /* Rx timestamp attribute low - RO */
+#define E1000_RXSATRH    0x0B630 /* Rx timestamp attribute high - RO */
+#define E1000_TXSTMPL    0x0B618 /* Tx timestamp value Low - RO */
+#define E1000_TXSTMPH    0x0B61C /* Tx timestamp value High - RO */
+#define E1000_SYSTIML    0x0B600 /* System time register Low - RO */
+#define E1000_SYSTIMH    0x0B604 /* System time register High - RO */
+#define E1000_TIMINCA    0x0B608 /* Increment attributes register - RW */
 
 /* Filtering Registers */
 #define E1000_SAQF(_n)  (0x05980 + (4 * (_n))) /* Source Address Queue Fltr */

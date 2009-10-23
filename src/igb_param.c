@@ -79,13 +79,13 @@ IGB_PARAM(InterruptThrottleRate, "Interrupt Throttling Rate");
 #define MIN_ITR                      120
 /* IntMode (Interrupt Mode)
  *
- * Valid Range: 0 - 3
+ * Valid Range: 0 - 2
  *
- * Default Value: 2 (MSI-X single queue)
+ * Default Value: 2 (MSI-X)
  */
 IGB_PARAM(IntMode, "Interrupt Mode");
-#define MAX_INTMODE                    3
-#define MIN_INTMODE                    0
+#define MAX_INTMODE                    IGB_INT_MODE_MSIX
+#define MIN_INTMODE                    IGB_INT_MODE_LEGACY
 
 /* LLIPort (Low Latency Interrupt TCP Port)
  *
@@ -136,6 +136,57 @@ IGB_PARAM(LROAggr, "LRO - Maximum packets to aggregate");
 #define MAX_LRO_AGGR                  44
 #define MIN_LRO_AGGR                   2
 #endif
+
+/* RSS (Enable RSS multiqueue receive)
+ *
+ * Valid Range: 0 - 8
+ *
+ * Default Value:  1
+ */
+IGB_PARAM(RSS, "RSS - multiqueue receive count");
+
+#define DEFAULT_RSS       1
+#define MAX_RSS          ((adapter->hw.mac.type == e1000_82575) ? 4 : 8)
+#define MIN_RSS           0 
+
+/* VMDQ (Enable VMDq multiqueue receive)
+ *
+ * Valid Range: 0 - 8
+ *
+ * Default Value:  0
+ */
+IGB_PARAM(VMDQ, "VMDQ - VMDq multiqueue receive");
+
+#define DEFAULT_VMDQ      0
+#define MAX_VMDQ          MAX_RSS
+#define MIN_VMDQ          0
+
+#ifdef CONFIG_PCI_IOV
+/* max_vfs (Enable SR-IOV VF devices)
+ *
+ * Valid Range: 0 - 7
+ *
+ * Default Value:  0
+ */
+IGB_PARAM(max_vfs, "max_vfs - SR-IOV VF devices");
+
+#define DEFAULT_SRIOV     0
+#define MAX_SRIOV         7
+#define MIN_SRIOV         0
+
+#endif /* CONFIG_PCI_IOV */
+
+/* QueuePairs (Enable TX/RX queue pairs for interrupt handling)
+ *
+ * Valid Range: 0 - 1
+ *
+ * Default Value:  1
+ */
+IGB_PARAM(QueuePairs, "QueuePairs - TX/RX queue pairs for interrupt handling");
+
+#define DEFAULT_QUEUE_PAIRS           1
+#define MAX_QUEUE_PAIRS               1
+#define MIN_QUEUE_PAIRS               0
 
 struct igb_option {
 	enum { enable_option, range_option, list_option } type;
@@ -288,8 +339,8 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 		struct igb_option opt = {
 			.type = range_option,
 			.name = "Interrupt Mode",
-			.err  = "defaulting to 2 (MSI-X single queue)",
-			.def  = IGB_INT_MODE_MSIX_1Q,
+			.err  = "defaulting to 2 (MSI-X)",
+			.def  = IGB_INT_MODE_MSIX,
 			.arg  = { .r = { .min = MIN_INTMODE,
 					 .max = MAX_INTMODE } }
 		};
@@ -404,5 +455,145 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 #endif
 	}
 #endif /* IGB_LRO */
+#ifdef CONFIG_PCI_IOV
+	{ /* SRIOV - Enable SR-IOV VF devices */
+		struct igb_option opt = {
+			.type = range_option,
+			.name = "max_vfs - SR-IOV VF devices",
+			.err  = "using default of " __MODULE_STRING(DEFAULT_SRIOV),
+			.def  = DEFAULT_SRIOV,
+			.arg  = { .r = { .min = MIN_SRIOV,
+					 .max = MAX_SRIOV } }
+		};
+
+#ifdef module_param_array
+		if (num_max_vfs > bd) {
+#endif
+			adapter->vfs_allocated_count = max_vfs[bd];
+			igb_validate_option(&adapter->vfs_allocated_count, &opt, adapter);
+
+#ifdef module_param_array
+		} else {
+			adapter->vfs_allocated_count = opt.def;
+		}
+#endif
+		if (adapter->hw.mac.type != e1000_82576 && adapter->vfs_allocated_count) {
+			adapter->vfs_allocated_count = 0;
+			DPRINTK(PROBE, INFO, "SR-IOV option max_vfs only supported on 82576.\n");
+		}
+	}
+#endif /* CONFIG_PCI_IOV */
+	{ /* VMDQ - Enable VMDq multiqueue receive */
+		struct igb_option opt = {
+			.type = range_option,
+			.name = "VMDQ - VMDq multiqueue receive count",
+			.err  = "using default of " __MODULE_STRING(DEFAULT_VMDQ),
+			.def  = DEFAULT_VMDQ,
+			.arg  = { .r = { .min = MIN_VMDQ,
+					 .max = (MAX_VMDQ - adapter->vfs_allocated_count) } }
+		};
+#ifdef module_param_array
+		if (num_VMDQ > bd) {
+#endif
+			adapter->VMDQ_queues = VMDQ[bd];
+			if (adapter->vfs_allocated_count && !adapter->VMDQ_queues) {
+				DPRINTK(PROBE, INFO, "Enabling SR-IOV requires VMDq be set to at least 1\n");
+				adapter->VMDQ_queues = 1;
+			}
+			igb_validate_option(&adapter->VMDQ_queues, &opt, adapter);
+
+#ifdef module_param_array
+		} else {
+			if (!adapter->vfs_allocated_count)
+				adapter->VMDQ_queues = opt.def;
+			else
+				adapter->VMDQ_queues = 1;
+		}
+#endif
+	}
+	{ /* RSS - Enable RSS multiqueue receives */
+		struct igb_option opt = {
+			.type = range_option,
+			.name = "RSS - RSS multiqueue receive count",
+			.err  = "using default of " __MODULE_STRING(DEFAULT_RSS),
+			.def  = DEFAULT_RSS,
+			.arg  = { .r = { .min = MIN_RSS,
+					 .max = MAX_RSS } }
+		};
+
+		if (adapter->VMDQ_queues) {
+			switch (adapter->hw.mac.type) {
+			case e1000_82576:
+				opt.arg.r.max = 2;
+				break;
+			case e1000_82575:
+				if (adapter->VMDQ_queues == 2)
+					opt.arg.r.max = 3;
+				if (adapter->VMDQ_queues <= 2)
+					break;
+			default:
+				opt.arg.r.max = 1;
+				break;
+			}
+		}
+
+#ifdef module_param_array
+		if (num_RSS > bd) {
+#endif
+			adapter->RSS_queues = RSS[bd];
+			switch (adapter->RSS_queues) {
+			case 1:
+				break;
+			default:
+				igb_validate_option(&adapter->RSS_queues, &opt, adapter);
+				if (adapter->RSS_queues)
+					break;
+			case 0:
+				adapter->RSS_queues = min_t(u32, opt.arg.r.max, num_online_cpus());
+				break;
+			}
+#ifdef module_param_array
+		} else {
+			adapter->RSS_queues = opt.def;
+		}
+#endif
+	}
+	{ /* QueuePairs - Enable TX/RX queue pairs for interrupt handling */
+		struct igb_option opt = {
+			.type = enable_option,
+			.name = "QueuePairs - TX/RX queue pairs for interrupt handling",
+			.err  = "defaulting to Enabled",
+			.def  = OPTION_ENABLED
+		};
+
+#ifdef module_param_array
+		if (num_QueuePairs > bd) {
+#endif
+			unsigned int qp = QueuePairs[bd];
+			/*
+			 * we must enable queue pairs if the number of queues
+			 * exceeds the number of avaialble interrupts.  We are
+			 * limited to 10, or 3 per unallocated vf. 
+			 */
+			if ((adapter->RSS_queues > 4) ||
+			    (adapter->VMDQ_queues > 4) ||
+			    ((adapter->RSS_queues > 1) &&
+			     ((adapter->VMDQ_queues > 3) ||
+			      (adapter->vfs_allocated_count > 6)))) {
+				if (qp == OPTION_DISABLED) {
+					qp = OPTION_ENABLED;
+					DPRINTK(PROBE, INFO,
+					        "Number of queues exceeds available interrupts, %s\n",opt.err);
+				}
+			}
+			igb_validate_option(&qp, &opt, adapter);
+			adapter->flags |= qp ? IGB_FLAG_QUEUE_PAIRS : 0;
+			    
+#ifdef module_param_array
+		} else {
+			adapter->flags |= opt.def ? IGB_FLAG_QUEUE_PAIRS : 0;
+		}
+#endif
+	}
 }
 

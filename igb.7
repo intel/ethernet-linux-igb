@@ -80,7 +80,7 @@ Causes an immediate interrupt if the board receives a packet smaller than the sp
 .B IntMode
 .IP
 .B Valid Range:    
-0-3
+0-2
 .IP
 .B Default Value:
 2
@@ -93,6 +93,77 @@ Causes an immediate interrupt if the board receives a packet smaller than the sp
 Allows changing interrupt mode and MQ status at load time, without requiring
 a recompile. If the driver fails to enable a specific interrupt mode, it will
 fail back to lesser capabilities.
+.IP
+.B RSS
+.IP
+.B Valid Range:   
+0-8
+.IP
+.B Default Value: 
+1
+.IP
+0 - Assign up to whichever is less, number of CPUS or number of queues
+X - Assign X queues where X is less than the maximum number of queues
+.IP
+Note: for 82575-based adapters the maximum number of queues is 4; for 
+82576-based and newer adapters it is 8.
+.IP
+This parameter is also affected by the VMDq parameter in that it will limit the
+queues more.
+.IP
+VMDQ
+.IP
+Model 0  1  2  3+
+82575 4  4  3  1
+82576 8  2  2  2
+82580 8  1  1  1
+.IP
+.B VMDQ
+.IP
+.B Valid Range:  
+0 - 4 on 82575-based adapters; and 0 - 8 for 82576 and 
+82580-based adapters.
+.IP
+.B Default Value: 
+0
+.IP
+Supports enabling VMDq pools as this is needed to support SR-IOV.
+.IP
+0 = disabled
+1 = sets the netdev as pool 0
+2+ = add additional queues but they currently are not used.
+.IP
+This parameter is forced to 1 or more if the max_vfs module parameter is used. 
+In addition the number of queues available for RSS is limited if this is set to 1 or greater.
+.IP
+.B max_vfs
+.IP
+.B Valid Range:   
+0-7
+.IP
+.B Default Value: 
+0
+.IP
+If the value is greater than 0 it will also force the VMDq parameter to be 1 or
+more.
+.IP
+This parameter adds support for SR-IOV.  It causes the driver to spawn up to 
+max_vfs worth of virtual function.  
+.IP
+.B QueuePairs
+.IP
+.B Valid Range:  
+0-1
+.IP
+.B Default Value:  
+1 (TX and RX will be paired onto one interrupt vector)
+.IP
+If set to 0, when MSI-X is enabled, the TX and RX will attempt to occupy
+separate vectors.    
+.IP
+This option can be overridden to 1 if there are not sufficient interrupts
+available.  This can occur if any combination of RSS, VMDQ, and max_vfs 
+results in more than 4 queues being used. 
 .SH JUMBO FRAMES
 Jumbo Frames support is enabled by changing the MTU to a value larger than the default of 1500.Use the ifconfig command to increase the MTU size.  For example:
 .IP

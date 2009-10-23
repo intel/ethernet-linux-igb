@@ -51,13 +51,17 @@ void e1000_phy_force_speed_duplex_setup(struct e1000_hw *hw, u16 *phy_ctrl);
 s32  e1000_phy_hw_reset_generic(struct e1000_hw *hw);
 s32  e1000_phy_reset_dsp_generic(struct e1000_hw *hw);
 s32  e1000_read_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 *data);
+s32  e1000_read_kmrn_reg_locked(struct e1000_hw *hw, u32 offset, u16 *data);
 s32  e1000_read_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 *data);
+s32  e1000_read_phy_reg_igp_locked(struct e1000_hw *hw, u32 offset, u16 *data);
 s32  e1000_read_phy_reg_m88(struct e1000_hw *hw, u32 offset, u16 *data);
 s32  e1000_set_d3_lplu_state_generic(struct e1000_hw *hw, bool active);
 s32  e1000_setup_copper_link_generic(struct e1000_hw *hw);
 s32  e1000_wait_autoneg_generic(struct e1000_hw *hw);
 s32  e1000_write_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 data);
+s32  e1000_write_kmrn_reg_locked(struct e1000_hw *hw, u32 offset, u16 data);
 s32  e1000_write_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 data);
+s32  e1000_write_phy_reg_igp_locked(struct e1000_hw *hw, u32 offset, u16 data);
 s32  e1000_write_phy_reg_m88(struct e1000_hw *hw, u32 offset, u16 data);
 s32  e1000_phy_reset_dsp(struct e1000_hw *hw);
 s32  e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
@@ -69,6 +73,8 @@ void e1000_power_up_phy_copper(struct e1000_hw *hw);
 void e1000_power_down_phy_copper(struct e1000_hw *hw);
 s32  e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data);
 s32  e1000_write_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 data);
+s32  e1000_read_phy_reg_i2c(struct e1000_hw *hw, u32 offset, u16 *data);
+s32  e1000_write_phy_reg_i2c(struct e1000_hw *hw, u32 offset, u16 data);
 
 #define E1000_MAX_PHY_ADDR                4
 

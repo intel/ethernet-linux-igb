@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Network Connection
 ==================================================
 
-February 24, 2009
+September 15, 2009
 
 
 Contents
@@ -40,6 +40,10 @@ The following features are now available in supported kernels:
 Channel Bonding documentation can be found in the Linux kernel source:
 /Documentation/networking/bonding.txt
 
+The igb driver supports IEEE 1588 time stamping for kernels 2.6.30 and above.  
+A basic tutorial for the technology can be found at:
+http://ieee1588.nist.gov/tutorial-basic.pdf
+
 The driver information previously displayed in the /proc filesystem is not
 supported in this release.  Alternatively, you can use ethtool (version 1.6
 or later), lspci, and ifconfig to obtain the same information.
@@ -59,7 +63,7 @@ For the latest Intel network drivers for Linux, refer to the following
 website.  In the search field, enter your adapter name or type, or use the
 networking link on the left to search for your adapter:
 
-    http://downloadcenter.intel.com/scripts-df-external/Support_Intel.aspx
+    http://support.intel.com/support/go/network/adapter/home.htm
 
 
 Building and Installation
@@ -299,7 +303,7 @@ than the specified size.
 
 IntMode
 -------
-Valid Range:    0-3
+Valid Range:    0-2
 Default Value:  2
 0 - Legacy Interrupts, single queue
 1 - MSI interrupts, single queue
@@ -316,7 +320,67 @@ LROAggr
 Valid Range:    2-44
 Default Value:  32
 
-Defines the maximum number of packets that can be aggregated together. 
+Defines the maximum number of packets that can be aggregated together.
+
+
+RSS
+---
+Valid Range:   0-8
+Default Value: 1
+
+0 - Assign up to whichever is less, number of CPUS or number of queues
+X - Assign X queues where X is less than the maximum number of queues
+
+Note: for 82575-based adapters the maximum number of queues is 4; for 
+82576-based and newer adapters it is 8.
+
+This parameter is also affected by the VMDq parameter in that it will limit the
+queues more.
+
+      VMDQ
+Model 0  1  2  3+
+82575 4  4  3  1
+82576 8  2  2  2
+
+
+VMDQ
+----
+Valid Range:  0 - 4 on 82575-based adapters; and 0 - 8 for 82576-based 
+adapters.
+Default Value: 0
+
+Supports enabling VMDq pools as this is needed to support SR-IOV.
+
+0 - disabled
+1 - sets the netdev as pool 0
+2+ - add additional queues but they currently are not used.
+
+This parameter is forced to 1 or more if the max_vfs module parameter is used. 
+In addition the number of queues available for RSS is limited if this is set to 1 or greater.
+
+ 
+max_vfs
+-------
+Valid Range:   0-7
+Default Value: 0
+If the value is greater than 0 it will also force the VMDq parameter to be 1 or
+more.
+
+This parameter adds support for SR-IOV.  It causes the driver to spawn up to 
+max_vfs worth of virtual function.  
+
+
+QueuePairs
+----------
+Valid Range:  0-1
+Default Value:  1 (TX and RX will be paired onto one interrupt vector)
+
+If set to 0, when MSI-X is enabled, the TX and RX will attempt to occupy
+separate vectors.    
+
+This option can be overridden to 1 if there are not sufficient interrupts
+available.  This can occur if any combination of RSS, VMDQ, and max_vfs 
+results in more than 4 queues being used. 
 
 
 Additional Configurations
@@ -425,19 +489,10 @@ Additional Configurations
 
   REQUIREMENTS: MSI-X support is required for Multiqueue. If MSI-X is not 
   found, the system will fallback to MSI or to Legacy interrupts.
-  This driver supports multiqueue in kernel versions 2.6.24 and 
-  greater.
+  This driver supports multiqueue in kernel versions 2.6.24 and greater.
   This driver supports receive multiqueue on all kernels that support MSI-X.
   NOTE: Do not use MSI-X with the 2.6.19 or 2.6.20 kernels.
 
-  To enable a separate vector for TX, use: 
-  # make CFLAGS_EXTRA=-DCONFIG_IGB_SEPARATE_TX_HANDLER
-  This will allocate a separate handler for tx cleanups. This might be useful 
-  if you have a lot of CPU cores under heavy load and want to spread the 
-  processing load around.  
- 
-  With this option, you would get three MSI-X vectors: one for TX, one for RX, 
-  and one for link.
 
 
   LRO
@@ -598,6 +653,14 @@ Known Issues/Troubleshooting
   Page allocation failure. order:0 errors may occur under stress with kernels 
   2.6.25 and above. This is caused by the way the Linux kernel reports this 
   stressed condition.
+
+  Under Redhat 5.4-GA - System May Crash when Closing Guest OS Window after 
+  Loading/Unloading Physical Function (PF) Driver
+  -------------------------------------------------------------------------
+  Do not remove the igb driver from Dom0 while Virtual Functions (VFs) are 
+  assigned to guests. VFs must first use the xm "pci-detach" command to 
+  hot-plug the VF device out of the VM it is assigned to or else shut down the
+  VM.
  
 
 Support
@@ -605,7 +668,7 @@ Support
 
 For general information, go to the Intel support website at:
 
-    http://support.intel.com
+    www.intel.com/support/
 
 or the Intel Wired Networking project hosted by Sourceforge at:
 
