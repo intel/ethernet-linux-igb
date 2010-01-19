@@ -123,19 +123,6 @@ IGB_PARAM(LLISize, "Low Latency Interrupt on Packet Size");
 #define MAX_LLISIZE                 1500
 #define MIN_LLISIZE                    0
 
-#ifdef IGB_LRO
-/* LROAggr (Large Receive Offload)
- *
- * Valid Range: 2 - 44
- *
- * Default Value:  32
- */
-IGB_PARAM(LROAggr, "LRO - Maximum packets to aggregate");
-
-#define DEFAULT_LRO_AGGR              32
-#define MAX_LRO_AGGR                  44
-#define MIN_LRO_AGGR                   2
-#endif
 
 /* RSS (Enable RSS multiqueue receive)
  *
@@ -292,8 +279,9 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 #ifdef module_param_array
 		if (num_InterruptThrottleRate > bd) {
 #endif
-			adapter->itr = InterruptThrottleRate[bd];
-			switch (adapter->itr) {
+			unsigned int itr = InterruptThrottleRate[bd];
+
+			switch (itr) {
 			case 0:
 				DPRINTK(PROBE, INFO, "%s turned off\n",
 				        opt.name);
@@ -301,39 +289,36 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			case 1:
 				DPRINTK(PROBE, INFO, "%s set to dynamic mode\n",
 					opt.name);
-				adapter->itr_setting = adapter->itr;
-				adapter->itr = IGB_START_ITR;
+				adapter->rx_itr_setting = itr;
 				break;
 			case 3:
 				DPRINTK(PROBE, INFO,
 				        "%s set to dynamic conservative mode\n",
 					opt.name);
-				adapter->itr_setting = adapter->itr;
-				adapter->itr = IGB_START_ITR;
+				adapter->rx_itr_setting = itr;
 				break;
 			default:
-				igb_validate_option(&adapter->itr, &opt,
-				        adapter);
+				igb_validate_option(&itr, &opt, adapter);
 				/* Save the setting, because the dynamic bits
 				 * change itr.  In case of invalid user value,
 				 * default to conservative mode, else need to
 				 * clear the lower two bits because they are
 				 * used as control */
-				if (adapter->itr == 3) {
-					adapter->itr_setting = adapter->itr;
-					adapter->itr = IGB_START_ITR;
+				if (itr == 3) {
+					adapter->rx_itr_setting = itr;
 				} else {
-					adapter->itr = 1000000000 / (adapter->itr * 256);
-					adapter->itr_setting = adapter->itr & ~3;
+					adapter->rx_itr_setting = 1000000000 /
+					                          (itr * 256);
+					adapter->rx_itr_setting &= ~3;
 				}
 				break;
 			}
 #ifdef module_param_array
 		} else {
-			adapter->itr_setting = opt.def;
-			adapter->itr = 8000;
+			adapter->rx_itr_setting = opt.def;
 		}
 #endif
+		adapter->tx_itr_setting = adapter->rx_itr_setting;
 	}
 	{ /* Interrupt Mode */
 		struct igb_option opt = {
@@ -431,30 +416,6 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 		}
 #endif
 	}
-#ifdef IGB_LRO
-	{ /* Large Receive Offload - Maximum packets to aggregate */
-		struct igb_option opt = {
-			.type = range_option,
-			.name = "LRO - Maximum packets to aggregate",
-			.err  = "using default of " __MODULE_STRING(DEFAULT_LRO_AGGR),
-			.def  = DEFAULT_LRO_AGGR,
-			.arg  = { .r = { .min = MIN_LRO_AGGR,
-					 .max = MAX_LRO_AGGR } }
-		};
-
-#ifdef module_param_array
-		if (num_LROAggr > bd) {
-#endif
-			adapter->lro_max_aggr = LROAggr[bd];
-			igb_validate_option(&adapter->lro_max_aggr, &opt, adapter);
-
-#ifdef module_param_array
-		} else {
-			adapter->lro_max_aggr = opt.def;
-		}
-#endif
-	}
-#endif /* IGB_LRO */
 #ifdef CONFIG_PCI_IOV
 	{ /* SRIOV - Enable SR-IOV VF devices */
 		struct igb_option opt = {
@@ -495,19 +456,19 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 #ifdef module_param_array
 		if (num_VMDQ > bd) {
 #endif
-			adapter->VMDQ_queues = VMDQ[bd];
-			if (adapter->vfs_allocated_count && !adapter->VMDQ_queues) {
+			adapter->vmdq_pools = VMDQ[bd];
+			if (adapter->vfs_allocated_count && !adapter->vmdq_pools) {
 				DPRINTK(PROBE, INFO, "Enabling SR-IOV requires VMDq be set to at least 1\n");
-				adapter->VMDQ_queues = 1;
+				adapter->vmdq_pools = 1;
 			}
-			igb_validate_option(&adapter->VMDQ_queues, &opt, adapter);
+			igb_validate_option(&adapter->vmdq_pools, &opt, adapter);
 
 #ifdef module_param_array
 		} else {
 			if (!adapter->vfs_allocated_count)
-				adapter->VMDQ_queues = opt.def;
+				adapter->vmdq_pools = opt.def;
 			else
-				adapter->VMDQ_queues = 1;
+				adapter->vmdq_pools = 1;
 		}
 #endif
 	}
@@ -521,15 +482,15 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 					 .max = MAX_RSS } }
 		};
 
-		if (adapter->VMDQ_queues) {
+		if (adapter->vmdq_pools) {
 			switch (adapter->hw.mac.type) {
 			case e1000_82576:
 				opt.arg.r.max = 2;
 				break;
 			case e1000_82575:
-				if (adapter->VMDQ_queues == 2)
+				if (adapter->vmdq_pools == 2)
 					opt.arg.r.max = 3;
-				if (adapter->VMDQ_queues <= 2)
+				if (adapter->vmdq_pools <= 2)
 					break;
 			default:
 				opt.arg.r.max = 1;
@@ -540,21 +501,21 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 #ifdef module_param_array
 		if (num_RSS > bd) {
 #endif
-			adapter->RSS_queues = RSS[bd];
-			switch (adapter->RSS_queues) {
+			adapter->rss_queues = RSS[bd];
+			switch (adapter->rss_queues) {
 			case 1:
 				break;
 			default:
-				igb_validate_option(&adapter->RSS_queues, &opt, adapter);
-				if (adapter->RSS_queues)
+				igb_validate_option(&adapter->rss_queues, &opt, adapter);
+				if (adapter->rss_queues)
 					break;
 			case 0:
-				adapter->RSS_queues = min_t(u32, opt.arg.r.max, num_online_cpus());
+				adapter->rss_queues = min_t(u32, opt.arg.r.max, num_online_cpus());
 				break;
 			}
 #ifdef module_param_array
 		} else {
-			adapter->RSS_queues = opt.def;
+			adapter->rss_queues = opt.def;
 		}
 #endif
 	}
@@ -575,10 +536,10 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			 * exceeds the number of avaialble interrupts.  We are
 			 * limited to 10, or 3 per unallocated vf. 
 			 */
-			if ((adapter->RSS_queues > 4) ||
-			    (adapter->VMDQ_queues > 4) ||
-			    ((adapter->RSS_queues > 1) &&
-			     ((adapter->VMDQ_queues > 3) ||
+			if ((adapter->rss_queues > 4) ||
+			    (adapter->vmdq_pools > 4) ||
+			    ((adapter->rss_queues > 1) &&
+			     ((adapter->vmdq_pools > 3) ||
 			      (adapter->vfs_allocated_count > 6)))) {
 				if (qp == OPTION_DISABLED) {
 					qp = OPTION_ENABLED;

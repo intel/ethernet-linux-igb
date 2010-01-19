@@ -126,6 +126,8 @@
 #define E1000_CTRL_EXT_RO_DIS    0x00020000 /* Relaxed Ordering disable */
 #define E1000_CTRL_EXT_DMA_DYN_CLK_EN 0x00080000 /* DMA Dynamic Clock Gating */
 #define E1000_CTRL_EXT_LINK_MODE_MASK 0x00C00000
+#define E1000_CTRL_EXT_LINK_MODE_82580_MASK 0x01C00000 /*82580 bit 24:22*/
+#define E1000_CTRL_EXT_LINK_MODE_1000BASE_KX  0x00400000
 #define E1000_CTRL_EXT_LINK_MODE_GMII 0x00000000
 #define E1000_CTRL_EXT_LINK_MODE_TBI  0x00C00000
 #define E1000_CTRL_EXT_LINK_MODE_KMRN    0x00000000
@@ -342,6 +344,8 @@
 #define E1000_SWFW_PHY0_SM  0x02
 #define E1000_SWFW_PHY1_SM  0x04
 #define E1000_SWFW_CSR_SM   0x08
+#define E1000_SWFW_PHY2_SM  0x20
+#define E1000_SWFW_PHY3_SM  0x40
 
 /* FACTPS Definitions */
 #define E1000_FACTPS_LFS    0x40000000  /* LAN Function Select */
@@ -716,6 +720,7 @@
 #define E1000_ICR_ACK           0x00020000 /* Receive Ack frame */
 #define E1000_ICR_MNG           0x00040000 /* Manageability event */
 #define E1000_ICR_DOCK          0x00080000 /* Dock/Undock */
+#define E1000_ICR_DRSTA         0x40000000 /* Device Reset Asserted */
 #define E1000_ICR_INT_ASSERTED  0x80000000 /* If this bit asserted, the driver
                                             * should claim the interrupt */
 #define E1000_ICR_RXD_FIFO_PAR0 0x00100000 /* Q0 Rx desc FIFO parity error */
@@ -731,6 +736,7 @@
                                             * an interrupt */
 #define E1000_ICR_DOUTSYNC      0x10000000 /* NIC DMA out of sync */
 #define E1000_ICR_EPRST         0x00100000 /* ME hardware reset occurs */
+#define E1000_ICR_FER           0x00400000 /* Fatal Error */
 
 
 /* Extended Interrupt Cause Read */
@@ -796,6 +802,7 @@
 #define E1000_IMS_ACK       E1000_ICR_ACK       /* Receive Ack frame */
 #define E1000_IMS_MNG       E1000_ICR_MNG       /* Manageability event */
 #define E1000_IMS_DOCK      E1000_ICR_DOCK      /* Dock/Undock */
+#define E1000_IMS_DRSTA     E1000_ICR_DRSTA     /* Device Reset Asserted */
 #define E1000_IMS_RXD_FIFO_PAR0 E1000_ICR_RXD_FIFO_PAR0 /* Q0 Rx desc FIFO
                                                          * parity error */
 #define E1000_IMS_TXD_FIFO_PAR0 E1000_ICR_TXD_FIFO_PAR0 /* Q0 Tx desc FIFO
@@ -812,6 +819,7 @@
 #define E1000_IMS_PHYINT    E1000_ICR_PHYINT
 #define E1000_IMS_DOUTSYNC  E1000_ICR_DOUTSYNC /* NIC DMA out of sync */
 #define E1000_IMS_EPRST     E1000_ICR_EPRST
+#define E1000_IMS_FER           E1000_ICR_FER /* Fatal Error */
 
 /* Extended Interrupt Mask Set */
 #define E1000_EIMS_RX_QUEUE0    E1000_EICR_RX_QUEUE0 /* Rx Queue 0 Interrupt */
@@ -844,6 +852,7 @@
 #define E1000_ICS_ACK       E1000_ICR_ACK       /* Receive Ack frame */
 #define E1000_ICS_MNG       E1000_ICR_MNG       /* Manageability event */
 #define E1000_ICS_DOCK      E1000_ICR_DOCK      /* Dock/Undock */
+#define E1000_ICS_DRSTA     E1000_ICR_DRSTA     /* Device Reset Aserted */
 #define E1000_ICS_RXD_FIFO_PAR0 E1000_ICR_RXD_FIFO_PAR0 /* Q0 Rx desc FIFO
                                                          * parity error */
 #define E1000_ICS_TXD_FIFO_PAR0 E1000_ICR_TXD_FIFO_PAR0 /* Q0 Tx desc FIFO
@@ -999,6 +1008,24 @@
 #define E1000_TSYNCRXCFG_PTP_V2_MANAGEMENT_MESSAGE           0x0D00
 
 #define E1000_TIMINCA_16NS_SHIFT 24
+/* TUPLE Filtering Configuration */
+#define E1000_TTQF_DISABLE_MASK   0xF0008000     /* TTQF Disable Mask */
+#define E1000_TTQF_QUEUE_ENABLE   0x100          /* TTQF Queue Enable Bit */
+#define E1000_TTQF_PROTOCOL_MASK  0xFF           /* TTQF Protocol Mask */
+/* TTQF TCP Bit, shift with E1000_TTQF_PROTOCOL SHIFT */
+#define E1000_TTQF_PROTOCOL_TCP   0x0
+/* TTQF UDP Bit, shift with E1000_TTQF_PROTOCOL_SHIFT */
+#define E1000_TTQF_PROTOCOL_UDP   0x1
+/* TTQF SCTP Bit, shift with E1000_TTQF_PROTOCOL_SHIFT */
+#define E1000_TTQF_PROTOCOL_SCTP  0x2
+#define E1000_TTQF_PROTOCOL_SHIFT 5              /* TTQF Protocol Shift */
+#define E1000_TTQF_QUEUE_SHIFT    16             /* TTQF Queue Shfit */
+#define E1000_TTQF_RX_QUEUE_MASK  0x70000        /* TTQF Queue Mask */
+#define E1000_TTQF_MASK_ENABLE    0x10000000     /* TTQF Mask Enable Bit */
+#define E1000_IMIR_CLEAR_MASK     0xF001FFFF     /* IMIR Reg Clear Mask */
+#define E1000_IMIR_PORT_BYPASS    0x20000        /* IMIR Port Bypass Bit */
+#define E1000_IMIR_PRIORITY_SHIFT 29             /* IMIR Priority Shift */
+#define E1000_IMIREXT_CLEAR_MASK  0x7FFFF        /* IMIREXT Reg Clear Mask */
 
 /* PCI Express Control */
 #define E1000_GCR_RXD_NO_SNOOP          0x00000001
@@ -1188,6 +1215,10 @@
 
 #define E1000_NVM_CFG_DONE_PORT_0  0x040000 /* MNG config cycle done */
 #define E1000_NVM_CFG_DONE_PORT_1  0x080000 /* ...for second port */
+#define E1000_NVM_CFG_DONE_PORT_2  0x100000 /* ...for third port */
+#define E1000_NVM_CFG_DONE_PORT_3  0x200000 /* ...for fourth port */
+
+#define NVM_82580_LAN_FUNC_OFFSET(a) (a ? (0x40 + (0x40 * a)) : 0)
 
 /* Mask bits for fields in Word 0x0f of the NVM */
 #define NVM_WORD0F_PAUSE_MASK       0x3000
@@ -1286,6 +1317,7 @@
 #define IFE_E_PHY_ID         0x02A80330
 #define IFE_PLUS_E_PHY_ID    0x02A80320
 #define IFE_C_E_PHY_ID       0x02A80310
+#define I82580_I_PHY_ID 0x015403A0
 #define IGP04E1000_E_PHY_ID  0x02A80391
 #define M88_VENDOR           0x0141
 
@@ -1509,5 +1541,34 @@
 #define E1000_LSECRXCTRL_RSV_MASK       0xFFFFFF33
 
 
+/* DMA Coalescing register fields */
+#define E1000_DMACR_DMACWT_MASK         0x00003FFF /* DMA Coalescing
+                                                    * Watchdog Timer */
+#define E1000_DMACR_DMACTHR_MASK        0x00FF0000 /* DMA Coalescing Receive
+                                                    * Threshold */
+#define E1000_DMACR_DMACTHR_SHIFT       16
+#define E1000_DMACR_DMAC_LX_MASK        0x30000000 /* Lx when no PCIe
+                                                    * transactions */
+#define E1000_DMACR_DMAC_LX_SHIFT       28
+#define E1000_DMACR_DMAC_EN             0x80000000 /* Enable DMA Coalescing */
+
+#define E1000_DMCTXTH_DMCTTHR_MASK      0x00000FFF /* DMA Coalescing Transmit
+                                                    * Threshold */
+
+#define E1000_DMCTLX_TTLX_MASK          0x00000FFF /* Time to LX request */
+
+#define E1000_DMCRTRH_UTRESH_MASK       0x0007FFFF /* Receive Traffic Rate
+                                                    * Threshold */
+#define E1000_DMCRTRH_LRPRCW            0x80000000 /* Rcv packet rate in
+                                                    * current window */
+
+#define E1000_DMCCNT_CCOUNT_MASK        0x01FFFFFF /* DMA Coal Rcv Traffic
+                                                    * Current Cnt */
+
+#define E1000_FCRTC_RTH_COAL_MASK       0x0003FFF0 /* Flow ctrl Rcv Threshold
+                                                    * High val */
+#define E1000_FCRTC_RTH_COAL_SHIFT      4
+#define E1000_PCIEMISC_LX_DECISION      0x00000080 /* Lx power decision based
+                                                      on DMA coal */
 
 #endif /* _E1000_DEFINES_H_ */

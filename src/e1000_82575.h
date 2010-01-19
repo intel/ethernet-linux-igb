@@ -44,6 +44,10 @@
  */
 #define E1000_RAR_ENTRIES_82575   16
 #define E1000_RAR_ENTRIES_82576   24
+#define E1000_RAR_ENTRIES_82580        24
+#define E1000_SW_SYNCH_MB              0x00000100
+#define E1000_STAT_DEV_RST_SET         0x00100000
+#define E1000_CTRL_DEV_RST             0x20000000
 
 struct e1000_adv_data_desc {
 	__le64 buffer_addr;    /* Address of the descriptor's data buffer */
@@ -119,6 +123,7 @@ struct e1000_adv_context_desc {
 #define E1000_SRRCTL_DESCTYPE_HDR_REPLICATION           0x06000000
 #define E1000_SRRCTL_DESCTYPE_HDR_REPLICATION_LARGE_PKT 0x08000000
 #define E1000_SRRCTL_DESCTYPE_MASK                      0x0E000000
+#define E1000_SRRCTL_TIMESTAMP                          0x40000000
 #define E1000_SRRCTL_DROP_EN                            0x80000000
 
 #define E1000_SRRCTL_BSIZEPKT_MASK      0x0000007F
@@ -133,6 +138,7 @@ struct e1000_adv_context_desc {
 #define E1000_MRQC_RSS_FIELD_IPV4_UDP       0x00400000
 #define E1000_MRQC_RSS_FIELD_IPV6_UDP       0x00800000
 #define E1000_MRQC_RSS_FIELD_IPV6_UDP_EX    0x01000000
+#define E1000_MRQC_ENABLE_RSS_8Q            0x00000002
 
 #define E1000_VMRCTL_MIRROR_PORT_SHIFT      8
 #define E1000_VMRCTL_MIRROR_DSTPORT_MASK    (7 << E1000_VMRCTL_MIRROR_PORT_SHIFT)
@@ -212,6 +218,7 @@ union e1000_adv_rx_desc {
 #define E1000_RXDADV_SPLITHEADER_EN      0x00001000
 #define E1000_RXDADV_SPH                 0x8000
 #define E1000_RXDADV_STAT_TS             0x10000 /* Pkt was time stamped */
+#define E1000_RXDADV_STAT_TSIP           0x08000 /* timestamp in packet */
 #define E1000_RXDADV_ERR_HBO             0x00800000
 
 /* RSS Hash results */
@@ -416,6 +423,9 @@ struct e1000_adv_tx_context_desc {
 #define E1000_VLVF_LVLAN          0x00100000
 #define E1000_VLVF_VLANID_ENABLE  0x80000000
 
+#define E1000_VMVIR_VLANA_DEFAULT 0x40000000 /* Always use default VLAN */
+#define E1000_VMVIR_VLANA_NEVER   0x80000000 /* Never insert VLAN tag */
+
 #define E1000_VF_INIT_TIMEOUT 200 /* Number of retries to clear RSTI */
 
 #define E1000_IOVCTL 0x05BBC
@@ -436,4 +446,5 @@ struct e1000_adv_tx_context_desc {
 #define E1000_RXPBS_SIZE_MASK_82576  0x0000007F
 void e1000_vmdq_set_loopback_pf(struct e1000_hw *hw, bool enable);
 void e1000_vmdq_set_replication_pf(struct e1000_hw *hw, bool enable);
+u16 e1000_rxpbs_adjust_82580(u32 data);
 #endif /* _E1000_82575_H_ */

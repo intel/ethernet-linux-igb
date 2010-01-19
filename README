@@ -1,8 +1,7 @@
 Linux* Base Driver for Intel(R) Network Connection
 ==================================================
 
-September 15, 2009
-
+November 11, 2009
 
 Contents
 ========
@@ -14,7 +13,6 @@ Contents
 - Additional Configurations
 - Known Issues/Troubleshooting
 - Support
-
 
 In This Release
 ===============
@@ -64,7 +62,6 @@ website.  In the search field, enter your adapter name or type, or use the
 networking link on the left to search for your adapter:
 
     http://support.intel.com/support/go/network/adapter/home.htm
-
 
 Building and Installation
 =========================
@@ -128,7 +125,6 @@ NOTE: For the build to work properly, the currently running kernel MUST
 
      ping  <IP_address>
 
-
 TROUBLESHOOTING: Some systems have trouble supporting MSI and/or MSI-X 
 interrupts. If you believe your system needs to disable this style of 
 interrupt, the driver can be built and installed with the command:
@@ -138,7 +134,6 @@ interrupt, the driver can be built and installed with the command:
 Normally the driver will generate an interrupt every two seconds, so if 
 you can see that you're no longer getting interrupts in cat /proc/interrupts
 for the ethX igb device, then this workaround may be necessary.
-
 
 To build igb driver with DCA:
 ------------------------------
@@ -160,7 +155,6 @@ This example assumes the ioatdma and igb sources are in /usr/src
      cd igb-<igb-version>/src
      make CFLAGS_EXTRA="-DIGB_DCA -I/usr/src/ioatdma-<ioat version>/include"
      make install
-
 
 Command Line Parameters
 =======================
@@ -185,7 +179,6 @@ NOTES:  For more information about the InterruptThrottleRate,
 
         A descriptor describes a data buffer and attributes related to
         the data buffer.  This information is accessed by the hardware.
-
 
 InterruptThrottleRate
 ---------------------
@@ -256,14 +249,12 @@ NOTE:  When igb is loaded with default settings and multiple adapters
        be platform-specific.  If CPU utilization is not a concern, use
        default driver settings.
 
-
 LLI (Low Latency Interrupts)
 ---------------------------- 
 LLI allows for immediate generation of an interrupt upon processing receive 
 packets that match certain criteria as set by the parameters described below. 
 LLI parameters are not enabled when Legacy interrupts are used. You must be 
 using MSI or MSI-X (see cat /proc/interrupts) to successfully use LLI.
-
 
 LLIPort
 -------
@@ -281,7 +272,6 @@ WARNING: Enabling LLI can result in an excessive number of interrupts/second
 that may cause problems with the system and in some cases may cause a kernel 
 panic. 
 
-
 LLIPush
 -------
 Valid Range:   0-1
@@ -291,7 +281,6 @@ Can be set to be enabled or disabled (default). It is most
 effective in an environment with many small transactions.
 NOTE: Enabling LLIPush may allow a denial of service attack.
 
-
 LLISize
 -------
 Valid Range:   0-1500
@@ -300,7 +289,6 @@ Default Value: 0 (disabled)
 Causes an immediate interrupt if the board receives a packet smaller 
 than the specified size.
 
-
 IntMode
 -------
 Valid Range:    0-2
@@ -308,20 +296,10 @@ Default Value:  2
 0 - Legacy Interrupts, single queue
 1 - MSI interrupts, single queue
 2 - MSI-X interrupts, single queue (default)
-3 - MSI-X interrupts, multiple queues
 
 Allows changing interrupt mode and MQ status at load time, without requiring
 a recompile. If the driver fails to enable a specific interrupt mode, it will
 fail back to lesser capabilities.
-
-
-LROAggr
--------
-Valid Range:    2-44
-Default Value:  32
-
-Defines the maximum number of packets that can be aggregated together.
-
 
 RSS
 ---
@@ -341,11 +319,11 @@ queues more.
 Model 0  1  2  3+
 82575 4  4  3  1
 82576 8  2  2  2
-
+82580 8  1  1  1
 
 VMDQ
 ----
-Valid Range:  0 - 4 on 82575-based adapters; and 0 - 8 for 82576-based 
+Valid Range:  0 - 4 on 82575-based adapters; and 0 - 8 for 82576/82580-based 
 adapters.
 Default Value: 0
 
@@ -356,19 +334,19 @@ Supports enabling VMDq pools as this is needed to support SR-IOV.
 2+ - add additional queues but they currently are not used.
 
 This parameter is forced to 1 or more if the max_vfs module parameter is used. 
-In addition the number of queues available for RSS is limited if this is set to 1 or greater.
-
+In addition the number of queues available for RSS is limited if this is set to
+1 or greater.
  
 max_vfs
 -------
 Valid Range:   0-7
 Default Value: 0
-If the value is greater than 0 it will also force the VMDq parameter to be 1 or
-more.
 
-This parameter adds support for SR-IOV.  It causes the driver to spawn up to 
-max_vfs worth of virtual function.  
+  If the value is greater than 0 it will also force the VMDq parameter to be 1 
+  or more.
 
+  This parameter adds support for SR-IOV.  It causes the driver to spawn up to 
+  max_vfs worth of virtual function.  
 
 QueuePairs
 ----------
@@ -382,10 +360,8 @@ This option can be overridden to 1 if there are not sufficient interrupts
 available.  This can occur if any combination of RSS, VMDQ, and max_vfs 
 results in more than 4 queues being used. 
 
-
 Additional Configurations
 =========================
-
 
   Configuring the Driver on Different Distributions
   -------------------------------------------------
@@ -407,7 +383,6 @@ Additional Configurations
        alias eth1 igb
        options igb IntMode=2,1
 
-
   Viewing Link Messages
   ---------------------
   Link messages will not be displayed to the console if the distribution is
@@ -417,7 +392,6 @@ Additional Configurations
        dmesg -n 8
 
   NOTE: This setting is not saved across reboots.
-
 
   Jumbo Frames
   ------------
@@ -447,7 +421,6 @@ Additional Configurations
   - Using Jumbo Frames at 10 or 100 Mbps may result in poor performance or
     loss of link.
 
-
   Ethtool
   -------
   The driver utilizes the ethtool interface for driver configuration and
@@ -456,7 +429,6 @@ Additional Configurations
   strongly recommend downloading the latest version at:
 
   http://sourceforge.net/projects/gkernel.
-  
 
   Enabling Wake on LAN* (WoL)
   ---------------------------
@@ -477,7 +449,6 @@ Additional Configurations
   Wake On LAN is not supported for the Intel(R) Gigabit VT Quad Port Server 
   Adapter.
 
-
   Multiqueue
   ----------
   In this mode, a separate MSI-X vector is allocated for each queue and one
@@ -493,8 +464,6 @@ Additional Configurations
   This driver supports receive multiqueue on all kernels that support MSI-X.
   NOTE: Do not use MSI-X with the 2.6.19 or 2.6.20 kernels.
 
-
-
   LRO
   ---
   Large Receive Offload (LRO) is a technique for increasing inbound throughput
@@ -505,10 +474,7 @@ Additional Configurations
   Ethernet frames into a single receive in the stack, thereby potentially 
   decreasing CPU utilization for receives.
 
-  NOTE: LRO requires 2.6.24 or later kernel version. You also need to have
-  inet_lro enabled via either the CONFIG_INET_LRO or CONFIG_INET_LRO_MODULE 
-  kernel config option. Additionally, if CONFIG_INET_LRO_MODULE is used, the
-  inet_lro module needs to be loaded before the igb driver.
+  NOTE: LRO requires 2.4.22 or later kernel version.
 
   IGB_LRO is a compile time flag. The user can enable it at compile 
   time to add support for LRO from the driver. The flag is used by adding 
@@ -521,8 +487,8 @@ Additional Configurations
 
   lro_aggregated - count of total packets that were combined
   lro_flushed - counts the number of packets flushed out of LRO
-  lro_no_desc - counts the number of times an LRO descriptor was not available 
-  for the LRO packet
+  lro_recycled - reflects the number of buffers returned to the ring from 
+  recycling
 
   NOTE: IPv6 and UDP are not supported by LRO.
   
@@ -661,7 +627,6 @@ Known Issues/Troubleshooting
   assigned to guests. VFs must first use the xm "pci-detach" command to 
   hot-plug the VF device out of the VM it is assigned to or else shut down the
   VM.
- 
 
 Support
 =======
@@ -677,8 +642,6 @@ or the Intel Wired Networking project hosted by Sourceforge at:
 If an issue is identified with the released source code on the supported
 kernel with a supported adapter, email the specific information related
 to the issue to igb-devel@lists.sf.net
-
-
 
 License
 =======
@@ -701,8 +664,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 The full GNU General Public License is included in this distribution in
 the file called "COPYING".
-
-
 
 Trademarks
 ==========

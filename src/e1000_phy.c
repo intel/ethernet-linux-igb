@@ -27,6 +27,7 @@
 
 #include "e1000_api.h"
 
+static s32 e1000_copper_link_autoneg(struct e1000_hw *hw);
 static s32 e1000_phy_setup_autoneg(struct e1000_hw *hw);
 /* Cable length tables */
 static const u16 e1000_m88_cable_length_table[] =
@@ -689,6 +690,49 @@ s32 e1000_write_kmrn_reg_locked(struct e1000_hw *hw, u32 offset, u16 data)
 }
 
 /**
+ *  e1000_copper_link_setup_82577 - Setup 82577 PHY for copper link
+ *  @hw: pointer to the HW structure
+ *
+ *  Sets up Carrier-sense on Transmit and downshift values.
+ **/
+s32 e1000_copper_link_setup_82577(struct e1000_hw *hw)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	s32 ret_val;
+	u16 phy_data;
+
+	DEBUGFUNC("e1000_copper_link_setup_82577");
+
+	if (phy->reset_disable) {
+		ret_val = E1000_SUCCESS;
+		goto out;
+	}
+
+	if (phy->type == e1000_phy_82580) {
+		ret_val = hw->phy.ops.reset(hw);
+		if (ret_val) {
+			DEBUGOUT("Error resetting the PHY.\n");
+			goto out;
+		}
+	}
+
+	/* Enable CRS on TX. This must be set for half-duplex operation. */
+	ret_val = phy->ops.read_reg(hw, I82577_CFG_REG, &phy_data);
+	if (ret_val)
+		goto out;
+
+	phy_data |= I82577_CFG_ASSERT_CRS_ON_TX;
+
+	/* Enable downshift */
+	phy_data |= I82577_CFG_ENABLE_DOWNSHIFT;
+
+	ret_val = phy->ops.write_reg(hw, I82577_CFG_REG, phy_data);
+
+out:
+	return ret_val;
+}
+
+/**
  *  e1000_copper_link_setup_m88 - Setup m88 PHY's for copper link
  *  @hw: pointer to the HW structure
  *
@@ -948,7 +992,7 @@ out:
  *  and restart the negotiation process between the link partner.  If
  *  autoneg_wait_to_complete, then wait for autoneg to complete before exiting.
  **/
-s32 e1000_copper_link_autoneg(struct e1000_hw *hw)
+static s32 e1000_copper_link_autoneg(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val;
@@ -2358,6 +2402,9 @@ enum e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id)
 	case IFE_C_E_PHY_ID:
 		phy_type = e1000_phy_ife;
 		break;
+	case I82580_I_PHY_ID:
+		phy_type = e1000_phy_82580;
+		break;
 	default:
 		phy_type = e1000_phy_unknown;
 		break;
@@ -2442,4 +2489,200 @@ void e1000_power_down_phy_copper(struct e1000_hw *hw)
 	mii_reg |= MII_CR_POWER_DOWN;
 	hw->phy.ops.write_reg(hw, PHY_CONTROL, mii_reg);
 	msec_delay(1);
+}
+
+/**
+ *  e1000_check_polarity_82577 - Checks the polarity.
+ *  @hw: pointer to the HW structure
+ *
+ *  Success returns 0, Failure returns -E1000_ERR_PHY (-2)
+ *
+ *  Polarity is determined based on the PHY specific status register.
+ **/
+s32 e1000_check_polarity_82577(struct e1000_hw *hw)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	s32 ret_val;
+	u16 data;
+
+	DEBUGFUNC("e1000_check_polarity_82577");
+
+	ret_val = phy->ops.read_reg(hw, I82577_PHY_STATUS_2, &data);
+
+	if (!ret_val)
+		phy->cable_polarity = (data & I82577_PHY_STATUS2_REV_POLARITY)
+		                      ? e1000_rev_polarity_reversed
+		                      : e1000_rev_polarity_normal;
+
+	return ret_val;
+}
+
+/**
+ *  e1000_phy_force_speed_duplex_82577 - Force speed/duplex for I82577 PHY
+ *  @hw: pointer to the HW structure
+ *
+ *  Calls the PHY setup function to force speed and duplex.  Clears the
+ *  auto-crossover to force MDI manually.  Waits for link and returns
+ *  successful if link up is successful, else -E1000_ERR_PHY (-2).
+ **/
+s32 e1000_phy_force_speed_duplex_82577(struct e1000_hw *hw)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	s32 ret_val;
+	u16 phy_data;
+	bool link;
+
+	DEBUGFUNC("e1000_phy_force_speed_duplex_82577");
+
+	ret_val = phy->ops.read_reg(hw, PHY_CONTROL, &phy_data);
+	if (ret_val)
+		goto out;
+
+	e1000_phy_force_speed_duplex_setup(hw, &phy_data);
+
+	ret_val = phy->ops.write_reg(hw, PHY_CONTROL, phy_data);
+	if (ret_val)
+		goto out;
+
+	/*
+	 * Clear Auto-Crossover to force MDI manually.  82577 requires MDI
+	 * forced whenever speed and duplex are forced.
+	 */
+	ret_val = phy->ops.read_reg(hw, I82577_PHY_CTRL_2, &phy_data);
+	if (ret_val)
+		goto out;
+
+	phy_data &= ~I82577_PHY_CTRL2_AUTO_MDIX;
+	phy_data &= ~I82577_PHY_CTRL2_FORCE_MDI_MDIX;
+
+	ret_val = phy->ops.write_reg(hw, I82577_PHY_CTRL_2, phy_data);
+	if (ret_val)
+		goto out;
+
+	DEBUGOUT1("I82577_PHY_CTRL_2: %X\n", phy_data);
+
+	usec_delay(1);
+
+	if (phy->autoneg_wait_to_complete) {
+		DEBUGOUT("Waiting for forced speed/duplex link on 82577 phy\n");
+
+		ret_val = e1000_phy_has_link_generic(hw,
+		                                     PHY_FORCE_LIMIT,
+		                                     100000,
+		                                     &link);
+		if (ret_val)
+			goto out;
+
+		if (!link)
+			DEBUGOUT("Link taking longer than expected.\n");
+
+		/* Try once more */
+		ret_val = e1000_phy_has_link_generic(hw,
+		                                     PHY_FORCE_LIMIT,
+		                                     100000,
+		                                     &link);
+		if (ret_val)
+			goto out;
+	}
+
+out:
+	return ret_val;
+}
+
+/**
+ *  e1000_get_phy_info_82577 - Retrieve I82577 PHY information
+ *  @hw: pointer to the HW structure
+ *
+ *  Read PHY status to determine if link is up.  If link is up, then
+ *  set/determine 10base-T extended distance and polarity correction.  Read
+ *  PHY port status to determine MDI/MDIx and speed.  Based on the speed,
+ *  determine on the cable length, local and remote receiver.
+ **/
+s32 e1000_get_phy_info_82577(struct e1000_hw *hw)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	s32 ret_val;
+	u16 data;
+	bool link;
+
+	DEBUGFUNC("e1000_get_phy_info_82577");
+
+	ret_val = e1000_phy_has_link_generic(hw, 1, 0, &link);
+	if (ret_val)
+		goto out;
+
+	if (!link) {
+		DEBUGOUT("Phy info is only valid if link is up\n");
+		ret_val = -E1000_ERR_CONFIG;
+		goto out;
+	}
+
+	phy->polarity_correction = true;
+
+	ret_val = e1000_check_polarity_82577(hw);
+	if (ret_val)
+		goto out;
+
+	ret_val = phy->ops.read_reg(hw, I82577_PHY_STATUS_2, &data);
+	if (ret_val)
+		goto out;
+
+	phy->is_mdix = (data & I82577_PHY_STATUS2_MDIX) ? true : false;
+
+	if ((data & I82577_PHY_STATUS2_SPEED_MASK) ==
+	    I82577_PHY_STATUS2_SPEED_1000MBPS) {
+		ret_val = hw->phy.ops.get_cable_length(hw);
+		if (ret_val)
+			goto out;
+
+		ret_val = phy->ops.read_reg(hw, PHY_1000T_STATUS, &data);
+		if (ret_val)
+			goto out;
+
+		phy->local_rx = (data & SR_1000T_LOCAL_RX_STATUS)
+		                ? e1000_1000t_rx_status_ok
+		                : e1000_1000t_rx_status_not_ok;
+
+		phy->remote_rx = (data & SR_1000T_REMOTE_RX_STATUS)
+		                 ? e1000_1000t_rx_status_ok
+		                 : e1000_1000t_rx_status_not_ok;
+	} else {
+		phy->cable_length = E1000_CABLE_LENGTH_UNDEFINED;
+		phy->local_rx = e1000_1000t_rx_status_undefined;
+		phy->remote_rx = e1000_1000t_rx_status_undefined;
+	}
+
+out:
+	return ret_val;
+}
+
+/**
+ *  e1000_get_cable_length_82577 - Determine cable length for 82577 PHY
+ *  @hw: pointer to the HW structure
+ *
+ * Reads the diagnostic status register and verifies result is valid before
+ * placing it in the phy_cable_length field.
+ **/
+s32 e1000_get_cable_length_82577(struct e1000_hw *hw)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	s32 ret_val;
+	u16 phy_data, length;
+
+	DEBUGFUNC("e1000_get_cable_length_82577");
+
+	ret_val = phy->ops.read_reg(hw, I82577_PHY_DIAG_STATUS, &phy_data);
+	if (ret_val)
+		goto out;
+
+	length = (phy_data & I82577_DSTATUS_CABLE_LENGTH) >>
+	         I82577_DSTATUS_CABLE_LENGTH_SHIFT;
+
+	if (length == E1000_CABLE_LENGTH_UNDEFINED)
+		ret_val = -E1000_ERR_PHY;
+
+	phy->cable_length = length;
+
+out:
+	return ret_val;
 }

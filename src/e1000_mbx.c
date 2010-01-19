@@ -261,10 +261,10 @@ out:
 }
 
 /**
- *  e1000_init_mbx_ops_generic - Initialize NVM function pointers
+ *  e1000_init_mbx_ops_generic - Initialize mbx function pointers
  *  @hw: pointer to the HW structure
  *
- *  Setups up the function pointers to no-op functions
+ *  Sets the function pointers to no-op functions
  **/
 void e1000_init_mbx_ops_generic(struct e1000_hw *hw)
 {

@@ -34,7 +34,6 @@ s32  e1000_check_polarity_m88(struct e1000_hw *hw);
 s32  e1000_check_polarity_igp(struct e1000_hw *hw);
 s32  e1000_check_polarity_ife(struct e1000_hw *hw);
 s32  e1000_check_reset_block_generic(struct e1000_hw *hw);
-s32  e1000_copper_link_autoneg(struct e1000_hw *hw);
 s32  e1000_copper_link_setup_igp(struct e1000_hw *hw);
 s32  e1000_copper_link_setup_m88(struct e1000_hw *hw);
 s32  e1000_phy_force_speed_duplex_igp(struct e1000_hw *hw);
@@ -75,6 +74,11 @@ s32  e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data);
 s32  e1000_write_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 data);
 s32  e1000_read_phy_reg_i2c(struct e1000_hw *hw, u32 offset, u16 *data);
 s32  e1000_write_phy_reg_i2c(struct e1000_hw *hw, u32 offset, u16 data);
+s32  e1000_copper_link_setup_82577(struct e1000_hw *hw);
+s32  e1000_check_polarity_82577(struct e1000_hw *hw);
+s32  e1000_get_phy_info_82577(struct e1000_hw *hw);
+s32  e1000_phy_force_speed_duplex_82577(struct e1000_hw *hw);
+s32  e1000_get_cable_length_82577(struct e1000_hw *hw);
 
 #define E1000_MAX_PHY_ADDR                4
 
@@ -90,6 +94,35 @@ s32  e1000_write_phy_reg_i2c(struct e1000_hw *hw, u32 offset, u16 data);
 #define BM_PHY_PAGE_SELECT                22   /* Page Select for BM */
 #define IGP_PAGE_SHIFT                    5
 #define PHY_REG_MASK                      0x1F
+
+#define HV_INTC_FC_PAGE_START             768
+#define I82578_ADDR_REG                   29
+#define I82577_ADDR_REG                   16
+#define I82577_CFG_REG                    22
+#define I82577_CFG_ASSERT_CRS_ON_TX       (1 << 15)
+#define I82577_CFG_ENABLE_DOWNSHIFT       (3 << 10) /* auto downshift 100/10 */
+#define I82577_CTRL_REG                   23
+
+/* 82577 specific PHY registers */
+#define I82577_PHY_CTRL_2            18
+#define I82577_PHY_LBK_CTRL          19
+#define I82577_PHY_STATUS_2          26
+#define I82577_PHY_DIAG_STATUS       31
+
+/* I82577 PHY Status 2 */
+#define I82577_PHY_STATUS2_REV_POLARITY   0x0400
+#define I82577_PHY_STATUS2_MDIX           0x0800
+#define I82577_PHY_STATUS2_SPEED_MASK     0x0300
+#define I82577_PHY_STATUS2_SPEED_1000MBPS 0x0200
+#define I82577_PHY_STATUS2_SPEED_100MBPS  0x0100
+
+/* I82577 PHY Control 2 */
+#define I82577_PHY_CTRL2_AUTO_MDIX        0x0400
+#define I82577_PHY_CTRL2_FORCE_MDI_MDIX   0x0200
+
+/* I82577 PHY Diagnostics Status */
+#define I82577_DSTATUS_CABLE_LENGTH       0x03FC
+#define I82577_DSTATUS_CABLE_LENGTH_SHIFT 2
 
 #define IGP01E1000_PHY_PCS_INIT_REG       0x00B4
 #define IGP01E1000_PHY_POLARITY_MASK      0x0078

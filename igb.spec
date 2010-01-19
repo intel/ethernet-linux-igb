@@ -1,6 +1,6 @@
 Name: igb
 Summary: Intel(R) Gigabit Ethernet Connection
-Version: 2.0.6
+Version: 2.1.9
 Release: 1
 Source: %{name}-%{version}.tar.gz
 Vendor: Intel Corporation
@@ -29,6 +29,7 @@ This package contains the Linux driver for the Intel(R) Gigabit Family of Server
 %setup
 
 %build
+%install
 mkdir -p %{buildroot}
 
 KV=$(uname -r)
@@ -111,7 +112,6 @@ else
 	fi
 fi
 
-%install
 # Append .new to driver name to avoid conflict with kernel RPM
 cd %{buildroot}
 find lib -name "igb.*o" -exec mv {} {}.new \; \

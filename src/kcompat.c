@@ -550,3 +550,16 @@ u16 _kc_skb_tx_hash(struct net_device *dev, struct sk_buff *skb)
 }
 #endif /* HAVE_NETDEV_SELECT_QUEUE */
 #endif /* < 2.6.30 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33) )
+struct sk_buff *_kc_netdev_alloc_skb_ip_align(struct net_device *dev,
+                                              unsigned int length)
+{
+	struct sk_buff *skb = netdev_alloc_skb(dev, length + NET_IP_ALIGN);
+
+	if (NET_IP_ALIGN && skb)
+		skb_reserve(skb, NET_IP_ALIGN);
+	return skb;
+}
+#endif /* < 2.6.33 */

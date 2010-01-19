@@ -36,6 +36,12 @@
 #define E1000_CTRL_EXT 0x00018  /* Extended Device Control - RW */
 #define E1000_FLA      0x0001C  /* Flash Access - RW */
 #define E1000_MDIC     0x00020  /* MDI Control - RW */
+#define E1000_MDICNFG  0x00E04  /* MDI Config - RW */
+#define E1000_REGISTER_SET_SIZE        0x20000 /* CSR Size */
+#define E1000_EEPROM_INIT_CTRL_WORD_2  0x0F /* EEPROM Init Ctrl Word 2 */
+#define E1000_BARCTRL                  0x5BBC /* BAR ctrl reg */
+#define E1000_BARCTRL_FLSIZE           0x0700 /* BAR ctrl Flsize */
+#define E1000_BARCTRL_CSRSIZE          0x2000 /* BAR ctrl CSR size */
 #define E1000_SCTL     0x00024  /* SerDes Control - RW */
 #define E1000_FCAL     0x00028  /* Flow Control Address Low - RW */
 #define E1000_FCAH     0x0002C  /* Flow Control Address High -RW */
@@ -110,6 +116,7 @@
 #define E1000_RDPUCTL  0x025DC  /* DMA Rx Descriptor uC Control - RW */
 #define E1000_PBDIAG   0x02458  /* Packet Buffer Diagnostic - RW */
 #define E1000_RXPBS    0x02404  /* Rx Packet Buffer Size - RW */
+#define E1000_IRPBS 0x02404 /* Same as RXPBS, renamed for newer adapters - RW */
 #define E1000_RDTR     0x02820  /* Rx Delay Timer - RW */
 #define E1000_RADV     0x0282C  /* Rx Interrupt Absolute Delay Timer - RW */
 /*
@@ -177,6 +184,7 @@
 #define E1000_PBSLAC   0x03100  /* Packet Buffer Slave Access Control */
 #define E1000_PBSLAD(_n)  (0x03110 + (0x4 * (_n)))  /* Packet Buffer DWORD (_n) */
 #define E1000_TXPBS    0x03404  /* Tx Packet Buffer Size - RW */
+#define E1000_ITPBS   0x03404   /* Same as TXPBS, renamed for newer adpaters - RW */
 #define E1000_TDFH     0x03410  /* Tx Data FIFO Head - RW */
 #define E1000_TDFT     0x03418  /* Tx Data FIFO Tail - RW */
 #define E1000_TDFHS    0x03420  /* Tx Data FIFO Head Saved - RW */
@@ -382,6 +390,7 @@
 #define E1000_SWSM2     0x05B58 /* Driver-only SW semaphore (not used by BOOT agents) */
 #define E1000_DCA_ID    0x05B70 /* DCA Requester ID Information - RO */
 #define E1000_DCA_CTRL  0x05B74 /* DCA Control - RW */
+#define E1000_UFUSE     0x05B78 /* UFUSE - RO */
 #define E1000_FFLT_DBG  0x05F04 /* Debug Register */
 #define E1000_HICR      0x08F00 /* Host Interface Control */
 
@@ -427,6 +436,7 @@
 #define E1000_VMOLR(_n)        (0x05AD0 + (4 * (_n)))
 #define E1000_VLVF(_n)         (0x05D00 + (4 * (_n))) /* VLAN Virtual Machine
                                                        * Filter - RW */
+#define E1000_VMVIR(_n)        (0x03700 + (4 * (_n)))
 /* Time Sync */
 #define E1000_TSYNCRXCTL 0x0B620 /* Rx Time Sync Control register - RW */
 #define E1000_TSYNCTXCTL 0x0B614 /* Tx Time Sync Control register - RW */
@@ -440,6 +450,8 @@
 #define E1000_SYSTIML    0x0B600 /* System time register Low - RO */
 #define E1000_SYSTIMH    0x0B604 /* System time register High - RO */
 #define E1000_TIMINCA    0x0B608 /* Increment attributes register - RW */
+#define E1000_TSAUXC     0x0B640 /* Timesync Auxiliary Control register */
+#define E1000_SYSTIMR    0x0B6F8 /* System time register Residue */
 
 /* Filtering Registers */
 #define E1000_SAQF(_n)  (0x05980 + (4 * (_n))) /* Source Address Queue Fltr */
@@ -481,4 +493,15 @@
 #define E1000_RTTBCNACH         0x0B214 /* Tx BCN Control High */
 #define E1000_RTTBCNACL         0x0B210 /* Tx BCN Control Low */
 
+/* DMA Coalescing registers */
+#define E1000_DMACR             0x02508 /* Control Register */
+#define E1000_DMCTXTH           0x03550 /* Transmit Threshold */
+#define E1000_DMCTLX            0x02514 /* Time to Lx Request */
+#define E1000_DMCRTRH           0x05DD0 /* Receive Packet Rate Threshold */
+#define E1000_DMCCNT            0x05DD4 /* Current RX Count */
+#define E1000_FCRTC             0x02170 /* Flow Control Rx high watermark */
+#define E1000_PCIEMISC          0x05BB8 /* PCIE misc config register */
+
+/* PCIe Parity Status Register */
+#define E1000_PCIEERRSTS        0x05BA8
 #endif

@@ -24,7 +24,18 @@
 		8086 a02b  Gigabit ET Quad Port Server Adapter
 		8086 a02c  Gigabit ET Quad Port Server Adapter
 	150a  82576NS Gigabit Network Connection
+#ifdef SUMMERLAND_KEY_HW
 	150d  82576 Gigabit Backplane Connection
 		8086 a10c  Gigabit ET Quad Port Mezzanine Card
+#endif
+	150e  82580 Gigabit Network Connection
+		8086 12a1  Ethernet Server Adapter I340-T4
+		8086 12a2  Ethernet Server Adapter I340-T4
+	150f  82580 Gigabit Fiber Network Connection
+	1510  82580 Gigabit Backplane Connection
+	1511  82580 Gigabit SFP Connection
+	1516  82580 Gigabit Network Connection
+		8086 12b1  Ethernet Server Adapter I340-T2
+		8086 12b2  Ethernet Server Adapter I340-T2
 	1518  82576NS SerDes Gigabit Network Connection
 
