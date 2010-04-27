@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2009 Intel Corporation.
+  Copyright(c) 2007-2010 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -42,8 +42,8 @@
  * For 82576, there are an additional set of RARs that begin at an offset
  * separate from the first set of RARs.
  */
-#define E1000_RAR_ENTRIES_82575   16
-#define E1000_RAR_ENTRIES_82576   24
+#define E1000_RAR_ENTRIES_82575        16
+#define E1000_RAR_ENTRIES_82576        24
 #define E1000_RAR_ENTRIES_82580        24
 #define E1000_SW_SYNCH_MB              0x00000100
 #define E1000_STAT_DEV_RST_SET         0x00100000
@@ -416,6 +416,7 @@ struct e1000_adv_tx_context_desc {
 #define E1000_VMOLR_STRVLAN    0x40000000 /* Vlan stripping enable */
 #define E1000_VMOLR_STRCRC     0x80000000 /* CRC stripping enable */
 
+
 #define E1000_VLVF_ARRAY_SIZE     32
 #define E1000_VLVF_VLANID_MASK    0x00000FFF
 #define E1000_VLVF_POOLSEL_SHIFT  12
@@ -433,6 +434,9 @@ struct e1000_adv_tx_context_desc {
 
 #define E1000_RPLOLR_STRVLAN   0x40000000
 #define E1000_RPLOLR_STRCRC    0x80000000
+
+#define E1000_TCTL_EXT_COLD       0x000FFC00
+#define E1000_TCTL_EXT_COLD_SHIFT 10
 
 #define E1000_DTXCTL_8023LL     0x0004
 #define E1000_DTXCTL_VLAN_ADDED 0x0008

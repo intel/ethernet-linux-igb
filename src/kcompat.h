@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2009 Intel Corporation.
+  Copyright(c) 2007-2010 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -199,6 +199,10 @@ struct msix_entry {
 #define NETIF_F_SCTP_CSUM 0
 #endif
 
+#ifndef NETIF_F_LRO
+#define NETIF_F_LRO 0
+#endif
+
 #ifndef IPPROTO_SCTP
 #define IPPROTO_SCTP 132
 #endif
@@ -286,6 +290,14 @@ enum {
 
 #ifndef VLAN_ETH_FRAME_LEN
 #define VLAN_ETH_FRAME_LEN 1518
+#endif
+
+#if !defined(IXGBE_DCA) && !defined(IGB_DCA)
+#define dca_get_tag(b) 0
+#define dca_add_requester(a) -1
+#define dca_remove_requester(b) do { } while(0) 
+#define DCA_PROVIDER_ADD     0x0001
+#define DCA_PROVIDER_REMOVE  0x0002
 #endif
 
 #ifndef DCA_GET_TAG_TWO_ARGS
@@ -1050,6 +1062,8 @@ static inline void _kc_synchronize_irq(void)
 /*****************************************************************************/
 /* 2.6.0 => 2.5.28 */
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0) )
+#define get_cpu() 0
+#define put_cpu()
 #define MODULE_INFO(version, _version)
 #ifndef CONFIG_E1000_DISABLE_PACKET_SPLIT
 #define CONFIG_E1000_DISABLE_PACKET_SPLIT 1
@@ -1551,6 +1565,10 @@ do { \
 #define skb_network_offset(skb) (skb->nh.raw - skb->data)
 #define skb_network_header(skb) (skb->nh.raw)
 #define skb_tail_pointer(skb) skb->tail
+#define skb_reset_tail_pointer(skb) \
+	do { \
+		skb->tail = skb->data; \
+	} while (0)
 #define skb_copy_to_linear_data_offset(skb, offset, from, len) \
                                  memcpy(skb->data + offset, from, len)
 #define skb_network_header_len(skb) (skb->h.raw - skb->nh.raw)
@@ -1673,6 +1691,14 @@ extern struct net_device *napi_to_poll_dev(struct napi_struct *napi);
 #define dev_get_by_name(_a, _b) dev_get_by_name(_b)
 #define __netif_subqueue_stopped(_a, _b) netif_subqueue_stopped(_a, _b)
 #define DMA_BIT_MASK(n)	(((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
+
+#ifdef NETIF_F_TSO6
+#define skb_is_gso_v6 _kc_skb_is_gso_v6
+static inline int _kc_skb_is_gso_v6(const struct sk_buff *skb)
+{
+	return skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6;
+}
+#endif /* NETIF_F_TSO6 */
 #else /* < 2.6.24 */
 #define HAVE_ETHTOOL_GET_SSET_COUNT
 #define HAVE_NETDEV_NAPI_LIST
@@ -1710,12 +1736,19 @@ extern struct net_device *napi_to_poll_dev(struct napi_struct *napi);
 
 #define pci_enable_device_mem(pdev) pci_enable_device(pdev)
 
+#ifndef DEFINE_PCI_DEVICE_TABLE
+#define DEFINE_PCI_DEVICE_TABLE(_table) struct pci_device_id _table[]
+#endif /* DEFINE_PCI_DEVICE_TABLE */
+
 #endif /* < 2.6.25 */
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26) )
 #undef kzalloc_node
 #define kzalloc_node(_size, _flags, _node) kzalloc(_size, _flags)
+
+extern void _kc_pci_disable_link_state(struct pci_dev *dev, int state);
+#define pci_disable_link_state(p, s) _kc_pci_disable_link_state(p, s)
 #else /* < 2.6.26 */
 #include <linux/pci-aspm.h>
 #define HAVE_NETDEV_VLAN_FEATURES
@@ -1812,11 +1845,12 @@ extern int _kc_pci_prepare_to_sleep(struct pci_dev *dev);
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29) )
 #define pci_request_selected_regions_exclusive(pdev, bars, name) \
 		pci_request_selected_regions(pdev, bars, name)
-extern void _kc_pci_disable_link_state(struct pci_dev *dev, int state);
-#define pci_disable_link_state(p, s) _kc_pci_disable_link_state(p, s)
 #ifndef CONFIG_NR_CPUS
 #define CONFIG_NR_CPUS 1
 #endif /* CONFIG_NR_CPUS */
+#ifndef pcie_aspm_enabled
+#define pcie_aspm_enabled()   (1)
+#endif /* pcie_aspm_enabled */
 #else /* < 2.6.29 */
 #ifdef CONFIG_DCB
 #define HAVE_PFC_MODE_ENABLE
@@ -1832,6 +1866,12 @@ extern void _kc_pci_disable_link_state(struct pci_dev *dev, int state);
 extern u16 _kc_skb_tx_hash(struct net_device *dev, struct sk_buff *skb);
 #define skb_tx_hash(n, s) _kc_skb_tx_hash(n, s)
 #define skb_record_rx_queue(a, b) do {} while (0)
+#ifndef CONFIG_PCI_IOV
+#undef pci_enable_sriov
+#define pci_enable_sriov(a, b) -ENOTSUPP
+#undef pci_disable_sriov
+#define pci_disable_sriov(a) do {} while (0)
+#endif /* CONFIG_PCI_IOV */
 #else
 #define HAVE_ASPM_QUIRKS
 #endif /* < 2.6.30 */
@@ -1845,6 +1885,9 @@ extern u16 _kc_skb_tx_hash(struct net_device *dev, struct sk_buff *skb);
 #endif
 #ifndef HAVE_NETDEV_HW_ADDR
 #define HAVE_NETDEV_HW_ADDR
+#endif
+#ifndef HAVE_TRANS_START_IN_QUEUE
+#define HAVE_TRANS_START_IN_QUEUE
 #endif
 #endif /* < 2.6.31 */
 
@@ -1885,4 +1928,18 @@ extern struct sk_buff *_kc_netdev_alloc_skb_ip_align(struct net_device *dev,
 #endif /* CONFIG_FCOE || CONFIG_FCOE_MODULE */
 #define HAVE_ETHTOOL_SFP_DISPLAY_PORT
 #endif /* < 2.6.33 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,34) )
+#ifndef netdev_mc_count
+#define netdev_mc_count(dev) ((dev)->mc_count)
+#endif
+#ifndef netdev_mc_empty
+#define netdev_mc_empty(dev) (netdev_mc_count(dev) == 0)
+#endif
+#ifndef netdev_for_each_mc_addr
+#define netdev_for_each_mc_addr(mclist, dev) \
+	for (mclist = dev->mc_list; mclist; mclist = mclist->next)
+#endif
+#endif /* < 2.6.34 */
 #endif /* _KCOMPAT_H_ */

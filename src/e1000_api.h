@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2009 Intel Corporation.
+  Copyright(c) 2007-2010 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -33,6 +33,7 @@
 extern void    e1000_init_function_pointers_82575(struct e1000_hw *hw);
 extern void    e1000_rx_fifo_flush_82575(struct e1000_hw *hw);
 extern void    e1000_init_function_pointers_vf(struct e1000_hw *hw);
+extern void    e1000_power_up_fiber_serdes_link(struct e1000_hw *hw);
 extern void    e1000_shutdown_fiber_serdes_link(struct e1000_hw *hw);
 
 s32  e1000_set_mac_type(struct e1000_hw *hw);
@@ -54,7 +55,6 @@ s32  e1000_get_speed_and_duplex(struct e1000_hw *hw, u16 *speed,
 s32  e1000_disable_pcie_master(struct e1000_hw *hw);
 void e1000_config_collision_dist(struct e1000_hw *hw);
 void e1000_rar_set(struct e1000_hw *hw, u8 *addr, u32 index);
-void e1000_mta_set(struct e1000_hw *hw, u32 hash_value);
 u32  e1000_hash_mc_addr(struct e1000_hw *hw, u8 *mc_addr);
 void e1000_update_mc_addr_list(struct e1000_hw *hw,
                                u8 *mc_addr_list, u32 mc_addr_count);

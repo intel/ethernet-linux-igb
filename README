@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Network Connection
 ==================================================
 
-November 11, 2009
+January 4, 2010
 
 Contents
 ========
@@ -25,10 +25,6 @@ not supplying patches against the kernel source to allow for static linking
 of the driver.  For questions related to hardware requirements, refer to the
 documentation supplied with your Intel Gigabit adapter.  All hardware
 requirements listed apply to use with Linux.
-
-This release includes support for Intel(R) I/O Acceleration Technology,
-Intel(R) I/OAT.  You can find additional information on Intel I/OAT at 
-http://www.intel.com/technology/ioacceleration/index.htm.
 
 The following features are now available in supported kernels:
  - Native VLANs
@@ -138,23 +134,7 @@ for the ethX igb device, then this workaround may be necessary.
 To build igb driver with DCA:
 ------------------------------
  
-This example assumes the ioatdma and igb sources are in /usr/src
- 
-1. # unpack the ioatdma source, build and install
-
-     cd /usr/src
-     tar zxf ioatdma-<ioat version>.tar.gz
-     cd ioatdma-<ioat version>
-     make
-     make install
- 
-2. # unpack with igb driver, build with DCA support and install
-     
-     cd /usr/src
-     tar zxf igb-<igb version>.tar.gz
-     cd igb-<igb-version>/src
-     make CFLAGS_EXTRA="-DIGB_DCA -I/usr/src/ioatdma-<ioat version>/include"
-     make install
+If your kernel supports DCA, the driver will build by default with DCA enabled.
 
 Command Line Parameters
 =======================

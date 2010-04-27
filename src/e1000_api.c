@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2009 Intel Corporation.
+  Copyright(c) 2007-2010 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -611,20 +611,6 @@ s32 e1000_validate_mdi_setting(struct e1000_hw *hw)
 }
 
 /**
- *  e1000_mta_set - Sets multicast table bit
- *  @hw: pointer to the HW structure
- *  @hash_value: Multicast hash value.
- *
- *  This sets the bit in the multicast table corresponding to the
- *  hash value.  This is a function pointer entry point called by drivers.
- **/
-void e1000_mta_set(struct e1000_hw *hw, u32 hash_value)
-{
-	if (hw->mac.ops.mta_set)
-		hw->mac.ops.mta_set(hw, hash_value);
-}
-
-/**
  *  e1000_hash_mc_addr - Determines address location in multicast table
  *  @hw: pointer to the HW structure
  *  @mc_addr: Multicast address to hash.
@@ -1088,6 +1074,18 @@ void e1000_power_down_phy(struct e1000_hw *hw)
 {
 	if (hw->phy.ops.power_down)
 		hw->phy.ops.power_down(hw);
+}
+
+/**
+ *  e1000_power_up_fiber_serdes_link - Power up serdes link
+ *  @hw: pointer to the HW structure
+ *
+ *  Power on the optics and PCS.
+ **/
+void e1000_power_up_fiber_serdes_link(struct e1000_hw *hw)
+{
+	if (hw->mac.ops.power_up_serdes)
+		hw->mac.ops.power_up_serdes(hw);
 }
 
 /**

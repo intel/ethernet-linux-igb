@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2009 Intel Corporation.
+  Copyright(c) 2007-2010 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -244,6 +244,24 @@ static int igb_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 
 	clear_bit(__IGB_RESETTING, &adapter->state);
 	return 0;
+}
+
+static u32 igb_get_link(struct net_device *netdev)
+{
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_mac_info *mac = &adapter->hw.mac;
+
+	/*
+	 * If the link is not reported up to netdev, interrupts are disabled,
+	 * and so the physical link state may have changed since we last
+	 * looked. Set get_link_status to make sure that the true link
+	 * state is interrogated, rather than pulling a cached and possibly
+	 * stale link state from the driver.
+	 */
+	if (!netif_carrier_ok(netdev))
+		mac->get_link_status = 1;
+
+	return igb_has_link(adapter);
 }
 
 static void igb_get_pauseparam(struct net_device *netdev,
@@ -819,7 +837,7 @@ static int igb_set_ringparam(struct net_device *netdev,
 		for (i = 0; i < adapter->num_tx_queues; i++)
 			adapter->tx_ring[i]->count = new_tx_count;
 		for (i = 0; i < adapter->num_rx_queues; i++)
-			adapter->rx_ring[i]->count = new_tx_count;
+			adapter->rx_ring[i]->count = new_rx_count;
 		adapter->tx_ring_count = new_tx_count;
 		adapter->rx_ring_count = new_rx_count;
 		goto clear_reset;
@@ -911,7 +929,7 @@ static bool reg_pattern_test(struct igb_adapter *adapter, u64 *data,
 		{0x5A5A5A5A, 0xA5A5A5A5, 0x00000000, 0xFFFFFFFF};
 	for (pat = 0; pat < ARRAY_SIZE(_test); pat++) {
 		E1000_WRITE_REG(hw, reg, (_test[pat] & write));
-		val = E1000_READ_REG(hw, reg);
+		val = E1000_READ_REG(hw, reg) & mask;
 		if (val != (_test[pat] & write & mask)) {
 			DPRINTK(DRV, ERR, "pattern test reg %04X failed: got "
 			        "0x%08X expected 0x%08X\n",
@@ -1244,7 +1262,9 @@ static int igb_setup_desc_rings(struct igb_adapter *adapter)
 	rx_ring->count = IGB_DEFAULT_RXD;
 	rx_ring->pdev = adapter->pdev;
 	rx_ring->netdev = adapter->netdev;
-	rx_ring->rx_buffer_len = IGB_RXBUFFER_2048;
+#ifdef CONFIG_IGB_DISABLE_PACKET_SPLIT
+	rx_ring->rx_buffer_len = IGB_RXBUFFER_512;
+#endif
 	rx_ring->reg_idx = adapter->vfs_allocated_count;
 
 	if (igb_setup_rx_resources(rx_ring)) {
@@ -1294,7 +1314,7 @@ static int igb_integrated_phy_loopback(struct igb_adapter *adapter)
 		e1000_write_phy_reg(hw, PHY_CONTROL, 0x9140);
 		/* autoneg off */
 		e1000_write_phy_reg(hw, PHY_CONTROL, 0x8140);
-	} else if (hw->phy.type == e1000_phy_82580) {
+	} else if (hw->phy.type >= e1000_phy_82580) {
 		/* enable MII loopback */
 		e1000_write_phy_reg(hw, I82577_PHY_LBK_CTRL, 0x8041);
 	}
@@ -1419,19 +1439,19 @@ static int igb_check_lbtest_frame(struct sk_buff *skb, unsigned int frame_size)
 	return 13;
 }
 
-static int igb_clean_test_rings(struct igb_ring *rx_ring,
+static u16 igb_clean_test_rings(struct igb_ring *rx_ring,
                                 struct igb_ring *tx_ring,
                                 unsigned int size)
 {
 	union e1000_adv_rx_desc *rx_desc;
 	struct igb_buffer *buffer_info;
-	int rx_ntc, tx_ntc, count = 0;
+	u16 rx_ntc, tx_ntc, count = 0;
 	u32 staterr;
 
 	/* initialize next to clean and descriptor values */
 	rx_ntc = rx_ring->next_to_clean;
 	tx_ntc = tx_ring->next_to_clean;
-	rx_desc = E1000_RX_DESC_ADV(*rx_ring, rx_ntc);
+	rx_desc = E1000_RX_DESC_ADV(rx_ring, rx_ntc);
 	staterr = le32_to_cpu(rx_desc->wb.upper.status_error);
 
 	while (staterr & E1000_RXD_STAT_DD) {
@@ -1441,7 +1461,11 @@ static int igb_clean_test_rings(struct igb_ring *rx_ring,
 		/* unmap rx buffer, will be remapped by alloc_rx_buffers */
 		pci_unmap_single(rx_ring->pdev,
 		                 buffer_info->dma,
+#ifdef CONFIG_IGB_DISABLE_PACKET_SPLIT
 				 rx_ring->rx_buffer_len,
+#else
+		                 IGB_RXBUFFER_512,
+#endif
 				 PCI_DMA_FROMDEVICE);
 		buffer_info->dma = 0;
 
@@ -1462,7 +1486,7 @@ static int igb_clean_test_rings(struct igb_ring *rx_ring,
 			tx_ntc = 0;
 
 		/* fetch next descriptor */
-		rx_desc = E1000_RX_DESC_ADV(*rx_ring, rx_ntc);
+		rx_desc = E1000_RX_DESC_ADV(rx_ring, rx_ntc);
 		staterr = le32_to_cpu(rx_desc->wb.upper.status_error);
 	}
 
@@ -1478,8 +1502,9 @@ static int igb_run_loopback_test(struct igb_adapter *adapter)
 {
 	struct igb_ring *tx_ring = &adapter->test_tx_ring;
 	struct igb_ring *rx_ring = &adapter->test_rx_ring;
-	int i, j, lc, good_cnt, ret_val = 0;
-	unsigned int size = 1024;
+	int i, j, lc, good_cnt;
+	int ret_val = 0;
+	unsigned int size = IGB_RXBUFFER_512;
 	netdev_tx_t tx_ret_val;
 	struct sk_buff *skb;
 
@@ -1510,7 +1535,7 @@ static int igb_run_loopback_test(struct igb_adapter *adapter)
 		/* place 64 packets on the transmit queue*/
 		for (i = 0; i < 64; i++) {
 			skb_get(skb);
-			tx_ret_val = igb_xmit_frame_ring_adv(skb, tx_ring);
+			tx_ret_val = igb_xmit_frame_ring_adv(skb, tx_ring, false);
 			if (tx_ret_val == NETDEV_TX_OK)
 				good_cnt++;
 		}
@@ -1609,6 +1634,9 @@ static void igb_diag_test(struct net_device *netdev,
 
 		DPRINTK(HW, INFO, "offline testing starting\n");
 
+		/* power up link for link test */
+		igb_power_up_link(adapter);
+
 		/* Link test performed before hardware reset so autoneg doesn't
 		 * interfere with test result */
 		if (igb_link_test(adapter, &data[4]))
@@ -1632,6 +1660,8 @@ static void igb_diag_test(struct net_device *netdev,
 			eth_test->flags |= ETH_TEST_FL_FAILED;
 
 		igb_reset(adapter);
+		/* power up link for loopback test */
+		igb_power_up_link(adapter);
 		if (igb_loopback_test(adapter, &data[3]))
 			eth_test->flags |= ETH_TEST_FL_FAILED;
 
@@ -1650,9 +1680,13 @@ static void igb_diag_test(struct net_device *netdev,
 			dev_open(netdev);
 	} else {
 		DPRINTK(HW, INFO, "online testing starting\n");
-		/* Online tests */
-		if (igb_link_test(adapter, &data[4]))
-			eth_test->flags |= ETH_TEST_FL_FAILED;
+		/* PHY is powered down when interface is down */
+		if (!netif_carrier_ok(netdev)) {
+			data[4] = 0;
+		} else {
+			if (igb_link_test(adapter, &data[4]))
+				eth_test->flags |= ETH_TEST_FL_FAILED;
+		}
 
 		/* Online tests aren't run; pass by default */
 		data[0] = 0;
@@ -1756,7 +1790,6 @@ static int igb_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 	if (igb_wol_exclusion(adapter, wol) ||
 	    !device_can_wakeup(&adapter->pdev->dev))
 		return wol->wolopts ? -EOPNOTSUPP : 0;
-
 	/* these settings will always override what we currently have */
 	adapter->wol = 0;
 
@@ -1988,9 +2021,8 @@ static void igb_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 	}
 }
 
-#ifdef NETIF_F_LRO
-#ifdef ETHTOOL_GFLAGS
 #ifdef IGB_LRO
+#ifdef ETHTOOL_GFLAGS
 static int igb_set_flags(struct net_device *netdev, u32 data)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
@@ -2008,9 +2040,8 @@ static int igb_set_flags(struct net_device *netdev, u32 data)
 
 }
 
-#endif /* IGB_LRO */
 #endif /* ETHTOOL_GFLAGS */
-#endif /* NETIF_F_LRO */
+#endif /* IGB_LRO */
 static struct ethtool_ops igb_ethtool_ops = {
 	.get_settings           = igb_get_settings,
 	.set_settings           = igb_set_settings,
@@ -2022,7 +2053,7 @@ static struct ethtool_ops igb_ethtool_ops = {
 	.get_msglevel           = igb_get_msglevel,
 	.set_msglevel           = igb_set_msglevel,
 	.nway_reset             = igb_nway_reset,
-	.get_link               = ethtool_op_get_link,
+	.get_link               = igb_get_link,
 	.get_eeprom_len         = igb_get_eeprom_len,
 	.get_eeprom             = igb_get_eeprom,
 	.set_eeprom             = igb_set_eeprom,

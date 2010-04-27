@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2009 Intel Corporation.
+  Copyright(c) 2007-2010 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -78,6 +78,9 @@ struct igb_adapter;
 
 /* Interrupt defines */
 #define IGB_START_ITR                    648 /* ~6000 ints/sec */
+#define IGB_4K_ITR                       980
+#define IGB_20K_ITR                      196
+#define IGB_70K_ITR                       56
 
 /* Interrupt modes, as used by the IntMode paramter */
 #define IGB_INT_MODE_LEGACY                0
@@ -97,7 +100,7 @@ struct igb_adapter;
 #define IGB_MAX_ITR_USECS               8191 /* 120  irq/sec */
 
 #define NON_Q_VECTORS                      1
-#define MAX_Q_VECTORS                      8
+#define MAX_Q_VECTORS                     10 
 
 /* Transmit and receive queues */
 #define IGB_MAX_RX_QUEUES                 16
@@ -137,7 +140,7 @@ struct vf_data_storage {
  *           descriptors until either it has this many to write back, or the
  *           ITR timer expires.
  */
-#define IGB_RX_PTHRESH                    (hw->mac.type <= e1000_82576 ? 16 : 8)
+#define IGB_RX_PTHRESH                     8
 #define IGB_RX_HTHRESH                     8
 #define IGB_RX_WTHRESH                     1
 #define IGB_TX_PTHRESH                     8
@@ -148,14 +151,17 @@ struct vf_data_storage {
 /* this is the size past which hardware will drop packets when setting LPE=0 */
 #define MAXIMUM_ETHERNET_VLAN_SIZE 1522
 
+/* NOTE: netdev_alloc_skb reserves 16 bytes, NET_IP_ALIGN means we
+ * reserve 2 more, and skb_shared_info adds an additional 384 more,
+ * this adds roughly 448 bytes of extra data meaning the smallest
+ * allocation we could have is 1K.
+ * i.e. RXBUFFER_512 --> size-1024 slab
+ */
 /* Supported Rx Buffer Sizes */
-#define IGB_RXBUFFER_64    64     /* Used for packet split */
-#define IGB_RXBUFFER_128   128    /* Used for packet split */
-#define IGB_RXBUFFER_1024  1024
-#define IGB_RXBUFFER_2048  2048
-#define IGB_RXBUFFER_4096  4096
-#define IGB_RXBUFFER_8192  8192
+#define IGB_RXBUFFER_512   512
 #define IGB_RXBUFFER_16384 16384
+#define IGB_RX_HDR_LEN     IGB_RXBUFFER_512
+
 
 /* Packet Buffer allocations */
 #define IGB_PBA_BYTES_SHIFT 0xA
@@ -228,16 +234,22 @@ struct igb_buffer {
 			unsigned long time_stamp;
 			u16 length;
 			u16 next_to_watch;
-			u16 mapped_as_page;
+			unsigned int bytecount;
+#ifdef NETIF_F_TSO
 			u16 gso_segs;
+#endif
+#ifdef SIOCSHWTSTAMP
+			union skb_shared_tx shtx;
+#endif
+			u8 mapped_as_page;
 		};
 
 #ifndef CONFIG_IGB_DISABLE_PACKET_SPLIT
 		/* RX */
 		struct {
-			unsigned long page_offset;
-			struct page *page;
 			dma_addr_t page_dma;
+			struct page *page;
+			u32 page_offset;
 		};
 #endif
 	};
@@ -280,39 +292,45 @@ struct igb_q_vector {
 };
 
 struct igb_ring {
-	struct igb_q_vector *q_vector; /* backlink to q_vector */
-	struct net_device *netdev;     /* back pointer to net_device */
-	struct pci_dev *pdev;          /* pci device for dma mapping */
-	dma_addr_t dma;                /* phys address of the ring */
-	void *desc;                    /* descriptor ring memory */
-	unsigned int size;             /* length of desc. ring in bytes */
-	u16 count;                     /* number of desc. in the ring */
-	u16 next_to_use;
-	u16 next_to_clean;
-	u8 queue_index;
-	u8 reg_idx;
-	void __iomem *head;
-	void __iomem *tail;
+	struct igb_q_vector *q_vector;  /* backlink to q_vector */
+	struct net_device *netdev;      /* back pointer to net_device */
+	struct pci_dev *pdev;           /* pci device for dma mapping */
 	struct igb_buffer *buffer_info; /* array of buffer info structs */
+	void *desc;                     /* descriptor ring memory */
+	dma_addr_t dma;                 /* phys address of the ring */
+	u16 count;                      /* number of desc. in the ring */
+	u8 queue_index;                 /* logical index of the ring*/
+	u8 reg_idx;                     /* physical index of the ring */
+	u32 flags;                      /* ring specific flags */
 
+	void __iomem *tail;             /* pointer to ring tail register */
+	void __iomem *head;             /* pointer to ring head register */
+
+	unsigned int size;              /* length of desc. ring in bytes */
+
+	u16 next_to_clean;
+
+	u16 itr;
 	unsigned int total_bytes;
 	unsigned int total_packets;
-
-	u32 flags;
 
 	union {
 		/* TX */
 		struct {
 			struct igb_tx_queue_stats tx_stats;
-			bool detect_tx_hung;
+			u8 detect_tx_hung;
 		};
 		/* RX */
 		struct {
 			struct igb_rx_queue_stats rx_stats;
-			u32 rx_buffer_len;
+#ifdef CONFIG_IGB_DISABLE_PACKET_SPLIT
+			u16 rx_buffer_len;
+#endif
 		};
 	};
-};
+
+	u16 next_to_use;
+} ____cacheline_internodealigned_in_smp;
 
 #define IGB_RING_FLAG_RX_CSUM        0x00000001 /* RX CSUM enabled */
 #define IGB_RING_FLAG_RX_SCTP_CSUM   0x00000002 /* SCTP CSUM offload enabled */
@@ -325,14 +343,14 @@ struct igb_ring {
 #define IGB_ADVTXD_DCMD (E1000_ADVTXD_DCMD_EOP | E1000_ADVTXD_DCMD_RS)
 
 #define E1000_RX_DESC_ADV(R, i)	    \
-	(&(((union e1000_adv_rx_desc *)((R).desc))[i]))
+	(&(((union e1000_adv_rx_desc *)((R)->desc))[i]))
 #define E1000_TX_DESC_ADV(R, i)	    \
-	(&(((union e1000_adv_tx_desc *)((R).desc))[i]))
+	(&(((union e1000_adv_tx_desc *)((R)->desc))[i]))
 #define E1000_TX_CTXTDESC_ADV(R, i)	    \
-	(&(((struct e1000_adv_tx_context_desc *)((R).desc))[i]))
+	(&(((struct e1000_adv_tx_context_desc *)((R)->desc))[i]))
 
 /* igb_desc_unused - calculate if we have unused descriptors */
-static inline int igb_desc_unused(struct igb_ring *ring)
+static inline u16 igb_desc_unused(struct igb_ring *ring)
 {
 	if (ring->next_to_clean > ring->next_to_use)
 		return ring->next_to_clean - ring->next_to_use - 1;
@@ -355,8 +373,6 @@ struct igb_adapter {
 	/* Interrupt Throttle Rate */
 	u32 rx_itr_setting;
 	u32 tx_itr_setting;
-	u16 tx_itr;
-	u16 rx_itr;
 
 	struct work_struct reset_task;
 	struct work_struct watchdog_task;
@@ -369,7 +385,6 @@ struct igb_adapter {
 
 	/* TX */
 	struct igb_ring *tx_ring[IGB_MAX_TX_QUEUES];
-	unsigned long tx_queue_len;
 	u32 tx_timeout_count;
 
 	/* RX */
@@ -378,7 +393,6 @@ struct igb_adapter {
 	int num_rx_queues;
 
 	u32 max_frame_size;
-	u32 min_frame_size;
 
 	/* OS defined structs */
 	struct net_device *netdev;
@@ -422,9 +436,6 @@ struct igb_adapter {
 	u32 eeprom_wol;
 
 	u32 *config_space;
-#ifdef HAVE_TX_MQ
-	struct igb_ring *multi_tx_table[IGB_MAX_TX_QUEUES];
-#endif /* HAVE_TX_MQ */
 	u16 tx_ring_count;
 	u16 rx_ring_count;
 	struct vf_data_storage *vf_data;
@@ -469,13 +480,15 @@ extern void igb_configure_tx_ring(struct igb_adapter *, struct igb_ring *);
 extern void igb_configure_rx_ring(struct igb_adapter *, struct igb_ring *);
 extern void igb_setup_tctl(struct igb_adapter *);
 extern void igb_setup_rctl(struct igb_adapter *);
-extern netdev_tx_t igb_xmit_frame_ring_adv(struct sk_buff *, struct igb_ring *);
+extern netdev_tx_t igb_xmit_frame_ring_adv(struct sk_buff *, struct igb_ring *, bool);
 extern void igb_unmap_and_free_tx_resource(struct igb_ring *,
                                            struct igb_buffer *);
-extern void igb_alloc_rx_buffers_adv(struct igb_ring *, int);
+extern void igb_alloc_rx_buffers_adv(struct igb_ring *, u16);
 extern void igb_update_stats(struct igb_adapter *);
+extern bool igb_has_link(struct igb_adapter *adapter);
 extern void igb_set_ethtool_ops(struct net_device *);
 extern void igb_check_options(struct igb_adapter *);
+extern void igb_power_up_link(struct igb_adapter *);
 #ifdef ETHTOOL_OPS_COMPAT
 extern int ethtool_ioctl(struct ifreq *);
 #endif

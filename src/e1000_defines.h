@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2009 Intel Corporation.
+  Copyright(c) 2007-2010 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -269,6 +269,11 @@
 
 #define E1000_MANC_SMB_DATA_OUT_SHIFT  28 /* SMBus Data Out Shift */
 #define E1000_MANC_SMB_CLK_OUT_SHIFT   29 /* SMBus Clock Out Shift */
+
+#define E1000_MANC2H_PORT_623    0x00000020 /* Port 0x26f */
+#define E1000_MANC2H_PORT_664    0x00000040 /* Port 0x298 */
+#define E1000_MDEF_PORT_623      0x00000800 /* Port 0x26f */
+#define E1000_MDEF_PORT_664      0x00000400 /* Port 0x298 */
 
 /* Receive Control */
 #define E1000_RCTL_RST            0x00000001    /* Software reset */
@@ -883,6 +888,8 @@
 #define E1000_EICS_OTHER        E1000_EICR_OTHER   /* Interrupt Cause Active */
 
 #define E1000_EITR_ITR_INT_MASK 0x0000FFFF
+/* E1000_EITR_CNT_IGNR is only for 82576 and newer */
+#define E1000_EITR_CNT_IGNR	0x80000000 /* Don't reset counters on write */
 
 /* Transmit Descriptor Control */
 #define E1000_TXDCTL_PTHRESH 0x0000003F /* TXDCTL Prefetch Threshold */
@@ -1291,6 +1298,9 @@
 #define PCI_HEADER_TYPE_MULTIFUNC    0x80
 #define PCIE_LINK_WIDTH_MASK         0x3F0
 #define PCIE_LINK_WIDTH_SHIFT        4
+#define PCIE_LINK_SPEED_MASK         0x0F
+#define PCIE_LINK_SPEED_2500         0x01
+#define PCIE_LINK_SPEED_5000         0x02
 #define PCIE_DEVICE_CONTROL2_16ms    0x0005
 
 #ifndef ETH_ADDR_LEN
@@ -1317,7 +1327,7 @@
 #define IFE_E_PHY_ID         0x02A80330
 #define IFE_PLUS_E_PHY_ID    0x02A80320
 #define IFE_C_E_PHY_ID       0x02A80310
-#define I82580_I_PHY_ID 0x015403A0
+#define I82580_I_PHY_ID      0x015403A0
 #define IGP04E1000_E_PHY_ID  0x02A80391
 #define M88_VENDOR           0x0141
 
@@ -1413,6 +1423,7 @@
 #define M88E1000_EPSCR_TX_CLK_2_5     0x0060 /* 2.5 MHz TX_CLK */
 #define M88E1000_EPSCR_TX_CLK_25      0x0070 /* 25  MHz TX_CLK */
 #define M88E1000_EPSCR_TX_CLK_0       0x0000 /* NO  TX_CLK */
+
 
 /* M88EC018 Rev 2 specific DownShift settings */
 #define M88EC018_EPSCR_DOWNSHIFT_COUNTER_MASK  0x0E00
@@ -1570,5 +1581,6 @@
 #define E1000_FCRTC_RTH_COAL_SHIFT      4
 #define E1000_PCIEMISC_LX_DECISION      0x00000080 /* Lx power decision based
                                                       on DMA coal */
+
 
 #endif /* _E1000_DEFINES_H_ */

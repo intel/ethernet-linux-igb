@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2009 Intel Corporation.
+  Copyright(c) 2007-2010 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -132,9 +132,9 @@ IGB_PARAM(LLISize, "Low Latency Interrupt on Packet Size");
  */
 IGB_PARAM(RSS, "RSS - multiqueue receive count");
 
-#define DEFAULT_RSS       1
+#define DEFAULT_RSS       1 
 #define MAX_RSS          ((adapter->hw.mac.type == e1000_82575) ? 4 : 8)
-#define MIN_RSS           0 
+#define MIN_RSS           0
 
 /* VMDQ (Enable VMDq multiqueue receive)
  *
@@ -148,7 +148,6 @@ IGB_PARAM(VMDQ, "VMDQ - VMDq multiqueue receive");
 #define MAX_VMDQ          MAX_RSS
 #define MIN_VMDQ          0
 
-#ifdef CONFIG_PCI_IOV
 /* max_vfs (Enable SR-IOV VF devices)
  *
  * Valid Range: 0 - 7
@@ -161,7 +160,6 @@ IGB_PARAM(max_vfs, "max_vfs - SR-IOV VF devices");
 #define MAX_SRIOV         7
 #define MIN_SRIOV         0
 
-#endif /* CONFIG_PCI_IOV */
 
 /* QueuePairs (Enable TX/RX queue pairs for interrupt handling)
  *
@@ -416,7 +414,6 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 		}
 #endif
 	}
-#ifdef CONFIG_PCI_IOV
 	{ /* SRIOV - Enable SR-IOV VF devices */
 		struct igb_option opt = {
 			.type = range_option,
@@ -438,12 +435,17 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			adapter->vfs_allocated_count = opt.def;
 		}
 #endif
-		if (adapter->hw.mac.type != e1000_82576 && adapter->vfs_allocated_count) {
-			adapter->vfs_allocated_count = 0;
-			DPRINTK(PROBE, INFO, "SR-IOV option max_vfs only supported on 82576.\n");
+		if (adapter->vfs_allocated_count) {
+			switch (adapter->hw.mac.type) {
+			case e1000_82575:
+			case e1000_82580:
+				adapter->vfs_allocated_count = 0;
+				DPRINTK(PROBE, INFO, "SR-IOV option max_vfs not supported.\n");
+			default:
+				break;
+			}
 		}
 	}
-#endif /* CONFIG_PCI_IOV */
 	{ /* VMDQ - Enable VMDq multiqueue receive */
 		struct igb_option opt = {
 			.type = range_option,
@@ -534,7 +536,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			/*
 			 * we must enable queue pairs if the number of queues
 			 * exceeds the number of avaialble interrupts.  We are
-			 * limited to 10, or 3 per unallocated vf. 
+			 * limited to 10, or 3 per unallocated vf.
 			 */
 			if ((adapter->rss_queues > 4) ||
 			    (adapter->vmdq_pools > 4) ||
@@ -549,7 +551,6 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			}
 			igb_validate_option(&qp, &opt, adapter);
 			adapter->flags |= qp ? IGB_FLAG_QUEUE_PAIRS : 0;
-			    
 #ifdef module_param_array
 		} else {
 			adapter->flags |= opt.def ? IGB_FLAG_QUEUE_PAIRS : 0;

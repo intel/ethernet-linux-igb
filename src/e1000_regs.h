@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2009 Intel Corporation.
+  Copyright(c) 2007-2010 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -270,6 +270,17 @@
 #define E1000_ICRXDMTC 0x04120  /* Interrupt Cause Rx Desc Min Thresh Count */
 #define E1000_ICRXOC   0x04124  /* Interrupt Cause Receiver Overrun Count */
 
+/* Virtualization statistical counters */
+#define E1000_PFVFGPRC(_n)   (0x010010 + (0x100 * (_n)))
+#define E1000_PFVFGPTC(_n)   (0x010014 + (0x100 * (_n)))
+#define E1000_PFVFGORC(_n)   (0x010018 + (0x100 * (_n)))
+#define E1000_PFVFGOTC(_n)   (0x010034 + (0x100 * (_n)))
+#define E1000_PFVFMPRC(_n)   (0x010038 + (0x100 * (_n)))
+#define E1000_PFVFGPRLBC(_n) (0x010040 + (0x100 * (_n)))
+#define E1000_PFVFGPTLBC(_n) (0x010044 + (0x100 * (_n)))
+#define E1000_PFVFGORLBC(_n) (0x010048 + (0x100 * (_n)))
+#define E1000_PFVFGOTLBC(_n) (0x010050 + (0x100 * (_n)))
+
 #define E1000_LSECTXUT        0x04300  /* LinkSec Tx Untagged Packet Count - OutPktsUntagged */
 #define E1000_LSECTXPKTE      0x04304  /* LinkSec Encrypted Tx Packets Count - OutPktsEncrypted */
 #define E1000_LSECTXPKTP      0x04308  /* LinkSec Protected Tx Packet Count - OutPktsProtected */
@@ -374,6 +385,7 @@
 #define E1000_KMRNCTRLSTA 0x00034 /* MAC-PHY interface - RW */
 #define E1000_MDPHYA      0x0003C /* PHY address - RW */
 #define E1000_MANC2H      0x05860 /* Management Control To Host - RW */
+#define E1000_MDEF(_n)    (0x05890 + (4 * (_n))) /* Mngmt Decision Filters */
 #define E1000_SW_FW_SYNC  0x05B5C /* Software-Firmware Synchronization - RW */
 #define E1000_CCMCTL      0x05B48 /* CCM Control Register */
 #define E1000_GIOCTL      0x05B44 /* GIO Analog Control Register */
@@ -504,4 +516,6 @@
 
 /* PCIe Parity Status Register */
 #define E1000_PCIEERRSTS        0x05BA8
+
+
 #endif

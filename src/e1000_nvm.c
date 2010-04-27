@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2009 Intel Corporation.
+  Copyright(c) 2007-2010 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -580,7 +580,7 @@ out:
  **/
 s32 e1000_update_nvm_checksum_generic(struct e1000_hw *hw)
 {
-	s32  ret_val;
+	s32 ret_val;
 	u16 checksum = 0;
 	u16 i, nvm_data;
 
