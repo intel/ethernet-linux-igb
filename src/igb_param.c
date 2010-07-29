@@ -73,7 +73,8 @@
  *
  * Valid Range: 100-100000 (0=off, 1=dynamic, 3=dynamic conservative)
  */
-IGB_PARAM(InterruptThrottleRate, "Interrupt Throttling Rate");
+IGB_PARAM(InterruptThrottleRate,
+	  "Maximum interrupts per second, per vector, (max 100000), default 3=adaptive");
 #define DEFAULT_ITR                    3
 #define MAX_ITR                   100000
 #define MIN_ITR                      120
@@ -83,9 +84,11 @@ IGB_PARAM(InterruptThrottleRate, "Interrupt Throttling Rate");
  *
  * Default Value: 2 (MSI-X)
  */
-IGB_PARAM(IntMode, "Interrupt Mode");
+IGB_PARAM(IntMode, "Change Interrupt Mode (0=Legacy, 1=MSI, 2=MSI-X), default 2");
 #define MAX_INTMODE                    IGB_INT_MODE_MSIX
 #define MIN_INTMODE                    IGB_INT_MODE_LEGACY
+
+IGB_PARAM(Node, "set the starting node to allocate memory on, default -1");
 
 /* LLIPort (Low Latency Interrupt TCP Port)
  *
@@ -93,7 +96,7 @@ IGB_PARAM(IntMode, "Interrupt Mode");
  *
  * Default Value: 0 (disabled)
  */
-IGB_PARAM(LLIPort, "Low Latency Interrupt TCP Port");
+IGB_PARAM(LLIPort, "Low Latency Interrupt TCP Port (0-65535), default 0=off");
 
 #define DEFAULT_LLIPORT                0
 #define MAX_LLIPORT               0xFFFF
@@ -105,7 +108,7 @@ IGB_PARAM(LLIPort, "Low Latency Interrupt TCP Port");
  *
  * Default Value: 0 (disabled)
  */
-IGB_PARAM(LLIPush, "Low Latency Interrupt on TCP Push flag");
+IGB_PARAM(LLIPush, "Low Latency Interrupt on TCP Push flag (0,1), default 0=off");
 
 #define DEFAULT_LLIPUSH                0
 #define MAX_LLIPUSH                    1
@@ -117,12 +120,11 @@ IGB_PARAM(LLIPush, "Low Latency Interrupt on TCP Push flag");
  *
  * Default Value: 0 (disabled)
  */
-IGB_PARAM(LLISize, "Low Latency Interrupt on Packet Size");
+IGB_PARAM(LLISize, "Low Latency Interrupt on Packet Size (0-1500), default 0=off");
 
 #define DEFAULT_LLISIZE                0
 #define MAX_LLISIZE                 1500
 #define MIN_LLISIZE                    0
-
 
 /* RSS (Enable RSS multiqueue receive)
  *
@@ -130,9 +132,9 @@ IGB_PARAM(LLISize, "Low Latency Interrupt on Packet Size");
  *
  * Default Value:  1
  */
-IGB_PARAM(RSS, "RSS - multiqueue receive count");
+IGB_PARAM(RSS, "Number of Receive-Side Scaling Descriptor Queues (0-8), default 1=number of cpus");
 
-#define DEFAULT_RSS       1 
+#define DEFAULT_RSS       1
 #define MAX_RSS          ((adapter->hw.mac.type == e1000_82575) ? 4 : 8)
 #define MIN_RSS           0
 
@@ -142,7 +144,7 @@ IGB_PARAM(RSS, "RSS - multiqueue receive count");
  *
  * Default Value:  0
  */
-IGB_PARAM(VMDQ, "VMDQ - VMDq multiqueue receive");
+IGB_PARAM(VMDQ, "Number of Virtual Machine Device Queues: 0-1 = disable, 2-8 enable, default 0");
 
 #define DEFAULT_VMDQ      0
 #define MAX_VMDQ          MAX_RSS
@@ -154,7 +156,7 @@ IGB_PARAM(VMDQ, "VMDQ - VMDq multiqueue receive");
  *
  * Default Value:  0
  */
-IGB_PARAM(max_vfs, "max_vfs - SR-IOV VF devices");
+IGB_PARAM(max_vfs, "Number of Virtual Functions: 0 = disable, 1-7 enable, default 0");
 
 #define DEFAULT_SRIOV     0
 #define MAX_SRIOV         7
@@ -167,7 +169,8 @@ IGB_PARAM(max_vfs, "max_vfs - SR-IOV VF devices");
  *
  * Default Value:  1
  */
-IGB_PARAM(QueuePairs, "QueuePairs - TX/RX queue pairs for interrupt handling");
+IGB_PARAM(QueuePairs, "Enable TX/RX queue pairs for interrupt handling (0,1), default 1=on");
+
 
 #define DEFAULT_QUEUE_PAIRS           1
 #define MAX_QUEUE_PAIRS               1
@@ -254,6 +257,7 @@ static int __devinit igb_validate_option(unsigned int *value,
 void __devinit igb_check_options(struct igb_adapter *adapter)
 {
 	int bd = adapter->bd_number;
+	struct e1000_hw *hw = &adapter->hw;
 
 	if (bd >= IGB_MAX_NIC) {
 		DPRINTK(PROBE, NOTICE,
@@ -436,7 +440,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 		}
 #endif
 		if (adapter->vfs_allocated_count) {
-			switch (adapter->hw.mac.type) {
+			switch (hw->mac.type) {
 			case e1000_82575:
 			case e1000_82580:
 				adapter->vfs_allocated_count = 0;
@@ -449,7 +453,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 	{ /* VMDQ - Enable VMDq multiqueue receive */
 		struct igb_option opt = {
 			.type = range_option,
-			.name = "VMDQ - VMDq multiqueue receive count",
+			.name = "VMDQ - VMDq multiqueue queue count",
 			.err  = "using default of " __MODULE_STRING(DEFAULT_VMDQ),
 			.def  = DEFAULT_VMDQ,
 			.arg  = { .r = { .min = MIN_VMDQ,
@@ -458,7 +462,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 #ifdef module_param_array
 		if (num_VMDQ > bd) {
 #endif
-			adapter->vmdq_pools = VMDQ[bd];
+			adapter->vmdq_pools = (VMDQ[bd] == 1 ? 0 : VMDQ[bd]);
 			if (adapter->vfs_allocated_count && !adapter->vmdq_pools) {
 				DPRINTK(PROBE, INFO, "Enabling SR-IOV requires VMDq be set to at least 1\n");
 				adapter->vmdq_pools = 1;
@@ -468,7 +472,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 #ifdef module_param_array
 		} else {
 			if (!adapter->vfs_allocated_count)
-				adapter->vmdq_pools = opt.def;
+				adapter->vmdq_pools = (opt.def == 1 ? 0 : opt.def);
 			else
 				adapter->vmdq_pools = 1;
 		}
@@ -485,7 +489,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 		};
 
 		if (adapter->vmdq_pools) {
-			switch (adapter->hw.mac.type) {
+			switch (hw->mac.type) {
 			case e1000_82576:
 				opt.arg.r.max = 2;
 				break;
@@ -528,7 +532,6 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			.err  = "defaulting to Enabled",
 			.def  = OPTION_ENABLED
 		};
-
 #ifdef module_param_array
 		if (num_QueuePairs > bd) {
 #endif
@@ -556,6 +559,52 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			adapter->flags |= opt.def ? IGB_FLAG_QUEUE_PAIRS : 0;
 		}
 #endif
+	}
+	{ /* Node assignment */
+		static struct igb_option opt = {
+			.type = range_option,
+			.name = "Node to start on",
+			.err  = "defaulting to -1",
+#ifdef HAVE_EARLY_VMALLOC_NODE
+			.def  = 0,
+#else
+			.def  = -1,
+#endif
+			.arg  = { .r = { .min = 0,
+					 .max = (MAX_NUMNODES - 1)}}
+		};
+		int node_param = opt.def;
+
+		/* if the default was zero then we need to set the
+		 * default value to an online node, which is not
+		 * necessarily zero, and the constant initializer
+		 * above can't take first_online_node */
+		if (node_param == 0)
+			/* must set opt.def for validate */
+			opt.def = node_param = first_online_node;
+
+#ifdef module_param_array
+		if (num_Node > bd) {
+#endif
+			node_param = Node[bd];
+			igb_validate_option((uint *)&node_param, &opt, adapter);
+
+			if (node_param != OPTION_UNSET) {
+				DPRINTK(PROBE, INFO, "node set to %d\n", node_param);
+			}
+#ifdef module_param_array
+		}
+
+		/* check sanity of the value */
+		if (node_param != -1 && !node_online(node_param)) {
+			DPRINTK(PROBE, INFO,
+			        "ignoring node set to invalid value %d\n",
+			        node_param);
+			node_param = opt.def;
+		}
+
+#endif
+		adapter->node = node_param;
 	}
 }
 

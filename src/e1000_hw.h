@@ -38,6 +38,7 @@ struct e1000_hw;
 #define E1000_DEV_ID_82576_FIBER              0x10E6
 #define E1000_DEV_ID_82576_SERDES             0x10E7
 #define E1000_DEV_ID_82576_QUAD_COPPER        0x10E8
+#define E1000_DEV_ID_82576_QUAD_COPPER_ET2    0x1526
 #define E1000_DEV_ID_82576_NS                 0x150A
 #define E1000_DEV_ID_82576_NS_SERDES          0x1518
 #define E1000_DEV_ID_82576_SERDES_QUAD        0x150D
@@ -49,6 +50,7 @@ struct e1000_hw;
 #define E1000_DEV_ID_82580_SERDES             0x1510
 #define E1000_DEV_ID_82580_SGMII              0x1511
 #define E1000_DEV_ID_82580_COPPER_DUAL        0x1516
+#define E1000_DEV_ID_82580_QUAD_FIBER         0x1527
 #define E1000_REVISION_0 0
 #define E1000_REVISION_1 1
 #define E1000_REVISION_2 2
@@ -179,6 +181,16 @@ enum e1000_serdes_link_state {
 	e1000_serdes_link_forced_up
 };
 
+#ifndef __le16
+#define __le16 u16
+#endif
+#ifndef __le32
+#define __le32 u32
+#endif
+#ifndef __le64
+#define __le64 u64
+
+#endif /* EXTERNAL_RELEASE */
 /* Receive Descriptor */
 struct e1000_rx_desc {
 	__le64 buffer_addr; /* Address of the descriptor's data buffer */
@@ -666,7 +678,6 @@ struct e1000_dev_spec_vf {
 	u32	vf_number;
 	u32	v2p_mailbox;
 };
-
 
 struct e1000_hw {
 	void *back;

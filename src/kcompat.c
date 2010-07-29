@@ -29,6 +29,356 @@
 #include "kcompat.h"
 
 /*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,8) )
+/* From lib/vsprintf.c */
+#include <asm/div64.h>
+
+static int skip_atoi(const char **s)
+{
+	int i=0;
+
+	while (isdigit(**s))
+		i = i*10 + *((*s)++) - '0';
+	return i;
+}
+
+#define _kc_ZEROPAD	1		/* pad with zero */
+#define _kc_SIGN	2		/* unsigned/signed long */
+#define _kc_PLUS	4		/* show plus */
+#define _kc_SPACE	8		/* space if plus */
+#define _kc_LEFT	16		/* left justified */
+#define _kc_SPECIAL	32		/* 0x */
+#define _kc_LARGE	64		/* use 'ABCDEF' instead of 'abcdef' */
+
+static char * number(char * buf, char * end, long long num, int base, int size, int precision, int type)
+{
+	char c,sign,tmp[66];
+	const char *digits;
+	const char small_digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+	const char large_digits[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	int i;
+
+	digits = (type & _kc_LARGE) ? large_digits : small_digits;
+	if (type & _kc_LEFT)
+		type &= ~_kc_ZEROPAD;
+	if (base < 2 || base > 36)
+		return 0;
+	c = (type & _kc_ZEROPAD) ? '0' : ' ';
+	sign = 0;
+	if (type & _kc_SIGN) {
+		if (num < 0) {
+			sign = '-';
+			num = -num;
+			size--;
+		} else if (type & _kc_PLUS) {
+			sign = '+';
+			size--;
+		} else if (type & _kc_SPACE) {
+			sign = ' ';
+			size--;
+		}
+	}
+	if (type & _kc_SPECIAL) {
+		if (base == 16)
+			size -= 2;
+		else if (base == 8)
+			size--;
+	}
+	i = 0;
+	if (num == 0)
+		tmp[i++]='0';
+	else while (num != 0)
+		tmp[i++] = digits[do_div(num,base)];
+	if (i > precision)
+		precision = i;
+	size -= precision;
+	if (!(type&(_kc_ZEROPAD+_kc_LEFT))) {
+		while(size-->0) {
+			if (buf <= end)
+				*buf = ' ';
+			++buf;
+		}
+	}
+	if (sign) {
+		if (buf <= end)
+			*buf = sign;
+		++buf;
+	}
+	if (type & _kc_SPECIAL) {
+		if (base==8) {
+			if (buf <= end)
+				*buf = '0';
+			++buf;
+		} else if (base==16) {
+			if (buf <= end)
+				*buf = '0';
+			++buf;
+			if (buf <= end)
+				*buf = digits[33];
+			++buf;
+		}
+	}
+	if (!(type & _kc_LEFT)) {
+		while (size-- > 0) {
+			if (buf <= end)
+				*buf = c;
+			++buf;
+		}
+	}
+	while (i < precision--) {
+		if (buf <= end)
+			*buf = '0';
+		++buf;
+	}
+	while (i-- > 0) {
+		if (buf <= end)
+			*buf = tmp[i];
+		++buf;
+	}
+	while (size-- > 0) {
+		if (buf <= end)
+			*buf = ' ';
+		++buf;
+	}
+	return buf;
+}
+
+int _kc_vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
+{
+	int len;
+	unsigned long long num;
+	int i, base;
+	char *str, *end, c;
+	const char *s;
+
+	int flags;		/* flags to number() */
+
+	int field_width;	/* width of output field */
+	int precision;		/* min. # of digits for integers; max
+				   number of chars for from string */
+	int qualifier;		/* 'h', 'l', or 'L' for integer fields */
+				/* 'z' support added 23/7/1999 S.H.    */
+				/* 'z' changed to 'Z' --davidm 1/25/99 */
+
+	str = buf;
+	end = buf + size - 1;
+
+	if (end < buf - 1) {
+		end = ((void *) -1);
+		size = end - buf + 1;
+	}
+
+	for (; *fmt ; ++fmt) {
+		if (*fmt != '%') {
+			if (str <= end)
+				*str = *fmt;
+			++str;
+			continue;
+		}
+
+		/* process flags */
+		flags = 0;
+		repeat:
+			++fmt;		/* this also skips first '%' */
+			switch (*fmt) {
+				case '-': flags |= _kc_LEFT; goto repeat;
+				case '+': flags |= _kc_PLUS; goto repeat;
+				case ' ': flags |= _kc_SPACE; goto repeat;
+				case '#': flags |= _kc_SPECIAL; goto repeat;
+				case '0': flags |= _kc_ZEROPAD; goto repeat;
+			}
+
+		/* get field width */
+		field_width = -1;
+		if (isdigit(*fmt))
+			field_width = skip_atoi(&fmt);
+		else if (*fmt == '*') {
+			++fmt;
+			/* it's the next argument */
+			field_width = va_arg(args, int);
+			if (field_width < 0) {
+				field_width = -field_width;
+				flags |= _kc_LEFT;
+			}
+		}
+
+		/* get the precision */
+		precision = -1;
+		if (*fmt == '.') {
+			++fmt;	
+			if (isdigit(*fmt))
+				precision = skip_atoi(&fmt);
+			else if (*fmt == '*') {
+				++fmt;
+				/* it's the next argument */
+				precision = va_arg(args, int);
+			}
+			if (precision < 0)
+				precision = 0;
+		}
+
+		/* get the conversion qualifier */
+		qualifier = -1;
+		if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' || *fmt =='Z') {
+			qualifier = *fmt;
+			++fmt;
+		}
+
+		/* default base */
+		base = 10;
+
+		switch (*fmt) {
+			case 'c':
+				if (!(flags & _kc_LEFT)) {
+					while (--field_width > 0) {
+						if (str <= end)
+							*str = ' ';
+						++str;
+					}
+				}
+				c = (unsigned char) va_arg(args, int);
+				if (str <= end)
+					*str = c;
+				++str;
+				while (--field_width > 0) {
+					if (str <= end)
+						*str = ' ';
+					++str;
+				}
+				continue;
+
+			case 's':
+				s = va_arg(args, char *);
+				if (!s)
+					s = "<NULL>";
+
+				len = strnlen(s, precision);
+
+				if (!(flags & _kc_LEFT)) {
+					while (len < field_width--) {
+						if (str <= end)
+							*str = ' ';
+						++str;
+					}
+				}
+				for (i = 0; i < len; ++i) {
+					if (str <= end)
+						*str = *s;
+					++str; ++s;
+				}
+				while (len < field_width--) {
+					if (str <= end)
+						*str = ' ';
+					++str;
+				}
+				continue;
+
+			case 'p':
+				if (field_width == -1) {
+					field_width = 2*sizeof(void *);
+					flags |= _kc_ZEROPAD;
+				}
+				str = number(str, end,
+						(unsigned long) va_arg(args, void *),
+						16, field_width, precision, flags);
+				continue;
+
+
+			case 'n':
+				/* FIXME:
+				* What does C99 say about the overflow case here? */
+				if (qualifier == 'l') {
+					long * ip = va_arg(args, long *);
+					*ip = (str - buf);
+				} else if (qualifier == 'Z') {
+					size_t * ip = va_arg(args, size_t *);
+					*ip = (str - buf);
+				} else {
+					int * ip = va_arg(args, int *);
+					*ip = (str - buf);
+				}
+				continue;
+
+			case '%':
+				if (str <= end)
+					*str = '%';
+				++str;
+				continue;
+
+				/* integer number formats - set up the flags and "break" */
+			case 'o':
+				base = 8;
+				break;
+
+			case 'X':
+				flags |= _kc_LARGE;
+			case 'x':
+				base = 16;
+				break;
+
+			case 'd':
+			case 'i':
+				flags |= _kc_SIGN;
+			case 'u':
+				break;
+
+			default:
+				if (str <= end)
+					*str = '%';
+				++str;
+				if (*fmt) {
+					if (str <= end)
+						*str = *fmt;
+					++str;
+				} else {
+					--fmt;
+				}
+				continue;
+		}
+		if (qualifier == 'L')
+			num = va_arg(args, long long);
+		else if (qualifier == 'l') {
+			num = va_arg(args, unsigned long);
+			if (flags & _kc_SIGN)
+				num = (signed long) num;
+		} else if (qualifier == 'Z') {
+			num = va_arg(args, size_t);
+		} else if (qualifier == 'h') {
+			num = (unsigned short) va_arg(args, int);
+			if (flags & _kc_SIGN)
+				num = (signed short) num;
+		} else {
+			num = va_arg(args, unsigned int);
+			if (flags & _kc_SIGN)
+				num = (signed int) num;
+		}
+		str = number(str, end, num, base,
+				field_width, precision, flags);
+	}
+	if (str <= end)
+		*str = '\0';
+	else if (size > 0)
+		/* don't write out a null byte if the buf size is zero */
+		*end = '\0';
+	/* the trailing null byte doesn't count towards the total
+	* ++str;
+	*/
+	return str-buf;
+}
+
+int _kc_snprintf(char * buf, size_t size, const char *fmt, ...)
+{
+	va_list args;
+	int i;
+
+	va_start(args, fmt);
+	i = _kc_vsnprintf(buf,size,fmt,args);
+	va_end(args);
+	return i;
+}
+#endif /* < 2.4.8 */
+
+/*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,21) )
 struct sk_buff *
 _kc_skb_pad(struct sk_buff *skb, int pad)
@@ -265,6 +615,25 @@ found_middle:
 #endif /* 2.6.0 => 2.4.6 */
 
 /*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,4) )
+int _kc_scnprintf(char * buf, size_t size, const char *fmt, ...)
+{
+	va_list args;
+	int i;
+
+	va_start(args, fmt);
+	i = vsnprintf(buf, size, fmt, args);
+	va_end(args);
+	return (i >= size) ? (size - 1) : i;
+}
+#endif /* < 2.6.4 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10) )
+DECLARE_BITMAP(_kcompat_node_online_map, MAX_NUMNODES) = {1};
+#endif /* < 2.6.10 */
+
+/*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14) )
 void *_kc_kzalloc(size_t size, int flags)
 {
@@ -274,22 +643,6 @@ void *_kc_kzalloc(size_t size, int flags)
 	return ret;
 }
 #endif /* <= 2.6.13 */
-
-/*****************************************************************************/
-#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18) )
-struct sk_buff *_kc_netdev_alloc_skb(struct net_device *dev,
-                                     unsigned int length)
-{
-	/* 16 == NET_PAD_SKB */
-	struct sk_buff *skb;
-	skb = alloc_skb(length + 16, GFP_ATOMIC);
-	if (likely(skb != NULL)) {
-		skb_reserve(skb, 16);
-		skb->dev = dev;
-	}
-	return skb;
-}
-#endif /* <= 2.6.17 */
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19) )
@@ -374,6 +727,122 @@ void _kc_free_netdev(struct net_device *netdev)
 }
 #endif
 #endif /* <= 2.6.18 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22) )
+/* hexdump code taken from lib/hexdump.c */
+static void _kc_hex_dump_to_buffer(const void *buf, size_t len, int rowsize,
+			int groupsize, unsigned char *linebuf,
+			size_t linebuflen, bool ascii)
+{
+	const u8 *ptr = buf;
+	u8 ch;
+	int j, lx = 0;
+	int ascii_column;
+
+	if (rowsize != 16 && rowsize != 32)
+		rowsize = 16;
+
+	if (!len)
+		goto nil;
+	if (len > rowsize)		/* limit to one line at a time */
+		len = rowsize;
+	if ((len % groupsize) != 0)	/* no mixed size output */
+		groupsize = 1;
+
+	switch (groupsize) {
+	case 8: {
+		const u64 *ptr8 = buf;
+		int ngroups = len / groupsize;
+
+		for (j = 0; j < ngroups; j++)
+			lx += scnprintf((char *)(linebuf + lx), linebuflen - lx,
+				"%s%16.16llx", j ? " " : "",
+				(unsigned long long)*(ptr8 + j));
+		ascii_column = 17 * ngroups + 2;
+		break;
+	}
+
+	case 4: {
+		const u32 *ptr4 = buf;
+		int ngroups = len / groupsize;
+
+		for (j = 0; j < ngroups; j++)
+			lx += scnprintf((char *)(linebuf + lx), linebuflen - lx,
+				"%s%8.8x", j ? " " : "", *(ptr4 + j));
+		ascii_column = 9 * ngroups + 2;
+		break;
+	}
+
+	case 2: {
+		const u16 *ptr2 = buf;
+		int ngroups = len / groupsize;
+
+		for (j = 0; j < ngroups; j++)
+			lx += scnprintf((char *)(linebuf + lx), linebuflen - lx,
+				"%s%4.4x", j ? " " : "", *(ptr2 + j));
+		ascii_column = 5 * ngroups + 2;
+		break;
+	}
+
+	default:
+		for (j = 0; (j < len) && (lx + 3) <= linebuflen; j++) {
+			ch = ptr[j];
+			linebuf[lx++] = hex_asc(ch >> 4);
+			linebuf[lx++] = hex_asc(ch & 0x0f);
+			linebuf[lx++] = ' ';
+		}
+		if (j)
+			lx--;
+
+		ascii_column = 3 * rowsize + 2;
+		break;
+	}
+	if (!ascii)
+		goto nil;
+
+	while (lx < (linebuflen - 1) && lx < (ascii_column - 1))
+		linebuf[lx++] = ' ';
+	for (j = 0; (j < len) && (lx + 2) < linebuflen; j++)
+		linebuf[lx++] = (isascii(ptr[j]) && isprint(ptr[j])) ? ptr[j]
+				: '.';
+nil:
+	linebuf[lx++] = '\0';
+}
+
+void _kc_print_hex_dump(const char *level,
+			const char *prefix_str, int prefix_type,
+			int rowsize, int groupsize,
+			const void *buf, size_t len, bool ascii)
+{
+	const u8 *ptr = buf;
+	int i, linelen, remaining = len;
+	unsigned char linebuf[200];
+
+	if (rowsize != 16 && rowsize != 32)
+		rowsize = 16;
+
+	for (i = 0; i < len; i += rowsize) {
+		linelen = min(remaining, rowsize);
+		remaining -= rowsize;
+		_kc_hex_dump_to_buffer(ptr + i, linelen, rowsize, groupsize,
+				linebuf, sizeof(linebuf), ascii);
+
+		switch (prefix_type) {
+		case DUMP_PREFIX_ADDRESS:
+			printk("%s%s%*p: %s\n", level, prefix_str,
+				(int)(2 * sizeof(void *)), ptr + i, linebuf);
+			break;
+		case DUMP_PREFIX_OFFSET:
+			printk("%s%s%.8x: %s\n", level, prefix_str, i, linebuf);
+			break;
+		default:
+			printk("%s%s%s\n", level, prefix_str, linebuf);
+			break;
+		}
+	}
+}
+#endif /* < 2.6.22 */
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
@@ -556,14 +1025,18 @@ u16 _kc_skb_tx_hash(struct net_device *dev, struct sk_buff *skb)
 #endif /* < 2.6.30 */
 
 /*****************************************************************************/
-#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33) )
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33) ) || defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
 struct sk_buff *_kc_netdev_alloc_skb_ip_align(struct net_device *dev,
                                               unsigned int length)
 {
-	struct sk_buff *skb = netdev_alloc_skb(dev, length + NET_IP_ALIGN);
+	struct sk_buff *skb;
 
-	if (NET_IP_ALIGN && skb)
-		skb_reserve(skb, NET_IP_ALIGN);
+	skb = alloc_skb(length + NET_SKB_PAD + NET_IP_ALIGN, GFP_ATOMIC);
+	if (skb) {
+		if (NET_IP_ALIGN + NET_SKB_PAD)
+			skb_reserve(skb, NET_IP_ALIGN + NET_SKB_PAD);
+		skb->dev = dev;
+	}
 	return skb;
 }
-#endif /* < 2.6.33 */
+#endif /* < 2.6.33 || defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) */

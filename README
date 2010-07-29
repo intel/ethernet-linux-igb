@@ -338,7 +338,26 @@ separate vectors.
 
 This option can be overridden to 1 if there are not sufficient interrupts
 available.  This can occur if any combination of RSS, VMDQ, and max_vfs 
-results in more than 4 queues being used. 
+results in more than 4 queues being used.
+
+Node
+----
+Valid Range:   0-n
+Default Value: -1 (off)
+
+  0 - n: where n is the number of the NUMA node that should be used to 
+         allocate memory for this adapter port. 
+  -1: uses the driver default of allocating memory on whichever processor is
+      running insmod/modprobe. 
+
+  The Node parameter will allow you to pick which NUMA node you want to have 
+  the adapter allocate memory from.  All driver structures, in-memory queues, 
+  and receive buffers will be allocated on the node specified.  This parameter
+  is only useful when interrupt affinity is specified, otherwise some portion 
+  of the time the interrupt could run on a different core than the memory is 
+  allocated on, causing slower memory access and impacting throughput, CPU, or
+  both.
+ 
 
 Additional Configurations
 =========================
@@ -621,13 +640,13 @@ or the Intel Wired Networking project hosted by Sourceforge at:
 
 If an issue is identified with the released source code on the supported
 kernel with a supported adapter, email the specific information related
-to the issue to igb-devel@lists.sf.net
+to the issue to e1000-devel@lists.sf.net
 
 License
 =======
 
 Intel Gigabit Linux driver.
-Copyright(c) 1999 - 2008 Intel Corporation.
+Copyright(c) 1999 - 2010 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms and conditions of the GNU General Public License,

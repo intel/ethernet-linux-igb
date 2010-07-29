@@ -165,6 +165,17 @@ endif
 KVER := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(VERSION_FILE) | grep UTS_RELEASE | \
         awk '{ print $$3 }' | sed 's/\"//g')
 
+KVER_MINOR := $(shell echo $(KVER) | awk -F "." '{ print $$2 }')
+KVER_REVIS := $(shell echo $(KVER) | awk -F "." '{ print $$3 }' | sed 's/-.*//')
+KKVER_REVIS := $(shell [ $(KVER_REVIS) -lt 21 ] && echo 0)
+
+ifeq ($(KVER_MINOR), 4)
+  ifeq ($(KKVER_REVIS), 0)
+    $(error *** This driver is not supported on < 2.4.21 kernels, \
+            because this driver requires NAPI support.)
+  endif
+endif
+
 # assume source symlink is the same as build, otherwise adjust KOBJ
 ifneq (,$(wildcard /lib/modules/$(KVER)/build))
 ifneq ($(KSRC),$(shell readlink /lib/modules/$(KVER)/build))
