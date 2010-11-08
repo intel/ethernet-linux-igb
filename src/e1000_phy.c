@@ -181,7 +181,7 @@ s32 e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data)
 		goto out;
 	}
 	*data = (u16) mdic;
-
+	
 out:
 	return ret_val;
 }

@@ -189,8 +189,7 @@ enum e1000_serdes_link_state {
 #endif
 #ifndef __le64
 #define __le64 u64
-
-#endif /* EXTERNAL_RELEASE */
+#endif
 /* Receive Descriptor */
 struct e1000_rx_desc {
 	__le64 buffer_addr; /* Address of the descriptor's data buffer */

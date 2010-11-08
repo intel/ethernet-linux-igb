@@ -1,6 +1,6 @@
 Name: igb
 Summary: Intel(R) Gigabit Ethernet Connection
-Version: 2.3.4
+Version: 2.4.8
 Release: 1
 Source: %{name}-%{version}.tar.gz
 Vendor: Intel Corporation

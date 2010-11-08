@@ -340,8 +340,8 @@ This option can be overridden to 1 if there are not sufficient interrupts
 available.  This can occur if any combination of RSS, VMDQ, and max_vfs 
 results in more than 4 queues being used.
 
-Node
-----
+NUMA Node
+---------
 Valid Range:   0-n
 Default Value: -1 (off)
 
@@ -350,7 +350,7 @@ Default Value: -1 (off)
   -1: uses the driver default of allocating memory on whichever processor is
       running insmod/modprobe. 
 
-  The Node parameter will allow you to pick which NUMA node you want to have 
+  The NUMA Node parameter will allow you to pick which NUMA node you want to have 
   the adapter allocate memory from.  All driver structures, in-memory queues, 
   and receive buffers will be allocated on the node specified.  This parameter
   is only useful when interrupt affinity is specified, otherwise some portion 
@@ -490,6 +490,20 @@ Additional Configurations
   recycling
 
   NOTE: IPv6 and UDP are not supported by LRO.
+
+  MAC and VLAN anti-spoofing feature
+  ----------------------------------
+  When a malicious driver attempts to send a spoofed packet, it is dropped by 
+  the hardware and not transmitted.  An interrupt is sent to the PF driver 
+  notifying it of the spoof attempt.
+
+  When a spoofed packet is detected the PF driver will send the following 
+  message to the system log (displayed by  the "dmesg" command):
+
+  Spoof event(s) detected on VF(n)
+
+  Where n=the VF that attempted to do the spoofing.
+
   
 Known Issues/Troubleshooting
 ============================
@@ -626,6 +640,16 @@ Known Issues/Troubleshooting
   assigned to guests. VFs must first use the xm "pci-detach" command to 
   hot-plug the VF device out of the VM it is assigned to or else shut down the
   VM.
+
+  SLES10 SP3 random system panic when reloading driver
+  ---------------------------------------------------
+  This is a known SLES-10 SP3 issue. After requesting interrupts for MSI-X 
+  vectors, system may panic. 
+
+  Currently the only known workaround is to build the drivers with 
+  CFLAGS_EXTRA=-DDISABLE_PCI_MSI if the driver need to be loaded/unloaded.
+  Otherwise the driver can be loaded once and will be safe, but unloading it 
+  will lead to the issue.
 
 Support
 =======

@@ -53,7 +53,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION "2.3.4" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION "2.4.8" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
@@ -67,6 +67,7 @@ static struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82580_SERDES) },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82580_SGMII) },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82580_COPPER_DUAL) },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82580_QUAD_FIBER) },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576) },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576_NS) },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576_NS_SERDES) },
@@ -135,7 +136,14 @@ static void igb_msg_task(struct igb_adapter *);
 static void igb_vmm_control(struct igb_adapter *);
 static int igb_set_vf_mac(struct igb_adapter *, int, unsigned char *);
 static void igb_restore_vf_multicasts(struct igb_adapter *adapter);
-
+#ifdef IFLA_VF_MAX
+static int igb_ndo_set_vf_mac( struct net_device *netdev, int vf, u8 *mac);
+static int igb_ndo_set_vf_vlan(struct net_device *netdev,
+			       int vf, u16 vlan, u8 qos);
+static int igb_ndo_set_vf_bw(struct net_device *netdev, int vf, int tx_rate);
+static int igb_ndo_get_vf_config(struct net_device *netdev, int vf,
+				 struct ifla_vf_info *ivi);
+#endif
 #ifdef CONFIG_PM
 static int igb_suspend(struct pci_dev *, pm_message_t);
 static int igb_resume(struct pci_dev *);
@@ -369,7 +377,7 @@ static int igb_alloc_queues(struct igb_adapter *adapter)
 #ifdef HAVE_DEVICE_NUMA_NODE
 	int orig_node = adapter->node;
 #endif /* HAVE_DEVICE_NUMA_NODE */
- 
+
 
 	for (i = 0; i < adapter->num_tx_queues; i++) {
 #ifdef HAVE_DEVICE_NUMA_NODE
@@ -1232,7 +1240,13 @@ static void igb_irq_disable(struct igb_adapter *adapter)
 	E1000_WRITE_REG(hw, E1000_IAM, 0);
 	E1000_WRITE_REG(hw, E1000_IMC, ~0);
 	E1000_WRITE_FLUSH(hw);
-	synchronize_irq(adapter->pdev->irq);
+	if (adapter->msix_entries) {
+		int i;
+		for (i = 0; i < adapter->num_q_vectors; i++)
+			synchronize_irq(adapter->msix_entries[i].vector);
+	} else {
+		synchronize_irq(adapter->pdev->irq);
+	}
 }
 
 /**
@@ -1636,6 +1650,12 @@ static const struct net_device_ops igb_netdev_ops = {
 	.ndo_vlan_rx_register	= igb_vlan_rx_register,
 	.ndo_vlan_rx_add_vid	= igb_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	= igb_vlan_rx_kill_vid,
+#ifdef IFLA_VF_MAX
+	.ndo_set_vf_mac		= igb_ndo_set_vf_mac,
+	.ndo_set_vf_vlan	= igb_ndo_set_vf_vlan,
+	.ndo_set_vf_tx_rate	= igb_ndo_set_vf_bw,
+	.ndo_get_vf_config	= igb_ndo_get_vf_config,
+#endif
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller	= igb_netpoll,
 #endif
@@ -1660,6 +1680,8 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 	struct igb_adapter *adapter;
 	struct e1000_hw *hw;
 	u16 eeprom_data = 0;
+	u8 pba_str[E1000_PBANUM_LENGTH];
+	s32 ret_val;
 	static int global_quad_port_a; /* global quad port a indication */
 	int i, err, pci_using_dac;
 	static int cards_found;
@@ -2052,7 +2074,7 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 #endif /* SIOCSHWTSTAMP */
 	dev_info(pci_dev_to_dev(pdev), "Intel(R) Gigabit Ethernet Network Connection\n");
 	/* print bus type/speed/width info */
-	dev_info(pci_dev_to_dev(pdev), "%s: (PCIe:%s:%s)",
+	dev_info(pci_dev_to_dev(pdev), "%s: (PCIe:%s:%s) ",
 	         netdev->name,
 	         ((hw->bus.speed == e1000_bus_speed_2500) ? "2.5Gb/s" :
 	          (hw->bus.speed == e1000_bus_speed_5000) ? "5.0Gb/s" :
@@ -2064,6 +2086,13 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 
 	for (i = 0; i < 6; i++)
 		printk("%2.2x%c", netdev->dev_addr[i], i == 5 ? '\n' : ':');
+
+	ret_val = e1000_read_pba_string(hw, pba_str, E1000_PBANUM_LENGTH);
+	if (ret_val)
+		strcpy(pba_str, "Unknown");
+	dev_info(pci_dev_to_dev(pdev), "%s: PBA No: %s\n", netdev->name,
+		 pba_str);
+
 
 #ifdef IGB_LRO
 	if (test_bit(IGB_RING_FLAG_RX_LRO, &adapter->rx_ring[0]->flags))
@@ -2656,8 +2685,8 @@ static void igb_setup_mrqc(struct igb_adapter *adapter)
 	} else {
 		mrqc = E1000_MRQC_ENABLE_RSS_4Q;
 	}
-	if (adapter->vfs_allocated_count)
-		igb_vmm_control(adapter);
+
+	igb_vmm_control(adapter);
 
 	/*
 	 * Generate RSS hash based on TCP port numbers and/or
@@ -2767,7 +2796,8 @@ static void igb_rlpml_set(struct igb_adapter *adapter)
 	E1000_WRITE_REG(hw, E1000_RLPML, max_frame_size);
 }
 
-static inline void igb_set_vmolr(struct igb_adapter *adapter, int vfn)
+static inline void igb_set_vmolr(struct igb_adapter *adapter,
+				 int vfn, bool aupe)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	u32 vmolr;
@@ -2780,8 +2810,12 @@ static inline void igb_set_vmolr(struct igb_adapter *adapter, int vfn)
 		return;
 
 	vmolr = E1000_READ_REG(hw, E1000_VMOLR(vfn));
-	vmolr |= E1000_VMOLR_AUPE |        /* Accept untagged packets */
-	         E1000_VMOLR_STRVLAN;      /* Strip vlan tags */
+
+	vmolr |= E1000_VMOLR_STRVLAN;      /* Strip vlan tags */
+	if (aupe)
+		vmolr |= E1000_VMOLR_AUPE;        /* Accept untagged packets */
+	else
+		vmolr &= ~(E1000_VMOLR_AUPE); /* Tagged packets ONLY */
 
 	/* clear all bits that might not be set */
 	vmolr &= ~(E1000_VMOLR_BAM | E1000_VMOLR_RSSE);
@@ -2854,7 +2888,7 @@ void igb_configure_rx_ring(struct igb_adapter *adapter,
 	E1000_WRITE_REG(hw, E1000_SRRCTL(reg_idx), srrctl);
 
 	/* set filtering for VMDQ pools */
-	igb_set_vmolr(adapter, reg_idx & 0x7);
+	igb_set_vmolr(adapter, reg_idx & 0x7, true);
 
 	rxdctl |= IGB_RX_PTHRESH;
 	rxdctl |= IGB_RX_HTHRESH << 8;
@@ -3359,6 +3393,7 @@ static void igb_watchdog_task(struct work_struct *work)
 	struct net_device *netdev = adapter->netdev;
 	u32 link;
 	int i;
+
 
 	link = igb_has_link(adapter);
 	if (link) {
@@ -4685,7 +4720,7 @@ static int igb_set_vf_promisc(struct igb_adapter *adapter, u32 *msgbuf, u32 vf)
 	u32 vmolr = E1000_READ_REG(hw, E1000_VMOLR(vf));
 	struct vf_data_storage *vf_data = &adapter->vf_data[vf];
 
-	vf_data->flags |= ~(IGB_VF_FLAG_UNI_PROMISC |
+	vf_data->flags &= ~(IGB_VF_FLAG_UNI_PROMISC |
 	                    IGB_VF_FLAG_MULTI_PROMISC);
 	vmolr &= ~(E1000_VMOLR_ROPE | E1000_VMOLR_ROMPE | E1000_VMOLR_MPME);
 
@@ -4698,6 +4733,7 @@ static int igb_set_vf_promisc(struct igb_adapter *adapter, u32 *msgbuf, u32 vf)
 #endif
 	if (*msgbuf & E1000_VF_SET_PROMISC_MULTICAST) {
 		vmolr |= E1000_VMOLR_MPME;
+		vf_data->flags |= IGB_VF_FLAG_MULTI_PROMISC;
 		*msgbuf &= ~E1000_VF_SET_PROMISC_MULTICAST;
 	} else {
 		/*
@@ -4903,8 +4939,58 @@ s32 igb_vlvf_set(struct igb_adapter *adapter, u32 vid, bool add, u32 vf)
 			return E1000_SUCCESS;
 		}
 	}
-	return -1;
+	return E1000_SUCCESS;
 }
+
+#ifdef IFLA_VF_MAX
+static void igb_set_vmvir(struct igb_adapter *adapter, u32 vid, u32 vf)
+{
+	struct e1000_hw *hw = &adapter->hw;
+
+	if (vid)
+		E1000_WRITE_REG(hw, E1000_VMVIR(vf), (vid | E1000_VMVIR_VLANA_DEFAULT));
+	else
+		E1000_WRITE_REG(hw, E1000_VMVIR(vf), 0);
+}
+
+static int igb_ndo_set_vf_vlan(struct net_device *netdev,
+			       int vf, u16 vlan, u8 qos)
+{
+	int err = 0;
+	struct igb_adapter *adapter = netdev_priv(netdev);
+
+	if ((vf >= adapter->vfs_allocated_count) || (vlan > 4095) || (qos > 7))
+		return -EINVAL;
+	if (vlan || qos) {
+		err = igb_vlvf_set(adapter, vlan, !!vlan, vf);
+		if (err)
+			goto out;
+		igb_set_vmvir(adapter, vlan | (qos << VLAN_PRIO_SHIFT), vf);
+		igb_set_vmolr(adapter, vf, !vlan);
+		adapter->vf_data[vf].pf_vlan = vlan;
+		adapter->vf_data[vf].pf_qos = qos;
+		dev_info(&adapter->pdev->dev,
+			 "Setting VLAN %d, QOS 0x%x on VF %d\n", vlan, qos, vf);
+		if (test_bit(__IGB_DOWN, &adapter->state)) {
+			dev_warn(&adapter->pdev->dev,
+				 "The VF VLAN has been set,"
+				 " but the PF device is not up.\n");
+			dev_warn(&adapter->pdev->dev,
+				 "Bring the PF device up before"
+				 " attempting to use the VF device.\n");
+		}
+	} else {
+		igb_vlvf_set(adapter, adapter->vf_data[vf].pf_vlan,
+				   false, vf);
+		igb_set_vmvir(adapter, vlan, vf);
+		igb_set_vmolr(adapter, vf, true);
+		adapter->vf_data[vf].pf_vlan = 0;
+		adapter->vf_data[vf].pf_qos = 0;
+       }
+out:
+       return err;
+}
+#endif
 
 static int igb_set_vf_vlan(struct igb_adapter *adapter, u32 *msgbuf, u32 vf)
 {
@@ -4916,15 +5002,23 @@ static int igb_set_vf_vlan(struct igb_adapter *adapter, u32 *msgbuf, u32 vf)
 
 static inline void igb_vf_reset(struct igb_adapter *adapter, u32 vf)
 {
-	/* clear all flags */
-	adapter->vf_data[vf].flags = 0;
+	/* clear flags */
+	adapter->vf_data[vf].flags &= ~(IGB_VF_FLAG_PF_SET_MAC);
 	adapter->vf_data[vf].last_nack = jiffies;
 
 	/* reset offloads to defaults */
-	igb_set_vmolr(adapter, vf);
+	igb_set_vmolr(adapter, vf, true);
 
 	/* reset vlans for device */
 	igb_clear_vf_vfta(adapter, vf);
+#ifdef IFLA_VF_MAX
+	if (adapter->vf_data[vf].pf_vlan)
+		igb_ndo_set_vf_vlan(adapter->netdev, vf,
+				    adapter->vf_data[vf].pf_vlan,
+				    adapter->vf_data[vf].pf_qos);
+	else
+		igb_clear_vf_vfta(adapter, vf);
+#endif
 
 	/* reset multicast table array for vf */
 	adapter->vf_data[vf].num_vf_mc_hashes = 0;
@@ -4938,7 +5032,8 @@ static void igb_vf_reset_event(struct igb_adapter *adapter, u32 vf)
 	unsigned char *vf_mac = adapter->vf_data[vf].vf_mac_addresses;
 
 	/* generate a new mac address as we were hotplug removed/added */
-	random_ether_addr(vf_mac);
+	if (!(adapter->vf_data[vf].flags & IGB_VF_FLAG_PF_SET_MAC))
+		random_ether_addr(vf_mac);
 
 	/* process remaining reset events */
 	igb_vf_reset(adapter, vf);
@@ -5057,7 +5152,12 @@ static void igb_rcv_msg_from_vf(struct igb_adapter *adapter, u32 vf)
 		retval = igb_set_vf_rlpml(adapter, msgbuf[1], vf);
 		break;
 	case E1000_VF_SET_VLAN:
-		retval = igb_set_vf_vlan(adapter, msgbuf, vf);
+#ifdef IFLA_VF_MAX
+		if (adapter->vf_data[vf].pf_vlan)
+			retval = -1;
+		else
+#endif
+			retval = igb_set_vf_vlan(adapter, msgbuf, vf);
 		break;
 	default:
 		dev_err(pci_dev_to_dev(pdev), "Unhandled Msg %08x\n", msgbuf[0]);
@@ -5568,16 +5668,19 @@ static inline struct sk_buff *igb_transform_rsc_queue(struct sk_buff *skb)
  * igb_can_lro - returns true if packet is TCP/IPV4 and LRO is enabled
  * @adapter: board private structure
  * @rx_desc: pointer to the rx descriptor
+ * @skb: pointer to the skb to be merged
  *
  **/
 static inline bool igb_can_lro(struct igb_ring *rx_ring,
-                               union e1000_adv_rx_desc *rx_desc)
+			       union e1000_adv_rx_desc *rx_desc,
+			       struct sk_buff *skb)
 {
 	u16 pkt_info = le16_to_cpu(rx_desc->wb.lower.lo_dword.hs_rss.pkt_info);
 
 	return (test_bit(IGB_RING_FLAG_RX_LRO, &rx_ring->flags) &&
-	        (pkt_info & E1000_RXDADV_PKTTYPE_IPV4) &&
-	        (pkt_info & E1000_RXDADV_PKTTYPE_TCP));
+		(skb->protocol == __constant_htons(ETH_P_IP)) &&
+		(pkt_info & E1000_RXDADV_PKTTYPE_IPV4) &&
+		(pkt_info & E1000_RXDADV_PKTTYPE_TCP));
 }
 
 /**
@@ -5757,7 +5860,13 @@ static struct sk_buff *igb_lro_queue(struct igb_q_vector *q_vector,
 			break;
 		}
 
-		if (lrod->opt_bytes || opt_bytes) {
+		/* packet without timestamp, or timestamp suddenly added to flow */
+		if (lrod->opt_bytes != opt_bytes) {
+			igb_lro_flush(q_vector, lrod);
+			break;
+		}
+
+		if (opt_bytes) {
 			u32 tsval = ntohl(*(ts_ptr + 1));
 			/* make sure timestamp values are increasing */
 			if (opt_bytes != lrod->opt_bytes ||
@@ -5970,7 +6079,7 @@ static void igb_clean_rx_irq(struct igb_q_vector *q_vector,
 		            le16_to_cpu(rx_desc->wb.upper.vlan) : 0);
 
 #ifdef IGB_LRO
-		if (igb_can_lro(rx_ring, rx_desc))
+		if (igb_can_lro(rx_ring, rx_desc, skb))
 			buffer_info->skb = igb_lro_queue(q_vector, skb, vlan_tag);
 		else
 #endif
@@ -6477,6 +6586,14 @@ int igb_set_spd_dplx(struct igb_adapter *adapter, u16 spddplx)
 
 	mac->autoneg = 0;
 
+	/* Fiber NIC's only allow 1000 gbps Full duplex */
+	if ((adapter->hw.phy.media_type == e1000_media_type_internal_serdes ) &&
+		spddplx != (SPEED_1000 + DUPLEX_FULL)) {
+		dev_err(pci_dev_to_dev(pdev),
+		        "Unsupported Speed/Duplex configuration\n");
+		return -EINVAL;
+	}
+
 	switch (spddplx) {
 	case SPEED_10 + DUPLEX_HALF:
 		mac->forced_speed_duplex = ADVERTISE_10_HALF;
@@ -6835,6 +6952,44 @@ static int igb_set_vf_mac(struct igb_adapter *adapter,
 	return 0;
 }
 
+#ifdef IFLA_VF_MAX
+static int igb_ndo_set_vf_mac(struct net_device *netdev, int vf, u8 *mac)
+{
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	if (!is_valid_ether_addr(mac) || (vf >= adapter->vfs_allocated_count))
+		return -EINVAL;
+	adapter->vf_data[vf].flags |= IGB_VF_FLAG_PF_SET_MAC;
+	dev_info(&adapter->pdev->dev, "setting MAC %pM on VF %d\n", mac, vf);
+	dev_info(&adapter->pdev->dev, "Reload the VF driver to make this"
+				      " change effective.");
+	if (test_bit(__IGB_DOWN, &adapter->state)) {
+		dev_warn(&adapter->pdev->dev, "The VF MAC address has been set,"
+			 " but the PF device is not up.\n");
+		dev_warn(&adapter->pdev->dev, "Bring the PF device up before"
+			 " attempting to use the VF device.\n");
+	}
+	return igb_set_vf_mac(adapter, vf, mac);
+}
+
+static int igb_ndo_set_vf_bw(struct net_device *netdev, int vf, int tx_rate)
+{
+	return -EOPNOTSUPP;
+}
+
+static int igb_ndo_get_vf_config(struct net_device *netdev,
+				 int vf, struct ifla_vf_info *ivi)
+{
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	if (vf >= adapter->vfs_allocated_count)
+		return -EINVAL;
+	ivi->vf = vf;
+	memcpy(&ivi->mac, adapter->vf_data[vf].vf_mac_addresses, ETH_ALEN);
+	ivi->tx_rate = 0;
+	ivi->vlan = adapter->vf_data[vf].pf_vlan;
+	ivi->qos = adapter->vf_data[vf].pf_qos;
+	return 0;
+}
+#endif
 static void igb_vmm_control(struct igb_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
@@ -6848,7 +7003,8 @@ static void igb_vmm_control(struct igb_adapter *adapter)
 	case e1000_82576:
 		/* notify HW that the MAC is adding vlan tags */
 		reg = E1000_READ_REG(hw, E1000_DTXCTL);
-		reg |= E1000_DTXCTL_VLAN_ADDED;
+		reg |= (E1000_DTXCTL_VLAN_ADDED |
+			E1000_DTXCTL_SPOOF_INT);
 		E1000_WRITE_REG(hw, E1000_DTXCTL, reg);
 	case e1000_82580:
 		/* enable replication vlan tag stripping */
@@ -6858,14 +7014,11 @@ static void igb_vmm_control(struct igb_adapter *adapter)
 		break;
 	}
 
-	/* enable replcation and loopback support */
-	if (adapter->vfs_allocated_count || adapter->vmdq_pools) {
-		e1000_vmdq_set_loopback_pf(hw, true);
-		e1000_vmdq_set_replication_pf(hw, true);
-	} else {
-		e1000_vmdq_set_loopback_pf(hw, false);
-		e1000_vmdq_set_replication_pf(hw, false);
-	}
+	/* enable replication and loopback support */
+	e1000_vmdq_set_loopback_pf(hw, adapter->vfs_allocated_count &&
+				   (adapter->vmdq_pools <= 1));
+	e1000_vmdq_set_replication_pf(hw, adapter->vfs_allocated_count ||
+				      adapter->vmdq_pools);
 }
 
 /* igb_main.c */

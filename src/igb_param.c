@@ -171,7 +171,6 @@ IGB_PARAM(max_vfs, "Number of Virtual Functions: 0 = disable, 1-7 enable, defaul
  */
 IGB_PARAM(QueuePairs, "Enable TX/RX queue pairs for interrupt handling (0,1), default 1=on");
 
-
 #define DEFAULT_QUEUE_PAIRS           1
 #define MAX_QUEUE_PAIRS               1
 #define MIN_QUEUE_PAIRS               0

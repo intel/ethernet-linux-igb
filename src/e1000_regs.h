@@ -46,6 +46,7 @@
 #define E1000_FCAL     0x00028  /* Flow Control Address Low - RW */
 #define E1000_FCAH     0x0002C  /* Flow Control Address High -RW */
 #define E1000_FEXT     0x0002C  /* Future Extended - RW */
+#define E1000_FEXTNVM4 0x00024  /* Future Extended NVM 4 - RW */
 #define E1000_FEXTNVM  0x00028  /* Future Extended NVM - RW */
 #define E1000_FCT      0x00030  /* Flow Control Type - RW */
 #define E1000_CONNSW   0x00034  /* Copper/Fiber switch control - RW */
@@ -175,6 +176,8 @@
                                        (0x054E0 + ((_i - 16) * 8)))
 #define E1000_RAH(_i)  (((_i) <= 15) ? (0x05404 + ((_i) * 8)) : \
                                        (0x054E4 + ((_i - 16) * 8)))
+#define E1000_SHRAL(_i)         (0x05438 + ((_i) * 8))
+#define E1000_SHRAH(_i)         (0x0543C + ((_i) * 8))
 #define E1000_IP4AT_REG(_i)     (0x05840 + ((_i) * 8))
 #define E1000_IP6AT_REG(_i)     (0x05880 + ((_i) * 4))
 #define E1000_WUPM_REG(_i)      (0x05A00 + ((_i) * 4))

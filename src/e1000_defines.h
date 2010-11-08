@@ -942,6 +942,9 @@
 #define E1000_ERR_SWFW_SYNC 13
 #define E1000_NOT_IMPLEMENTED 14
 #define E1000_ERR_MBX      15
+#define E1000_ERR_INVALID_ARGUMENT  16
+#define E1000_ERR_NO_SPACE          17
+#define E1000_ERR_NVM_PBA_SECTION   18
 
 /* Loop limit on how long we wait for auto-negotiation to complete */
 #define FIBER_LINK_UP_LIMIT               50
@@ -1248,12 +1251,19 @@
 /* Mask bits for fields in Word 0x1a of the NVM */
 #define NVM_WORD1A_ASPM_MASK  0x000C
 
+/* Mask bits for fields in Word 0x03 of the EEPROM */
+#define NVM_COMPAT_LOM    0x0800
+
+/* length of string needed to store PBA number */
+#define E1000_PBANUM_LENGTH             11
+
 /* For checksumming, the sum of all words in the NVM should equal 0xBABA. */
 #define NVM_SUM                    0xBABA
 
 #define NVM_MAC_ADDR_OFFSET        0
 #define NVM_PBA_OFFSET_0           8
 #define NVM_PBA_OFFSET_1           9
+#define NVM_PBA_PTR_GUARD          0xFAFA
 #define NVM_RESERVED_WORD          0xFFFF
 #define NVM_PHY_CLASS_A            0x8000
 #define NVM_SERDES_AMPLITUDE_MASK  0x000F
