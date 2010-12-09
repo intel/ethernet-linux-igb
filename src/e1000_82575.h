@@ -45,6 +45,7 @@
 #define E1000_RAR_ENTRIES_82575        16
 #define E1000_RAR_ENTRIES_82576        24
 #define E1000_RAR_ENTRIES_82580        24
+#define E1000_RAR_ENTRIES_I350         32
 #define E1000_SW_SYNCH_MB              0x00000100
 #define E1000_STAT_DEV_RST_SET         0x00100000
 #define E1000_CTRL_DEV_RST             0x20000000

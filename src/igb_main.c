@@ -53,7 +53,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION "2.4.8" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION "2.4.11" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
@@ -62,6 +62,10 @@ static const char igb_driver_string[] =
 static const char igb_copyright[] = "Copyright (c) 2007-2010 Intel Corporation.";
 
 static struct pci_device_id igb_pci_tbl[] = {
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I350_COPPER) },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I350_FIBER) },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I350_SERDES) },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I350_SGMII) },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82580_COPPER) },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82580_FIBER) },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82580_SERDES) },
@@ -338,6 +342,7 @@ static void igb_cache_ring_register(struct igb_adapter *adapter)
 		}
 	case e1000_82575:
 	case e1000_82580:
+	case e1000_i350:
 	default:
 		for (; i < adapter->num_rx_queues; i++)
 			adapter->rx_ring[i]->reg_idx = rbase_offset + i;
@@ -565,6 +570,7 @@ static void igb_assign_vector(struct igb_q_vector *q_vector, int msix_vector)
 		q_vector->eims_value = 1 << msix_vector;
 		break;
 	case e1000_82580:
+	case e1000_i350:
 		/* 82580 uses the same table-based approach as 82576 but has fewer
 		   entries as a result we carry over for queues greater than 4. */
 		if (rx_queue > IGB_N0_QUEUE) {
@@ -645,6 +651,7 @@ static void igb_configure_msix(struct igb_adapter *adapter)
 
 	case e1000_82576:
 	case e1000_82580:
+	case e1000_i350:
 		/* Turn on MSI-X capability first, or our settings
 		 * won't stick.  And it will take days to debug. */
 		E1000_WRITE_REG(hw, E1000_GPIE, E1000_GPIE_MSIX_MODE |
@@ -1525,6 +1532,7 @@ void igb_reset(struct igb_adapter *adapter)
 	 * To take effect CTRL.RST is required.
 	 */
 	switch (mac->type) {
+	case e1000_i350:
 	case e1000_82580:
 		pba = E1000_READ_REG(hw, E1000_RXPBS);
 		pba = e1000_rxpbs_adjust_82580(pba);
@@ -1980,6 +1988,7 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 #endif
 #ifdef SIOCSHWTSTAMP
 	switch (hw->mac.type) {
+	case e1000_i350:
 	case e1000_82580:
 		memset(&adapter->cycles, 0, sizeof(adapter->cycles));
 		adapter->cycles.read = igb_read_clock;
@@ -2619,6 +2628,7 @@ static void igb_setup_mrqc(struct igb_adapter *adapter)
 	if (adapter->vfs_allocated_count || adapter->vmdq_pools) {
 		/* 82575 and 82576 supports 2 RSS queues for VMDq */
 		switch (hw->mac.type) {
+		case e1000_i350:
 		case e1000_82580:
 			num_rx_queues = 1;
 			shift = 0;

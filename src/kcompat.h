@@ -215,14 +215,6 @@ struct msix_entry {
 #define NETIF_F_LRO (1 << 15)
 #endif
 
-#ifndef ETH_FLAG_LRO
-#define ETH_FLAG_LRO (1 << 15)
-#endif
-
-#ifndef ETH_FLAG_NTUPLE
-#define ETH_FLAG_NTUPLE 0
-#endif
-
 #ifndef IPPROTO_SCTP
 #define IPPROTO_SCTP 132
 #endif
@@ -1851,6 +1843,10 @@ extern void _kc_print_hex_dump(const char *level, const char *prefix_str,
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) )
+#ifndef ETH_FLAG_LRO
+#define ETH_FLAG_LRO (1 << 15)
+#endif
+
 /* if GRO is supported then the napi struct must already exist */
 #ifndef NETIF_F_GRO
 /* NAPI API changes in 2.6.24 break everything */
@@ -2215,6 +2211,10 @@ extern struct sk_buff *_kc_netdev_alloc_skb_ip_align(struct net_device *dev,
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,34) )
+#ifndef ETH_FLAG_NTUPLE
+#define ETH_FLAG_NTUPLE (1 << 27)
+#endif
+
 #ifndef netdev_mc_count
 #define netdev_mc_count(dev) ((dev)->mc_count)
 #endif

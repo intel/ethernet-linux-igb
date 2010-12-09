@@ -107,6 +107,7 @@ static bool e1000_sgmii_uses_mdio_82575(struct e1000_hw *hw)
 		ext_mdio = !!(reg & E1000_MDIC_DEST);
 		break;
 	case e1000_82580:
+	case e1000_i350:
 		reg = E1000_READ_REG(hw, E1000_MDICNFG);
 		ext_mdio = !!(reg & E1000_MDICNFG_EXT_MDIO);
 		break;
@@ -192,6 +193,7 @@ static s32 e1000_init_phy_params_82575(struct e1000_hw *hw)
 		phy->ops.set_d3_lplu_state  = e1000_set_d3_lplu_state_generic;
 		break;
 	case I82580_I_PHY_ID:
+	case I350_I_PHY_ID:
 		phy->type                   = e1000_phy_82580;
 		phy->ops.check_polarity     = e1000_check_polarity_82577;
 		phy->ops.force_speed_duplex = e1000_phy_force_speed_duplex_82577;
@@ -310,6 +312,10 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 		mac->rar_entry_count = E1000_RAR_ENTRIES_82576;
 	if (mac->type == e1000_82580)
 		mac->rar_entry_count = E1000_RAR_ENTRIES_82580;
+	if (mac->type == e1000_i350) {
+		mac->rar_entry_count = E1000_RAR_ENTRIES_I350;
+	}
+
 	/* Set if part includes ASF firmware */
 	mac->asf_firmware_present = true;
 	/* FWSM register */
@@ -542,6 +548,7 @@ static s32 e1000_get_phy_id_82575(struct e1000_hw *hw)
 			phy->addr = mdic >> E1000_MDIC_PHY_SHIFT;
 			break;
 		case e1000_82580:
+		case e1000_i350:
 			mdic = E1000_READ_REG(hw, E1000_MDICNFG);
 			mdic &= E1000_MDICNFG_PHY_MASK;
 			phy->addr = mdic >> E1000_MDICNFG_PHY_SHIFT;

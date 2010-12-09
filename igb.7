@@ -164,7 +164,7 @@ This option can be overridden to 1 if there are not sufficient interrupts
 available.  This can occur if any combination of RSS, VMDQ, and max_vfs 
 results in more than 4 queues being used. 
 .IP
-.B NUMA Node
+.B Node
 .IP
 .B Valid Range:   
 0-n
@@ -176,7 +176,7 @@ results in more than 4 queues being used.
 .IP
 -1: uses the driver default of allocating memory on whichever processor is running insmod/modprobe. 
 .IP
-The NUMA Node parameter will allow you to pick which NUMA node you want to have 
+The Node parameter will allow you to pick which NUMA node you want to have 
 the adapter allocate memory from.  All driver structures, in-memory queues, and receive buffers will be allocated on the node specified.  This parameter is onlyuseful when interrupt affinity is specified, otherwise some portion of the time the interrupt could run on a different core than the memory is allocated on, causing slower memory access and impacting throughput, CPU, or both.
 
 .SH JUMBO FRAMES

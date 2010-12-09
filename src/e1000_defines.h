@@ -1348,6 +1348,7 @@
 #define IFE_PLUS_E_PHY_ID    0x02A80320
 #define IFE_C_E_PHY_ID       0x02A80310
 #define I82580_I_PHY_ID      0x015403A0
+#define I350_I_PHY_ID        0x015403B0
 #define IGP04E1000_E_PHY_ID  0x02A80391
 #define M88_VENDOR           0x0141
 
