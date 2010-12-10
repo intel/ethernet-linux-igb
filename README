@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Network Connection
 ==================================================
 
-January 4, 2010
+November 21, 2010
 
 Contents
 ========
@@ -54,8 +54,7 @@ Driver ID Guide at:
     http://support.intel.com/support/go/network/adapter/idguide.htm
 
 For the latest Intel network drivers for Linux, refer to the following
-website.  In the search field, enter your adapter name or type, or use the
-networking link on the left to search for your adapter:
+website.  Select the link for your adapter.
 
     http://support.intel.com/support/go/network/adapter/home.htm
 
@@ -508,6 +507,15 @@ Additional Configurations
 Known Issues/Troubleshooting
 ============================
 
+For known hardware and troubleshooting issues, refer to the following website.
+
+    http://support.intel.com/support/go/network/adapter/home.htm
+
+Select the link for your adapter. The adapter's page lists many issues. For a
+complete list of hardware issues download your adapter's user guide and read 
+the Release Notes. 
+
+
   NOTE: After installing the driver, if your Intel Network Connection is not 
   working, verify in the "In This Release" section of the readme that you have 
   installed the correct driver.
@@ -650,6 +658,29 @@ Known Issues/Troubleshooting
   CFLAGS_EXTRA=-DDISABLE_PCI_MSI if the driver need to be loaded/unloaded.
   Otherwise the driver can be loaded once and will be safe, but unloading it 
   will lead to the issue.
+
+  Enabling SR-IOV in a 32-bit Microsoft* Windows* Server 2008 Guest OS using
+  Intel (R) 82576-based GbE or Intel (R) 82599-based 10GbE controller under KVM
+  -----------------------------------------------------------------------------
+  KVM Hypervisor/VMM supports direct assignment of a PCIe device to a VM.  This 
+  includes traditional PCIe devices, as well as SR-IOV-capable devices using
+  Intel 82576-based and 82599-based controllers.
+
+  While direct assignment of a PCIe device or an SR-IOV Virtual Function (VF)
+  to a Linux-based VM running 2.6.32 or later kernel works fine, there is a
+  known issue with Microsoft Windows Server 2008 VM that results in a "yellow 
+  bang" error. This problem is within the KVM VMM itself, not the Intel driver,
+  or the SR-IOV logic of the VMM, but rather that KVM emulates an older CPU 
+  model for the guests, and this older CPU model does not support MSI-X
+  interrupts, which is a requirement for Intel SR-IOV.  
+
+  If you wish to use the Intel 82576 or 82599-based controllers in SR-IOV mode
+  with KVM and a Microsoft Windows Server 2008 guest try the following 
+  workaround. The workaround is to tell KVM to emulate a different model of CPU
+  when using qemu to create the KVM guest: 
+
+       "-cpu qemu64,model=13"
+
 
 Support
 =======

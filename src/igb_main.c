@@ -53,7 +53,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION "2.4.11" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION "2.4.12" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
@@ -1880,7 +1880,7 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 		dev_err(pci_dev_to_dev(pdev), "NVM Read Error\n");
 
 	memcpy(netdev->dev_addr, hw->mac.addr, netdev->addr_len);
-#ifdef ETHTOOL_GPERMADDR
+#ifdef HAVE_ETHTOOL_GET_PERM_ADDR
 	memcpy(netdev->perm_addr, hw->mac.addr, netdev->addr_len);
 
 	if (!is_valid_ether_addr(netdev->perm_addr)) {

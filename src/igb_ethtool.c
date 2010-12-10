@@ -2092,7 +2092,7 @@ static struct ethtool_ops igb_ethtool_ops = {
 	.self_test_count        = igb_diag_test_count,
 #endif
 	.get_ethtool_stats      = igb_get_ethtool_stats,
-#ifdef ETHTOOL_GPERMADDR
+#ifdef HAVE_ETHTOOL_GET_PERM_ADDR
 	.get_perm_addr          = ethtool_op_get_perm_addr,
 #endif
 	.get_coalesce           = igb_get_coalesce,
