@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Network Connection
 ==================================================
 
-November 21, 2010
+February 8, 2011
 
 Contents
 ========
@@ -356,6 +356,15 @@ Default Value: -1 (off)
   of the time the interrupt could run on a different core than the memory is 
   allocated on, causing slower memory access and impacting throughput, CPU, or
   both.
+
+EEE
+---
+Valid Range:  0-1
+Default Value: 1 (enabled)
+
+  A link between two EEE-compliant devices will result in periodic bursts of 
+  data followed by long periods where in the link is in an idle state. This Low
+  Power Idle (LPI) state is supported in both 1Gbps and 100Mbps link speeds.
  
 
 Additional Configurations
@@ -511,10 +520,9 @@ For known hardware and troubleshooting issues, refer to the following website.
 
     http://support.intel.com/support/go/network/adapter/home.htm
 
-Select the link for your adapter. The adapter's page lists many issues. For a
-complete list of hardware issues download your adapter's user guide and read 
-the Release Notes. 
-
+Either select the link for your adapter or perform a search for the adapter 
+number. The adapter's page lists many issues. For a complete list of hardware
+issues download your adapter's user guide and read the Release Notes.  
 
   NOTE: After installing the driver, if your Intel Network Connection is not 
   working, verify in the "In This Release" section of the readme that you have 
@@ -701,7 +709,7 @@ License
 =======
 
 Intel Gigabit Linux driver.
-Copyright(c) 1999 - 2010 Intel Corporation.
+Copyright(c) 1999 - 2011 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms and conditions of the GNU General Public License,

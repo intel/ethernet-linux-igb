@@ -53,7 +53,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION "2.4.12" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION "2.4.13" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
@@ -236,7 +236,7 @@ static void igb_vfta_set(struct e1000_hw *hw, u32 vid, bool add)
 	e1000_write_vfta(hw, index, vfta);
 }
 
-#ifdef SIOCSHWTSTAMP
+#ifdef HAVE_HW_TIME_STAMP
 /**
  * igb_read_clock - read raw cycle counter (to be used by time counter)
  */
@@ -1968,8 +1968,6 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 	 * driver. */
 	igb_get_hw_control(adapter);
 
-	netif_tx_stop_all_queues(netdev);
-
 	strncpy(netdev->name, "eth%d", IFNAMSIZ);
 	err = register_netdev(netdev);
 	if (err)
@@ -1986,7 +1984,7 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 	}
 
 #endif
-#ifdef SIOCSHWTSTAMP
+#ifdef HAVE_HW_TIME_STAMP
 	switch (hw->mac.type) {
 	case e1000_i350:
 	case e1000_82580:
@@ -3937,8 +3935,12 @@ static inline int igb_tx_map(struct igb_ring *tx_ring, struct sk_buff *skb,
 	}
 
 	tx_ring->buffer_info[i].skb = skb;
-#ifdef SIOCSHWTSTAMP
+#ifdef HAVE_HW_TIME_STAMP
+#ifdef SKB_SHARED_TX_IS_UNION
+	tx_ring->buffer_info[i].shtx = skb_shinfo(skb)->tx_flags.flags;
+#else
 	tx_ring->buffer_info[i].shtx = skb_shinfo(skb)->tx_flags;
+#endif
 #endif
 #ifdef NETIF_F_TSO
 	/* multiply data chunks by size of headers */
@@ -4081,9 +4083,6 @@ netdev_tx_t igb_xmit_frame_ring(struct sk_buff *skb,
 	u32 tx_flags = 0;
 	u16 first;
 	u8 hdr_len = 0;
-#ifdef SIOCSHWTSTAMP
-	union skb_shared_tx *shtx = skb_tx(skb);
-#endif
 
 	/* need: 1 descriptor per page,
 	 *       + 2 desc gap to keep tail from touching head,
@@ -4095,11 +4094,18 @@ netdev_tx_t igb_xmit_frame_ring(struct sk_buff *skb,
 		return NETDEV_TX_BUSY;
 	}
 
-#ifdef SIOCSHWTSTAMP
-	if (unlikely(shtx->hardware)) {
-		shtx->in_progress = 1;
+#ifdef HAVE_HW_TIME_STAMP
+#ifdef SKB_SHARED_TX_IS_UNION
+	if (unlikely(skb_shinfo(skb)->tx_flags.flags & SKBTX_HW_TSTAMP)) {
+		skb_shinfo(skb)->tx_flags.flags |= SKBTX_IN_PROGRESS;
 		tx_flags |= IGB_TX_FLAGS_TSTAMP;
 	}
+#else
+	if (unlikely(skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP)) {
+		skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+		tx_flags |= IGB_TX_FLAGS_TSTAMP;
+	}
+#endif
 
 #endif
 	if (vlan_enable && vlan_tx_tag_present(skb)) {
@@ -5367,7 +5373,7 @@ static int igb_poll(struct napi_struct *napi, int budget)
 	return work_done;
 }
 
-#ifdef SIOCSHWTSTAMP
+#ifdef HAVE_HW_TIME_STAMP
 /**
  * igb_systim_to_hwtstamp - convert system time value to hw timestamp
  * @adapter: board private structure
@@ -5414,7 +5420,7 @@ static void igb_tx_hwtstamp(struct igb_q_vector *q_vector, struct igb_buffer *bu
 	u64 regval;
 
 	/* if skb does not support hw timestamp or TX stamp not valid exit */
-	if (likely(!buffer_info->shtx.hardware) ||
+	if (likely(!buffer_info->shtx & SKBTX_HW_TSTAMP) ||
 	    !(E1000_READ_REG(hw, E1000_TSYNCTXCTL) & E1000_TSYNCTXCTL_VALID))
 		return;
 
@@ -5464,7 +5470,7 @@ static bool igb_clean_tx_irq(struct igb_q_vector *q_vector, int budget)
 #else
 				total_packets++;
 #endif
-#ifdef SIOCSHWTSTAMP
+#ifdef HAVE_HW_TIME_STAMP
 				igb_tx_hwtstamp(q_vector, buffer_info);
 #endif
 			}
@@ -5596,7 +5602,7 @@ static inline void igb_rx_checksum(struct igb_ring *ring,
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 }
 
-#ifdef SIOCSHWTSTAMP
+#ifdef HAVE_HW_TIME_STAMP
 static void igb_rx_hwtstamp(struct igb_q_vector *q_vector, u32 staterr,
                                    struct sk_buff *skb)
 {
@@ -6074,7 +6080,7 @@ static void igb_clean_rx_irq(struct igb_q_vector *q_vector,
 			goto next_desc;
 		}
 
-#ifdef SIOCSHWTSTAMP
+#ifdef HAVE_HW_TIME_STAMP
 		if (staterr & (E1000_RXDADV_STAT_TSIP | E1000_RXDADV_STAT_TS))
 			igb_rx_hwtstamp(q_vector, staterr, skb);
 #endif
@@ -6262,7 +6268,7 @@ static int igb_mii_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 }
 
 #endif
-#ifdef SIOCSHWTSTAMP
+#ifdef HAVE_HW_TIME_STAMP
 /**
  * igb_hwtstamp_ioctl - control hardware time stamping
  * @netdev:
@@ -6455,7 +6461,7 @@ static int igb_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 	case SIOCSMIIREG:
 		return igb_mii_ioctl(netdev, ifr, cmd);
 #endif
-#ifdef SIOCSHWTSTAMP
+#ifdef HAVE_HW_TIME_STAMP
 	case SIOCSHWTSTAMP:
 		return igb_hwtstamp_ioctl(netdev, ifr, cmd);
 #endif

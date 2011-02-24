@@ -4,7 +4,7 @@
 .\"
 .\" * Other names and brands may be claimed as the property of others.
 .\"
-.TH igb 1 "August 14, 2007"
+.TH igb 1 "February 8, 2011"
 
 .SH NAME
 igb \-This file describes the Linux* Base Driver for the Gigabit Family of Adapters.
@@ -178,6 +178,18 @@ results in more than 4 queues being used.
 .IP
 The Node parameter will allow you to pick which NUMA node you want to have 
 the adapter allocate memory from.  All driver structures, in-memory queues, and receive buffers will be allocated on the node specified.  This parameter is onlyuseful when interrupt affinity is specified, otherwise some portion of the time the interrupt could run on a different core than the memory is allocated on, causing slower memory access and impacting throughput, CPU, or both.
+.IP
+.B EEE
+.IP
+.B Valid Range:
+0-1
+.IP
+.B Default Value: 
+1 (enabled)
+.IP
+A link between two EEE-compliant devices will result in periodic bursts of 
+data followed by long periods where in the link is in an idle state. This Low
+Power Idle (LPI) state is supported in both 1Gbps and 100Mbps link speeds.
 
 .SH JUMBO FRAMES
 Jumbo Frames support is enabled by changing the MTU to a value larger than the default of 1500.Use the ifconfig command to increase the MTU size.  For example:

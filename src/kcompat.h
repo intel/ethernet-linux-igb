@@ -2459,5 +2459,15 @@ static inline void _kc_skb_checksum_none_assert(struct sk_buff *skb)
 	WARN_ON(skb->ip_summed != CHECKSUM_NONE);
 }
 #define skb_checksum_none_assert(skb) _kc_skb_checksum_none_assert(skb)
+
+#ifdef HAVE_HW_TIME_STAMP
+#define SKBTX_HW_TSTAMP (1 << 0)
+#define SKBTX_IN_PROGRESS (1 << 2)
+#define SKB_SHARED_TX_IS_UNION
+#endif
 #endif /* < 2.6.37 */
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38) )
+#define VLAN_GROUP_ARRAY_LEN 4096
+#endif /* < 2.6.38 > */
 #endif /* _KCOMPAT_H_ */
