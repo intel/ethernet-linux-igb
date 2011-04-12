@@ -41,6 +41,15 @@
 #include "kcompat_ethtool.c"
 #endif
 
+#ifdef ETHTOOL_SPFLAGS
+enum igb_pflags {
+	IGB_DMAC = (1 << 0),
+};
+#define IGB_N_PFLAGS ARRAY_SIZE(igb_gstrings_pflags)
+static const char igb_gstrings_pflags[][ETH_GSTRING_LEN] = {
+       "dma_coal",
+};
+#endif /* ETHTOOL_SPFLAGS */
 #ifdef ETHTOOL_GSTATS
 struct igb_stats {
 	char stat_string[ETH_GSTRING_LEN];
@@ -48,6 +57,7 @@ struct igb_stats {
 	int stat_offset;
 };
 
+#endif
 #define IGB_STAT(_name, _stat) { \
 	.stat_string = _name, \
 	.sizeof_stat = FIELD_SIZEOF(struct igb_adapter, _stat), \
@@ -94,6 +104,10 @@ static const struct igb_stats igb_gstrings_stats[] = {
 	IGB_STAT("tx_smbus", stats.mgptc),
 	IGB_STAT("rx_smbus", stats.mgprc),
 	IGB_STAT("dropped_smbus", stats.mgpdc),
+	IGB_STAT("os2bmc_rx_by_bmc", stats.o2bgptc),
+	IGB_STAT("os2bmc_tx_by_bmc", stats.b2ospc),
+	IGB_STAT("os2bmc_tx_by_host", stats.o2bspc),
+	IGB_STAT("os2bmc_rx_by_host", stats.b2ogprc),
 };
 
 #define IGB_NETDEV_STAT(_net_stat) { \
@@ -199,6 +213,17 @@ static int igb_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 	}
 
 	ecmd->autoneg = hw->mac.autoneg ? AUTONEG_ENABLE : AUTONEG_DISABLE;
+#ifdef ETH_TP_MDI_X
+
+	/* MDI-X => 2; MDI =>1; Invalid =>0 */
+	if ((hw->phy.media_type == e1000_media_type_copper) &&
+	    netif_carrier_ok(netdev))
+	    	ecmd->eth_tp_mdix = hw->phy.is_mdix ? ETH_TP_MDI_X :
+		                                      ETH_TP_MDI;
+	else
+		ecmd->eth_tp_mdix = ETH_TP_MDI_INVALID;
+
+#endif /* ETH_TP_MDI_X */
 	return 0;
 }
 
@@ -233,6 +258,24 @@ static int igb_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 		}
 	}
 
+#ifdef ETH_TP_MDI_X
+	/* MDI-X =>2; MDI=>1; Invalid =>0 */
+	if (hw->phy.media_type == e1000_media_type_copper) {
+		switch (ecmd->eth_tp_mdix) {
+		case ETH_TP_MDI_X:
+			hw->phy.mdix = 2;
+			break;
+		case ETH_TP_MDI:
+			hw->phy.mdix = 1;
+			break;
+		case ETH_TP_MDI_INVALID:
+		default:
+			hw->phy.mdix = 0;
+			break;
+		}
+	}
+
+#endif /* ETH_TP_MDI_X */
 	/* reset the link */
 	if (netif_running(adapter->netdev)) {
 		igb_down(adapter);
@@ -432,7 +475,7 @@ static void igb_set_msglevel(struct net_device *netdev, u32 data)
 
 static int igb_get_regs_len(struct net_device *netdev)
 {
-#define IGB_REGS_LEN 551
+#define IGB_REGS_LEN 555
 	return IGB_REGS_LEN * sizeof(u32);
 }
 
@@ -649,7 +692,10 @@ static void igb_get_regs(struct net_device *netdev,
 	regs_buff[548] = E1000_READ_REG(hw, E1000_TDFT);
 	regs_buff[549] = E1000_READ_REG(hw, E1000_TDFHS);
 	regs_buff[550] = E1000_READ_REG(hw, E1000_TDFPC);
-
+	regs_buff[551] = adapter->stats.o2bgptc;
+	regs_buff[552] = adapter->stats.b2ospc;
+	regs_buff[553] = adapter->stats.o2bspc;
+	regs_buff[554] = adapter->stats.b2ogprc;
 }
 
 static int igb_get_eeprom_len(struct net_device *netdev)
@@ -771,8 +817,8 @@ static void igb_get_drvinfo(struct net_device *netdev,
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 
-	strncpy(drvinfo->driver,  igb_driver_name, 32);
-	strncpy(drvinfo->version, igb_driver_version, 32);
+	strncpy(drvinfo->driver,  igb_driver_name, sizeof(drvinfo->driver) - 1);
+	strncpy(drvinfo->version, igb_driver_version, sizeof(drvinfo->version) - 1);
 
 	/* EEPROM image version # is reported as firmware version # for
 	 * 82575 controllers */
@@ -782,6 +828,9 @@ static void igb_get_drvinfo(struct net_device *netdev,
 		 adapter->fw_version & 0x000F);
 
 	strncpy(drvinfo->bus_info, pci_name(adapter->pdev), 32);
+#ifdef ETHTOOL_GPFLAGS
+	drvinfo->n_priv_flags = IGB_N_PFLAGS;
+#endif /* ETHTOOL_GPFLAGS */
 	drvinfo->n_stats = IGB_STATS_LEN;
 	drvinfo->testinfo_len = IGB_TEST_LEN;
 	drvinfo->regdump_len = igb_get_regs_len(netdev);
@@ -1541,7 +1590,7 @@ static int igb_run_loopback_test(struct igb_adapter *adapter)
 		/* place 64 packets on the transmit queue*/
 		for (i = 0; i < 64; i++) {
 			skb_get(skb);
-			tx_ret_val = igb_xmit_frame_ring(skb, tx_ring, false);
+			tx_ret_val = igb_xmit_frame_ring(skb, tx_ring);
 			if (tx_ret_val == NETDEV_TX_OK)
 				good_cnt++;
 		}
@@ -1852,7 +1901,10 @@ static int igb_set_coalesce(struct net_device *netdev,
 	    ((ec->rx_coalesce_usecs > 3) &&
 	     (ec->rx_coalesce_usecs < IGB_MIN_ITR_USECS)) ||
 	    (ec->rx_coalesce_usecs == 2))
+	    {
+	    	printk("set_coalesce:invalid parameter..");
 		return -EINVAL;
+	}
 
 	if ((ec->tx_coalesce_usecs > IGB_MAX_ITR_USECS) ||
 	    ((ec->tx_coalesce_usecs > 3) &&
@@ -1863,6 +1915,12 @@ static int igb_set_coalesce(struct net_device *netdev,
 	if ((adapter->flags & IGB_FLAG_QUEUE_PAIRS) && ec->tx_coalesce_usecs)
 		return -EINVAL;
 
+	/* If ITR is disabled, disable DMAC */
+	if (ec->rx_coalesce_usecs == 0) {
+		if (adapter->flags & IGB_FLAG_DMAC)
+			adapter->flags &= ~IGB_FLAG_DMAC;
+	}
+	
 	/* convert to rate of irq's per second */
 	if (ec->rx_coalesce_usecs && ec->rx_coalesce_usecs <= 3)
 		adapter->rx_itr_setting = ec->rx_coalesce_usecs;
@@ -1927,6 +1985,8 @@ static int igb_get_sset_count(struct net_device *netdev, int sset)
 		return IGB_STATS_LEN;
 	case ETH_SS_TEST:
 		return IGB_TEST_LEN;
+	case ETH_SS_PRIV_FLAGS:
+		return IGB_N_PFLAGS;
 	default:
 		return -ENOTSUPP;
 	}
@@ -2053,6 +2113,7 @@ static int igb_set_flags(struct net_device *netdev, u32 data)
 
 #endif /* ETHTOOL_GFLAGS */
 #endif /* IGB_LRO */
+
 static struct ethtool_ops igb_ethtool_ops = {
 	.get_settings           = igb_get_settings,
 	.set_settings           = igb_set_settings,
@@ -2097,16 +2158,19 @@ static struct ethtool_ops igb_ethtool_ops = {
 #endif
 	.get_coalesce           = igb_get_coalesce,
 	.set_coalesce           = igb_set_coalesce,
-#ifdef ETHTOOL_GFLAGS
 #ifdef IGB_LRO
+#ifdef ETHTOOL_GFLAGS
 	.get_flags              = ethtool_op_get_flags,
 	.set_flags              = igb_set_flags,
-#endif
 #endif /* ETHTOOL_GFLAGS */
+#endif
+#ifdef ETHTOOL_GPFLAGS
+#endif /* ETHTOOL_GPFLAGS */
+#ifdef ETHTOOL_SPFLAGS
+#endif /*ETHTOOL_GPFLAGS */
 };
 
 void igb_set_ethtool_ops(struct net_device *netdev)
 {
 	SET_ETHTOOL_OPS(netdev, &igb_ethtool_ops);
 }
-#endif	/* SIOCETHTOOL */

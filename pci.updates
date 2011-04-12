@@ -6,6 +6,10 @@
 #             (numerical order).
 #
 8086  Intel Corporation
+	0438  DH8900CC Series Gigabit Network Connection
+	043a  DH8900CC Series Gigabit Fiber Network Connection
+	043c  DH8900CC Series Gigabit Backplane Network Connection
+	0440  DH8900CC Series Gigabit SFP Network Connection
 	10a7  82575EB Gigabit Network Connection
 		8086 10a8  82575EB Gigabit Riser Card
 	10a9  82575EB Gigabit Backplane Connection
@@ -36,6 +40,18 @@
 		8086 12b1  Ethernet Server Adapter I340-T2
 		8086 12b2  Ethernet Server Adapter I340-T2
 	1518  82576NS SerDes Gigabit Network Connection
+	1521  I350 Gigabit Network Connection
+		8086 0001  Ethernet Server Adapter I350-T4
+		8086 0002  Ethernet Server Adapter I350-T2
+		8086 00a1  Ethernet Server Adapter I350-T4
+		8086 00a2  Ethernet Server Adapter I350-T2
+	1522  I350 Gigabit Fiber Network Connection
+		8086 0003  Ethernet Server Adapter I350-F4
+		8086 0004  Ethernet Server Adapter I350-F2
+		8086 00a3  Ethernet Server Adapter I350-F4
+		8086 00a4  Ethernet Server Adapter I350-F2
+	1523  I350 Gigabit Backplane Connection
+	1524  I350 Gigabit Connection
 	1526  82576 Gigabit Network Connection
 		8086 a05c  Gigabit ET2 Quad Port Server Adapter
 		8086 a06c  Gigabit ET2 Quad Port Server Adapter

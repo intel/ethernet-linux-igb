@@ -25,27 +25,22 @@
 
 *******************************************************************************/
 
-#ifndef _E1000_NVM_H_
-#define _E1000_NVM_H_
+#ifndef _IGB_VMDQ_H_
+#define _IGB_VMDQ_H_
 
-void e1000_init_nvm_ops_generic(struct e1000_hw *hw);
-s32  e1000_acquire_nvm_generic(struct e1000_hw *hw);
-
-s32  e1000_poll_eerd_eewr_done(struct e1000_hw *hw, int ee_reg);
-s32  e1000_read_mac_addr_generic(struct e1000_hw *hw);
-s32  e1000_read_pba_string_generic(struct e1000_hw *hw, u8 *pba_num,
-                                   u32 pba_num_size);
-s32  e1000_read_pba_length_generic(struct e1000_hw *hw, u32 *pba_num_size);
-s32  e1000_read_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data);
-s32  e1000_read_nvm_eerd(struct e1000_hw *hw, u16 offset, u16 words,
-                         u16 *data);
-s32  e1000_valid_led_default_generic(struct e1000_hw *hw, u16 *data);
-s32  e1000_validate_nvm_checksum_generic(struct e1000_hw *hw);
-s32  e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words,
-                         u16 *data);
-s32  e1000_update_nvm_checksum_generic(struct e1000_hw *hw);
-void e1000_release_nvm_generic(struct e1000_hw *hw);
-
-#define E1000_STM_OPCODE  0xDB00
-
-#endif
+#ifdef CONFIG_IGB_VMDQ_NETDEV
+int igb_vmdq_open(struct net_device *dev);
+int igb_vmdq_close(struct net_device *dev);
+netdev_tx_t igb_vmdq_xmit_frame(struct sk_buff *skb, struct net_device *dev);
+struct net_device_stats *igb_vmdq_get_stats(struct net_device *dev);
+void igb_vmdq_set_rx_mode(struct net_device *dev);
+int igb_vmdq_set_mac(struct net_device *dev, void *addr);
+int igb_vmdq_change_mtu(struct net_device *dev, int new_mtu);
+void igb_vmdq_tx_timeout(struct net_device *dev);
+void igb_vmdq_vlan_rx_register(struct net_device *dev,
+				 struct vlan_group *grp);
+void igb_vmdq_vlan_rx_add_vid(struct net_device *dev, unsigned short vid);
+void igb_vmdq_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid);
+void igb_vmdq_set_ethtool_ops(struct net_device *netdev);
+#endif /* CONFIG_IGB_VMDQ_NETDEV */
+#endif /* _IGB_VMDQ_H_ */

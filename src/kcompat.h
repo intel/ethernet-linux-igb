@@ -50,6 +50,7 @@
 #include <linux/ip.h>
 #include <linux/udp.h>
 #include <linux/mii.h>
+#include <linux/vmalloc.h>
 #include <asm/io.h>
 
 /* NAPI enable/disable flags here */
@@ -296,7 +297,6 @@ enum {
 #ifndef numa_node_id
 #define numa_node_id() 0
 #endif
-
 
 #ifndef _LINUX_RANDOM_H
 #include <linux/random.h>
@@ -709,7 +709,7 @@ struct _kc_ethtool_pauseparam {
 #define AX_RELEASE_VERSION(a,b) (((a) << 8) + (b))
 #endif
 
-/* SuSE version macro is the same as Linux kernel verison */
+/* SuSE version macro is the same as Linux kernel version */
 #ifndef SLE_VERSION
 #define SLE_VERSION(a,b,c) KERNEL_VERSION(a,b,c)
 #endif
@@ -963,6 +963,8 @@ struct vlan_ethhdr {
 #endif /* 2.4.17 => 2.4.13 */
 
 /*****************************************************************************/
+
+/*****************************************************************************/
 /* 2.4.20 => 2.4.19 */
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,20) )
 
@@ -972,13 +974,6 @@ struct vlan_ethhdr {
 #endif
 
 #endif /* 2.4.20 => 2.4.19 */
-
-/*****************************************************************************/
-/* < 2.4.21 */
-#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,21) )
-#define skb_pad(x,y) _kc_skb_pad(x, y)
-struct sk_buff * _kc_skb_pad(struct sk_buff *skb, int pad);
-#endif  /* < 2.4.21 */
 
 /*****************************************************************************/
 /* 2.4.22 => 2.4.17 */
@@ -1553,6 +1548,10 @@ static inline unsigned long _kc_usecs_to_jiffies(const unsigned int m)
 #define ADVERTISE_PAUSE_ASYM    0x0800  /* Try for asymmetric pause     */
 /* 1000BASE-T Control register */
 #define ADVERTISE_1000FULL      0x0200  /* Advertise 1000BASE-T full duplex */
+static inline int is_zero_ether_addr(const u8 *addr)
+{
+	return !(addr[0] | addr[1] | addr[2] | addr[3] | addr[4] | addr[5]);
+}
 #endif /* < 2.6.12 */
 
 /*****************************************************************************/
@@ -1593,6 +1592,15 @@ do { \
 #ifndef device_init_wakeup
 #define device_init_wakeup(dev,val) do {} while (0)
 #endif
+static inline unsigned _kc_compare_ether_addr(const u8 *addr1, const u8 *addr2)
+{
+	const u16 *a = (const u16 *) addr1;
+	const u16 *b = (const u16 *) addr2;
+
+	return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2])) != 0;
+}
+#undef compare_ether_addr
+#define compare_ether_addr(addr1, addr2) _kc_compare_ether_addr(addr1, addr2)
 #endif /* < 2.6.15 */
 
 /*****************************************************************************/
@@ -1670,6 +1678,23 @@ static inline int _kc_skb_is_gso(const struct sk_buff *skb)
 #define resource_size_t unsigned long
 #endif
 
+#ifdef skb_pad
+#undef skb_pad
+#endif
+#define skb_pad(x,y) _kc_skb_pad(x, y)
+int _kc_skb_pad(struct sk_buff *skb, int pad);
+#ifdef skb_padto
+#undef skb_padto
+#endif
+#define skb_padto(x,y) _kc_skb_padto(x, y)
+static inline int _kc_skb_padto(struct sk_buff *skb, unsigned int len)
+{
+	unsigned int size = skb->len;
+	if(likely(size >= len))
+		return 0;
+	return _kc_skb_pad(skb, len - size);
+}
+
 #endif /* < 2.6.18 */
 
 /*****************************************************************************/
@@ -1732,8 +1757,12 @@ static inline int pci_enable_pcie_error_reporting(struct pci_dev *dev)
 }
 #define pci_disable_pcie_error_reporting(dev) do {} while (0)
 #define pci_cleanup_aer_uncorrect_error_status(dev) do {} while (0)
+
+extern void *_kc_kmemdup(const void *src, size_t len, unsigned gfp);
+#define kmemdup(src, len, gfp) _kc_kmemdup(src, len, gfp)
 #else /* 2.6.19 */
 #include <linux/aer.h>
+#include <linux/string.h>
 #endif /* < 2.6.19 */
 
 /*****************************************************************************/
@@ -2361,6 +2390,35 @@ do {								\
 })
 #endif /* DEBUG */
 
+#undef netif_printk
+#define netif_printk(priv, type, level, dev, fmt, args...)	\
+do {								\
+	if (netif_msg_##type(priv))				\
+		netdev_printk(level, (dev), fmt, ##args);	\
+} while (0)
+
+#undef netif_emerg
+#define netif_emerg(priv, type, dev, fmt, args...)		\
+	netif_level(emerg, priv, type, dev, fmt, ##args)
+#undef netif_alert
+#define netif_alert(priv, type, dev, fmt, args...)		\
+	netif_level(alert, priv, type, dev, fmt, ##args)
+#undef netif_crit
+#define netif_crit(priv, type, dev, fmt, args...)		\
+	netif_level(crit, priv, type, dev, fmt, ##args)
+#undef netif_err
+#define netif_err(priv, type, dev, fmt, args...)		\
+	netif_level(err, priv, type, dev, fmt, ##args)
+#undef netif_warn
+#define netif_warn(priv, type, dev, fmt, args...)		\
+	netif_level(warn, priv, type, dev, fmt, ##args)
+#undef netif_notice
+#define netif_notice(priv, type, dev, fmt, args...)		\
+	netif_level(notice, priv, type, dev, fmt, ##args)
+#undef netif_info
+#define netif_info(priv, type, dev, fmt, args...)		\
+	netif_level(info, priv, type, dev, fmt, ##args)
+
 #if !defined(CONFIG_PM_OPS) && defined(CONFIG_PM_SLEEP)
 #define CONFIG_PM_OPS
 #endif
@@ -2437,13 +2495,28 @@ static inline struct sk_buff *_kc_netdev_alloc_skb_ip_align(struct net_device *d
 #undef netdev_alloc_skb_ip_align
 #endif
 #define netdev_alloc_skb_ip_align(n, l) _kc_netdev_alloc_skb_ip_align(n, l)
+
+#undef netif_level
+#define netif_level(level, priv, type, dev, fmt, args...)	\
+do {								\
+	if (netif_msg_##type(priv))				\
+		netdev_##level(dev, fmt, ##args);		\
+} while (0)
+
+#undef usleep_range
+#define usleep_range(min, max)	msleep(DIV_ROUND_UP(min, 1000))	
+
 #else /* < 2.6.36 */
 #define HAVE_PM_QOS_REQUEST_ACTIVE
 #define HAVE_8021P_SUPPORT
+#define HAVE_NDO_GET_STATS64
 #endif /* < 2.6.36 */
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37) )
+#ifndef ETHTOOL_RXNTUPLE_ACTION_CLEAR
+#define ETHTOOL_RXNTUPLE_ACTION_CLEAR (-2)
+#endif
 #ifndef VLAN_N_VID
 #define VLAN_N_VID	VLAN_GROUP_ARRAY_LEN
 #endif /* VLAN_N_VID */
@@ -2460,14 +2533,53 @@ static inline void _kc_skb_checksum_none_assert(struct sk_buff *skb)
 }
 #define skb_checksum_none_assert(skb) _kc_skb_checksum_none_assert(skb)
 
+static inline void *_kc_vzalloc_node(unsigned long size, int node)
+{
+	void *addr = vmalloc_node(size, node);
+	if (addr)
+		memset(addr, 0, size);
+	return addr;
+}
+#define vzalloc_node(_size, _node) _kc_vzalloc_node(_size, _node)
+
+static inline void *_kc_vzalloc(unsigned long size)
+{
+	void *addr = vmalloc(size);
+	if (addr)
+		memset(addr, 0, size);
+	return addr;
+}
+#define vzalloc(_size) _kc_vzalloc(_size)
+
 #ifdef HAVE_HW_TIME_STAMP
 #define SKBTX_HW_TSTAMP (1 << 0)
 #define SKBTX_IN_PROGRESS (1 << 2)
 #define SKB_SHARED_TX_IS_UNION
 #endif
 #endif /* < 2.6.37 */
+
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38) )
-#define VLAN_GROUP_ARRAY_LEN 4096
-#endif /* < 2.6.38 > */
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22) )
+#define skb_checksum_start_offset(skb) skb_transport_offset(skb)
+#else /* 2.6.22 -> 2.6.37 */
+static inline int _kc_skb_checksum_start_offset(const struct sk_buff *skb)
+{
+        return skb->csum_start - skb_headroom(skb);
+}
+#define skb_checksum_start_offset(skb) _kc_skb_checksum_start_offset(skb)
+#endif /* 2.6.22 -> 2.6.37 */
+
+#endif /* < 2.6.38 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39) )
+#else /* < 2.6.39 */
+#if defined(CONFIG_FCOE) || defined(CONFIG_FCOE_MODULE)
+#ifndef HAVE_NETDEV_OPS_FCOE_DDP_TARGET
+#define HAVE_NETDEV_OPS_FCOE_DDP_TARGET
+#endif
+#endif /* CONFIG_FCOE || CONFIG_FCOE_MODULE */
+#endif /* < 2.6.39 */
+
 #endif /* _KCOMPAT_H_ */

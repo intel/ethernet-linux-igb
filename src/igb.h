@@ -25,7 +25,6 @@
 
 *******************************************************************************/
 
-
 /* Linux PRO/1000 Ethernet Driver main header file */
 
 #ifndef _IGB_H_
@@ -67,6 +66,7 @@ struct igb_adapter;
 
 #include "e1000_api.h"
 #include "e1000_82575.h"
+#include "e1000_manage.h"
 
 #define IGB_ERR(args...) printk(KERN_ERR "igb: " args)
 
@@ -112,6 +112,7 @@ struct igb_adapter;
 #define IGB_MAX_UTA_ENTRIES              128
 #define MAX_EMULATION_MAC_ADDRS           16
 #define OUI_LEN                            3
+#define IGB_MAX_VMDQ_QUEUES                8
 
 struct vf_data_storage {
 	unsigned char vf_mac_addresses[ETH_ALEN];
@@ -126,6 +127,7 @@ struct vf_data_storage {
 #ifdef IFLA_VF_MAX
 	u16 pf_vlan; /* When set, guest VLAN config not allowed. */
 	u16 pf_qos;
+	u16 tx_rate;
 #endif
 };
 
@@ -181,8 +183,10 @@ struct vf_data_storage {
 /* How many Rx Buffers do we bundle into one write to the hardware ? */
 #define IGB_RX_BUFFER_WRITE	16	/* Must be power of 2 */
 
-#define AUTO_ALL_MODES            0
 #define IGB_EEPROM_APME         0x0400
+#ifndef ETH_TP_MDI_X
+#define AUTO_ALL_MODES          0
+#endif
 
 #ifndef IGB_MASTER_SLAVE
 /* Switch to override PHY master/slave setting */
@@ -333,10 +337,14 @@ struct igb_ring {
 #endif
 		};
 	};
-
+#ifdef CONFIG_IGB_VMDQ_NETDEV
+	struct net_device *vmdq_netdev;
+	int vqueue_index;		/* queue index for virtual netdev */
+#endif
 	/* Items past this point are only used during ring alloc / free */
 	dma_addr_t dma;                 /* phys address of the ring */
 	int numa_node;                  /* node to alloc ring memory on */
+
 } ____cacheline_internodealigned_in_smp;
 
 enum e1000_ring_flags_t {
@@ -345,9 +353,18 @@ enum e1000_ring_flags_t {
 #ifdef IGB_LRO
 	IGB_RING_FLAG_RX_LRO,
 #endif /* IGB_LRO */
+	IGB_RING_FLAG_RX_LB_VLAN_BSWAP,
 	IGB_RING_FLAG_TX_CTX_IDX,
 	IGB_RING_FLAG_TX_DETECT_HANG
 };
+struct igb_mac_addr {
+	u8 addr[ETH_ALEN];
+	u16 queue;
+	u16 state; /* bitmask */
+};
+#define IGB_MAC_STATE_DEFAULT	0x1
+#define IGB_MAC_STATE_MODIFIED	0x2
+#define IGB_MAC_STATE_IN_USE	0x4
 
 #define IGB_TXD_DCMD (E1000_ADVTXD_DCMD_EOP | E1000_ADVTXD_DCMD_RS)
 
@@ -357,6 +374,16 @@ enum e1000_ring_flags_t {
 	(&(((union e1000_adv_tx_desc *)((R)->desc))[i]))
 #define IGB_TX_CTXTDESC(R, i)	    \
 	(&(((struct e1000_adv_tx_context_desc *)((R)->desc))[i]))
+
+#ifdef CONFIG_IGB_VMDQ_NETDEV
+#define netdev_ring(ring) \
+	((ring->vmdq_netdev ? ring->vmdq_netdev : ring->netdev))
+#define ring_queue_index(ring) \
+	((ring->vmdq_netdev ? ring->vqueue_index : ring->queue_index))
+#else
+#define netdev_ring(ring) (ring->netdev)
+#define ring_queue_index(ring) (ring->queue_index)
+#endif /* CONFIG_IGB_VMDQ_NETDEV */
 
 /* igb_desc_unused - calculate if we have unused descriptors */
 static inline u16 igb_desc_unused(const struct igb_ring *ring)
@@ -452,6 +479,9 @@ struct igb_adapter {
 	u16 tx_ring_count;
 	u16 rx_ring_count;
 	struct vf_data_storage *vf_data;
+#ifdef IFLA_VF_MAX
+	int vf_rate_link_speed;
+#endif
 	u32 lli_port;
 	u32 lli_size;
 	unsigned int vfs_allocated_count;
@@ -461,7 +491,22 @@ struct igb_adapter {
 	u16 fw_version;
 	int node;
 	u32 wvbr;
+	struct igb_mac_addr *mac_table;
+#ifdef CONFIG_IGB_VMDQ_NETDEV
+	struct net_device *vmdq_netdev[IGB_MAX_VMDQ_QUEUES];
+#endif
 };
+
+#ifdef CONFIG_IGB_VMDQ_NETDEV
+struct igb_vmdq_adapter {
+	struct igb_adapter *real_adapter;
+	struct net_device *vnetdev;
+	struct net_device_stats net_stats;
+	struct igb_ring *tx_ring;
+	struct igb_ring *rx_ring;
+	struct vlan_group *vlgrp;
+};
+#endif
 
 
 #define IGB_FLAG_HAS_MSI           (1 << 0)
@@ -471,10 +516,44 @@ struct igb_adapter {
 #define IGB_FLAG_QUAD_PORT_A       (1 << 4)
 #define IGB_FLAG_QUEUE_PAIRS       (1 << 5)
 #define IGB_FLAG_EEE               (1 << 6)
+#define IGB_FLAG_DMAC              (1 << 7)
+
+
+/* DMA Coalescing defines */
+#define IGB_MIN_TXPBSIZE           20408
+#define IGB_TX_BUF_4096            4096
+#define IGB_DMCTLX_DCFLUSH_DIS     0x80000000  /* Disable DMA Coal Flush */
 
 #define IGB_82576_TSYNC_SHIFT 19
 #define IGB_82580_TSYNC_SHIFT 24
 #define IGB_TS_HDR_LEN        16
+/* CEM Support */
+#define FW_HDR_LEN           0x4
+#define FW_CMD_DRV_INFO      0xDD
+#define FW_CMD_DRV_INFO_LEN  0x5
+#define FW_CMD_RESERVED      0X0
+#define FW_RESP_SUCCESS      0x1
+#define FW_UNUSED_VER        0x0
+#define FW_MAX_RETRIES       3
+#define FW_STATUS_SUCCESS    0x1
+
+struct e1000_fw_hdr {
+	u8 cmd;
+	u8 buf_len;
+	union
+	{
+		u8 cmd_resv;
+		u8 ret_status;
+	} cmd_or_resp;
+	u8 checksum;
+};
+struct e1000_fw_drv_info {
+	struct e1000_fw_hdr hdr;
+	u8 port_num;
+	u32 drv_version;
+	u16 pad; /* end spacing to ensure length is mult. of dword */
+	u8  pad2; /* end spacing to ensure length is mult. of dword2 */
+};
 enum e1000_state_t {
 	__IGB_TESTING,
 	__IGB_RESETTING,
@@ -497,10 +576,11 @@ extern void igb_configure_tx_ring(struct igb_adapter *, struct igb_ring *);
 extern void igb_configure_rx_ring(struct igb_adapter *, struct igb_ring *);
 extern void igb_setup_tctl(struct igb_adapter *);
 extern void igb_setup_rctl(struct igb_adapter *);
-extern netdev_tx_t igb_xmit_frame_ring(struct sk_buff *, struct igb_ring *, bool);
+extern netdev_tx_t igb_xmit_frame_ring(struct sk_buff *, struct igb_ring *);
 extern void igb_unmap_and_free_tx_resource(struct igb_ring *,
                                            struct igb_buffer *);
 extern void igb_alloc_rx_buffers(struct igb_ring *, u16);
+extern void igb_clean_rx_ring(struct igb_ring *);
 extern void igb_update_stats(struct igb_adapter *);
 extern bool igb_has_link(struct igb_adapter *adapter);
 extern void igb_set_ethtool_ops(struct net_device *);
@@ -509,7 +589,12 @@ extern void igb_power_up_link(struct igb_adapter *);
 #ifdef ETHTOOL_OPS_COMPAT
 extern int ethtool_ioctl(struct ifreq *);
 #endif
+extern int igb_write_mc_addr_list(struct net_device *netdev);
+extern int igb_add_mac_filter(struct igb_adapter *adapter, u8 *addr, u16 queue);
+extern int igb_del_mac_filter(struct igb_adapter *adapter, u8* addr, u16 queue);
+extern int igb_available_rars(struct igb_adapter *adapter);
 extern s32 igb_vlvf_set(struct igb_adapter *, u32, bool, u32);
 extern void igb_configure_vt_default_pool(struct igb_adapter *adapter);
+extern void igb_enable_vlan_tags(struct igb_adapter *adapter);
 
 #endif /* _IGB_H_ */

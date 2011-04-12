@@ -135,7 +135,7 @@ IGB_PARAM(LLISize, "Low Latency Interrupt on Packet Size (0-1500), default 0=off
 IGB_PARAM(RSS, "Number of Receive-Side Scaling Descriptor Queues (0-8), default 1=number of cpus");
 
 #define DEFAULT_RSS       1
-#define MAX_RSS          ((adapter->hw.mac.type == e1000_82575) ? 4 : 8)
+#define MAX_RSS           ((adapter->hw.mac.type == e1000_82575) ? 4 : 8)
 #define MIN_RSS           0
 
 /* VMDQ (Enable VMDq multiqueue receive)
@@ -175,6 +175,21 @@ IGB_PARAM(QueuePairs, "Enable TX/RX queue pairs for interrupt handling (0,1), de
 #define MAX_QUEUE_PAIRS               1
 #define MIN_QUEUE_PAIRS               0
 
+/* Enable/disable EEE (a.k.a. IEEE802.3az)
+ *
+ * Valid Range: 0, 1
+ *
+ * Default Value: 1
+ */
+ IGB_PARAM(EEE, "Enable/disable on parts that support the feature");
+
+/* Enable/disable DMA Coalescing
+ *
+ * Valid Range: 0, 1
+ *
+ * Default Value: 0
+ */
+ IGB_PARAM(DMAC, "Enable/disable on parts that support the feature");
 struct igb_option {
 	enum { enable_option, range_option, list_option } type;
 	const char *name;
@@ -286,6 +301,8 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			case 0:
 				DPRINTK(PROBE, INFO, "%s turned off\n",
 				        opt.name);
+				if(hw->mac.type >= e1000_i350)
+					adapter->flags &= ~IGB_FLAG_DMAC;
 				break;
 			case 1:
 				DPRINTK(PROBE, INFO, "%s set to dynamic mode\n",
@@ -476,6 +493,12 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 				adapter->vmdq_pools = 1;
 		}
 #endif
+#ifdef CONFIG_IGB_VMDQ_NETDEV
+		if (hw->mac.type == e1000_82575 && adapter->vmdq_pools) {
+			DPRINTK(PROBE, INFO, "VMDq not supported on this part.\n");
+			adapter->vmdq_pools = 0;
+		}
+#endif
 	}
 	{ /* RSS - Enable RSS multiqueue receives */
 		struct igb_option opt = {
@@ -489,6 +512,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 
 		if (adapter->vmdq_pools) {
 			switch (hw->mac.type) {
+#ifndef CONFIG_IGB_VMDQ_NETDEV
 			case e1000_82576:
 				opt.arg.r.max = 2;
 				break;
@@ -497,6 +521,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 					opt.arg.r.max = 3;
 				if (adapter->vmdq_pools <= 2)
 					break;
+#endif
 			default:
 				opt.arg.r.max = 1;
 				break;
@@ -558,6 +583,58 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			adapter->flags |= opt.def ? IGB_FLAG_QUEUE_PAIRS : 0;
 		}
 #endif
+	}
+	{ /* EEE -  Enable EEE for capable adapters */
+
+		if (hw->mac.type >= e1000_i350) {
+			struct igb_option opt = {
+				.type = enable_option,
+				.name = "EEE Support",
+				.err  = "defaulting to Enabled",
+				.def  = OPTION_ENABLED
+			};
+#ifdef module_param_array
+			if (num_EEE > bd) {
+#endif
+				unsigned int eee = EEE[bd];
+				igb_validate_option(&eee, &opt, adapter);
+				adapter->flags |= eee ? IGB_FLAG_EEE : 0;
+				if (eee)
+					hw->dev_spec._82575.eee_disable = false;
+				else
+					hw->dev_spec._82575.eee_disable = true;
+
+#ifdef module_param_array
+			} else {
+				adapter->flags |= opt.def ? IGB_FLAG_EEE : 0;
+				if (adapter->flags & IGB_FLAG_EEE)
+					hw->dev_spec._82575.eee_disable = false;
+				else
+					hw->dev_spec._82575.eee_disable = true;
+			}
+#endif
+		}
+	}
+	{ /* DMAC -  Enable DMA Coalescing for capable adapters */
+
+		if (hw->mac.type >= e1000_i350) {
+			struct igb_option opt = {
+				.type = enable_option,
+				.name = "DMA Coalescing",
+				.err  = "defaulting to Enabled",
+				.def  = OPTION_DISABLED
+			};
+#ifdef module_param_array
+			if (num_DMAC > bd) {
+#endif
+				unsigned int dmac = DMAC[bd];
+				igb_validate_option(&dmac, &opt, adapter);
+				adapter->flags |= dmac ? IGB_FLAG_DMAC : 0;
+#ifdef module_param_array
+			} else 
+				adapter->flags |= opt.def ? IGB_FLAG_DMAC : 0;
+#endif
+		}
 	}
 	{ /* Node assignment */
 		static struct igb_option opt = {

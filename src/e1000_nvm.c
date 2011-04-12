@@ -304,17 +304,17 @@ static s32 e1000_ready_nvm_eeprom(struct e1000_hw *hw)
 	struct e1000_nvm_info *nvm = &hw->nvm;
 	u32 eecd = E1000_READ_REG(hw, E1000_EECD);
 	s32 ret_val = E1000_SUCCESS;
-	u16 timeout = 0;
 	u8 spi_stat_reg;
 
 	DEBUGFUNC("e1000_ready_nvm_eeprom");
 
 	if (nvm->type == e1000_nvm_eeprom_spi) {
+		u16 timeout = NVM_MAX_RETRY_SPI;
+
 		/* Clear SK and CS */
 		eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
 		E1000_WRITE_REG(hw, E1000_EECD, eecd);
 		usec_delay(1);
-		timeout = NVM_MAX_RETRY_SPI;
 
 		/*
 		 * Read "Status Register" repeatedly until the LSB is cleared.
@@ -340,6 +340,70 @@ static s32 e1000_ready_nvm_eeprom(struct e1000_hw *hw)
 			goto out;
 		}
 	}
+
+out:
+	return ret_val;
+}
+
+/**
+ *  e1000_read_nvm_spi - Read EEPROM's using SPI
+ *  @hw: pointer to the HW structure
+ *  @offset: offset of word in the EEPROM to read
+ *  @words: number of words to read
+ *  @data: word read from the EEPROM
+ *
+ *  Reads a 16 bit word from the EEPROM.
+ **/
+s32 e1000_read_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
+{
+	struct e1000_nvm_info *nvm = &hw->nvm;
+	u32 i = 0;
+	s32 ret_val;
+	u16 word_in;
+	u8 read_opcode = NVM_READ_OPCODE_SPI;
+
+	DEBUGFUNC("e1000_read_nvm_spi");
+
+	/*
+	 * A check for invalid values:  offset too large, too many words,
+	 * and not enough words.
+	 */
+	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
+	    (words == 0)) {
+		DEBUGOUT("nvm parameter(s) out of bounds\n");
+		ret_val = -E1000_ERR_NVM;
+		goto out;
+	}
+
+	ret_val = nvm->ops.acquire(hw);
+	if (ret_val)
+		goto out;
+
+	ret_val = e1000_ready_nvm_eeprom(hw);
+	if (ret_val)
+		goto release;
+
+	e1000_standby_nvm(hw);
+
+	if ((nvm->address_bits == 8) && (offset >= 128))
+		read_opcode |= NVM_A8_OPCODE_SPI;
+
+	/* Send the READ command (opcode + addr) */
+	e1000_shift_out_eec_bits(hw, read_opcode, nvm->opcode_bits);
+	e1000_shift_out_eec_bits(hw, (u16)(offset*2), nvm->address_bits);
+
+	/*
+	 * Read the data.  SPI NVMs increment the address with each byte
+	 * read and will roll over if reading beyond the end.  This allows
+	 * us to read the whole NVM from any offset
+	 */
+	for (i = 0; i < words; i++) {
+		word_in = e1000_shift_in_eec_bits(hw, 16);
+		data[i] = (word_in >> 8) | (word_in << 8);
+	}
+
+release:
+	nvm->ops.release(hw);
 
 out:
 	return ret_val;
@@ -483,7 +547,7 @@ out:
  *  Reads the product board assembly (PBA) number from the EEPROM and stores
  *  the value in pba_num.
  **/
-s32 e1000_read_pba_string_generic(struct e1000_hw *hw, u8 *pba_num, 
+s32 e1000_read_pba_string_generic(struct e1000_hw *hw, u8 *pba_num,
                                   u32 pba_num_size)
 {
 	s32 ret_val;

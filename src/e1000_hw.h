@@ -55,6 +55,11 @@ struct e1000_hw;
 #define E1000_DEV_ID_I350_FIBER               0x1522
 #define E1000_DEV_ID_I350_SERDES              0x1523
 #define E1000_DEV_ID_I350_SGMII               0x1524
+#define E1000_DEV_ID_I350_DA4                 0x1546
+#define E1000_DEV_ID_DH89XXCC_SGMII           0x0438
+#define E1000_DEV_ID_DH89XXCC_SERDES          0x043A
+#define E1000_DEV_ID_DH89XXCC_BACKPLANE       0x043C
+#define E1000_DEV_ID_DH89XXCC_SFP             0x0440
 #define E1000_REVISION_0 0
 #define E1000_REVISION_1 1
 #define E1000_REVISION_2 2
@@ -410,6 +415,10 @@ struct e1000_hw_stats {
 	u64 scvpc;
 	u64 hrmpc;
 	u64 doosync;
+	u64 o2bgptc;
+	u64 o2bspc;
+	u64 b2ospc;
+	u64 b2ogprc;
 };
 
 
@@ -535,8 +544,8 @@ struct e1000_nvm_operations {
 
 struct e1000_mac_info {
 	struct e1000_mac_operations ops;
-	u8 addr[6];
-	u8 perm_addr[6];
+	u8 addr[ETH_ADDR_LEN];
+	u8 perm_addr[ETH_ADDR_LEN];
 
 	enum e1000_mac_type type;
 
@@ -676,11 +685,12 @@ struct e1000_mbx_info {
 struct e1000_dev_spec_82575 {
 	bool sgmii_active;
 	bool global_device_reset;
+	bool eee_disable;
 };
 
 struct e1000_dev_spec_vf {
-	u32	vf_number;
-	u32	v2p_mailbox;
+	u32 vf_number;
+	u32 v2p_mailbox;
 };
 
 struct e1000_hw {
@@ -699,8 +709,8 @@ struct e1000_hw {
 	struct e1000_host_mng_dhcp_cookie mng_cookie;
 
 	union {
-		struct e1000_dev_spec_82575	_82575;
-		struct e1000_dev_spec_vf	vf;
+		struct e1000_dev_spec_82575 _82575;
+		struct e1000_dev_spec_vf vf;
 	} dev_spec;
 
 	u16 device_id;

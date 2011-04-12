@@ -4,7 +4,7 @@
 .\"
 .\" * Other names and brands may be claimed as the property of others.
 .\"
-.TH igb 1 "February 8, 2011"
+.TH igb 1 "March 14, 2011"
 
 .SH NAME
 igb \-This file describes the Linux* Base Driver for the Gigabit Family of Adapters.
@@ -190,7 +190,23 @@ the adapter allocate memory from.  All driver structures, in-memory queues, and 
 A link between two EEE-compliant devices will result in periodic bursts of 
 data followed by long periods where in the link is in an idle state. This Low
 Power Idle (LPI) state is supported in both 1Gbps and 100Mbps link speeds.
-
+.IP
+NOTE: EEE support requires autonegotiation.
+.IP
+.B DMAC
+.IP
+.B Valid Range: 
+0-1
+.IP
+.B Default Value: 
+0 (disabled)
+.IP
+ Enables or disables DMA Coalescing feature. Turning on DMA Coalescing may
+  save energy with kernel 2.6.32 and later. InterruptThrottleRate (ITR) should
+  be set to dynamic. This will impart the greatest chance for your system to 
+  consume less power. DMA Coalescing is effective in helping potentially saving   the platform power only when it is enabled across all active ports.
+  For more information on how to configure DMA Coalescing, perform a search on
+  www.intel.com
 .SH JUMBO FRAMES
 Jumbo Frames support is enabled by changing the MTU to a value larger than the default of 1500.Use the ifconfig command to increase the MTU size.  For example:
 .IP
@@ -202,12 +218,12 @@ Jumbo Frames are supported at 1000 Mbps only.  Using Jumbo Frames at 10 or 100 M
 Some Intel gigabit adapters that support Jumbo Frames have a frame size limit of 9238 bytes, with a corresponding MTU size limit of 9216 bytes. 
 .LP
 See the section "Jumbo Frames" in README.
-.SH Ethtool
-The driver utilizes the ethtool interface for driver configuration and diagnostics, as well as displaying statistical information.  Ethtool version 1.8.1 or later is required for this functionality.
+.SH ethtool
+The driver utilizes the ethtool interface for driver configuration and diagnostics, as well as displaying statistical information.  ethtool version 1.8.1 or later is required for this functionality.
 .LP
-The latest release of ethtool can be found from http://sf.net/projects/gkernel.  The driver then must be recompiled in order to take advantage of the latest ethtool features.
+The latest release of ethtool can be found from http://ftp.kernel.org/pub/software/network/ethtool/.  The driver then must be recompiled in order to take advantage of the latest ethtool features.
 .LP
-Ethtool 1.6 only supports a limited set of ethtool options.  Support for a more complete ethtool feature set can be enabled by upgrading ethtool to ethtool-1.8.1.  
+ethtool 1.6 only supports a limited set of ethtool options.  Support for a more complete ethtool feature set can be enabled by upgrading ethtool to ethtool-1.8.1.  
 .SH SUPPORT
 For additional information, including supported adapters, building, and installation, see the README file included with the driver.
 .LP
