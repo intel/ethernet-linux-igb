@@ -1,5 +1,5 @@
-11297    10 igb.spec
-43074     9 igb.7
+55973    10 igb.spec
+29790     9 igb.7
 46931     3 pci.updates
 45202     7 src/e1000_api.h
 29069     3 src/e1000_nvm.h
@@ -28,8 +28,8 @@
 00495    36 src/e1000_regs.h
 37570    18 src/igb_param.c
 10915     4 src/e1000_manage.h
-02107   215 src/igb_main.c
+59482   215 src/igb_main.c
 64506    30 src/kcompat_ethtool.c
 02802    12 src/Makefile
 39773    19 COPYING
-06832    29 README
+54984    30 README

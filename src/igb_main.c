@@ -56,7 +56,7 @@
 
 #define MAJ 3
 #define MIN 0
-#define BUILD 19
+#define BUILD 22
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "." __stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
 char igb_driver_name[] = "igb";
@@ -4526,7 +4526,7 @@ static inline struct igb_ring *igb_tx_queue_mapping(struct igb_adapter *adapter,
 {
 	unsigned int r_idx = skb->queue_mapping & (IGB_MAX_TX_QUEUES - 1);
 
-	if (r_idx > adapter->num_tx_queues)
+	if (r_idx >= adapter->num_tx_queues)
 		r_idx = r_idx % adapter->num_tx_queues;
 
 	return adapter->tx_ring[r_idx];
