@@ -39,9 +39,11 @@
 #define E1000_MDICNFG  0x00E04  /* MDI Config - RW */
 #define E1000_REGISTER_SET_SIZE        0x20000 /* CSR Size */
 #define E1000_EEPROM_INIT_CTRL_WORD_2  0x0F /* EEPROM Init Ctrl Word 2 */
+#define E1000_EEPROM_PCIE_CTRL_WORD_2  0x28 /* EEPROM PCIe Ctrl Word 2 */
 #define E1000_BARCTRL                  0x5BBC /* BAR ctrl reg */
 #define E1000_BARCTRL_FLSIZE           0x0700 /* BAR ctrl Flsize */
 #define E1000_BARCTRL_CSRSIZE          0x2000 /* BAR ctrl CSR size */
+#define E1000_I350_BARCTRL             0x5BFC /* BAR ctrl reg */
 #define E1000_SCTL     0x00024  /* SerDes Control - RW */
 #define E1000_FCAL     0x00028  /* Flow Control Address Low - RW */
 #define E1000_FCAH     0x0002C  /* Flow Control Address High -RW */
@@ -464,6 +466,7 @@
                                                        * Filter - RW */
 #define E1000_VMVIR(_n)        (0x03700 + (4 * (_n)))
 #define E1000_DVMOLR(_n)       (0x0C038 + (0x40 * (_n))) /* DMA VM offload */
+#define E1000_VTCTRL(_n)       (0x10000 + (0x100 * (_n))) /* VT Control */
 /* Time Sync */
 #define E1000_TSYNCRXCTL 0x0B620 /* Rx Time Sync Control register - RW */
 #define E1000_TSYNCTXCTL 0x0B614 /* Tx Time Sync Control register - RW */

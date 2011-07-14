@@ -196,17 +196,36 @@ NOTE: EEE support requires autonegotiation.
 .B DMAC
 .IP
 .B Valid Range: 
-0-1
+0, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000.
 .IP
 .B Default Value: 
 0 (disabled)
 .IP
- Enables or disables DMA Coalescing feature. Turning on DMA Coalescing may
-  save energy with kernel 2.6.32 and later. InterruptThrottleRate (ITR) should
-  be set to dynamic. This will impart the greatest chance for your system to 
-  consume less power. DMA Coalescing is effective in helping potentially saving   the platform power only when it is enabled across all active ports.
-  For more information on how to configure DMA Coalescing, perform a search on
-  www.intel.com
+Enables or disables DMA Coalescing feature. Values are in usec’s and increase the internal DMA Coalescing feature’s internal timer. DMA (Direct Memory Access) allows the network device to move packet data directly to the system's memory, 
+  reducing CPU utilitzation. However, the frequency and random intervals at
+  which packets arrive do not allow the system to enter a lower power state. 
+  DMA Coalescing allows the adapter to collect packets before it initiates a 
+  DMA event. This may increase network latency but also increases the chances 
+  that the system will enter a lower power state.
+.IP
+Turning on DMA Coalescing may save energy with kernel 2.6.32 and later. This
+  will impart the greatest chance for your system to consume less power. DMA 
+  Coalescing is effective in helping potentially saving the platform power only
+  when it is enabled across all active ports.
+.IP
+InterruptThrottleRate (ITR) should be set to dynamic. When ITR=0, DMA 
+  Coalescing is automatically disabled. A whitepaper containing information on how to best configure your platform 
+  is available on the Intel website.
+.B MDD (Malicious Driver Detection)
+.IP
+.B Valid Range: 
+0, 1; 0 = Disable, 1 = Enable
+.B Default Value:
+1
+.IP
+This parameter is only relevant for I350 devices operating in SR-IOV mode. When
+this parameter is set, the driver detects malicious VF driver and disables its
+TX/RX queues until a VF driver reset occurs.
 .SH JUMBO FRAMES
 Jumbo Frames support is enabled by changing the MTU to a value larger than the default of 1500.Use the ifconfig command to increase the MTU size.  For example:
 .IP

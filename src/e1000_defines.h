@@ -126,6 +126,8 @@
 #define E1000_CTRL_EXT_RO_DIS    0x00020000 /* Relaxed Ordering disable */
 #define E1000_CTRL_EXT_DMA_DYN_CLK_EN 0x00080000 /* DMA Dynamic Clock Gating */
 #define E1000_CTRL_EXT_LINK_MODE_MASK 0x00C00000
+#define E1000_CTRL_EXT_LINK_MODE_OFFSET 22  /* Offset of the link mode field
+                                             * in Ctrl Ext register */
 #define E1000_CTRL_EXT_LINK_MODE_82580_MASK 0x01C00000 /*82580 bit 24:22*/
 #define E1000_CTRL_EXT_LINK_MODE_1000BASE_KX  0x00400000
 #define E1000_CTRL_EXT_LINK_MODE_GMII 0x00000000
@@ -161,6 +163,8 @@
 #define E1000_I2CCMD_READY            0x20000000
 #define E1000_I2CCMD_INTERRUPT_ENA    0x40000000
 #define E1000_I2CCMD_ERROR            0x80000000
+#define E1000_I2CCMD_SFP_DATA_ADDR(a) (0x0000 + (a))
+#define E1000_I2CCMD_SFP_DIAG_ADDR(a) (0x0100 + (a))
 #define E1000_MAX_SGMII_PHY_REG_ADDR  255
 #define E1000_I2CCMD_PHY_TIMEOUT      200
 #define E1000_IVAR_VALID        0x80
@@ -693,6 +697,8 @@
 #define E1000_PBA_48K 0x0030    /* 48KB */
 #define E1000_PBA_64K 0x0040    /* 64KB */
 
+#define E1000_PBA_RXA_MASK  0xFFFF;
+
 #define E1000_PBS_16K E1000_PBA_16K
 #define E1000_PBS_24K E1000_PBA_24K
 
@@ -1059,7 +1065,7 @@
 #define E1000_THSTAT_PWR_DOWN       0x00000001  /* Power Down Event */
 #define E1000_THSTAT_LINK_THROTTLE  0x00000002  /* Link Speed Throttle Event */
 
-/* Powerville EEE defines */
+/* I350 EEE defines */
 #define E1000_IPCNFG_EEE_1G_AN      0x00000008  /* IPCNFG EEE Enable 1G AN */
 #define E1000_IPCNFG_EEE_100M_AN    0x00000004  /* IPCNFG EEE Enable 100M AN */
 #define E1000_EEER_TX_LPI_EN        0x00010000  /* EEER Tx LPI Enable */
@@ -1272,6 +1278,11 @@
 /* Mask bits for fields in Word 0x24 of the NVM */
 #define NVM_WORD24_COM_MDIO         0x0008 /* MDIO interface shared */
 #define NVM_WORD24_EXT_MDIO         0x0004 /* MDIO accesses routed external */
+#define NVM_WORD24_LNK_MODE_OFFSET         8 /* Offset of Link Mode bits
+                                              * for 82575 up to Kawela */
+#define NVM_WORD24_82580_LNK_MODE_OFFSET   4 /* Offset of Link Mode bits
+                                              * Link Mode bits for 82580 up */
+
 
 /* Mask bits for fields in Word 0x0f of the NVM */
 #define NVM_WORD0F_PAUSE_MASK       0x3000
@@ -1702,6 +1713,10 @@
 /* Firmware Status */
 #define E1000_FWSTS_FWRI               0x80000000 /* Firmware Reset
                                                    * Indication */
+/* VF Control */
+#define E1000_VTCTRL_RST               0x04000000 /* Reset VF */
 
-
+#define E1000_STATUS_LAN_ID_MASK        0x00000000C /* Mask for Lan ID field */
+#define E1000_STATUS_LAN_ID_OFFSET      2           /* Lan ID bit field offset
+                                                     * in status register */
 #endif /* _E1000_DEFINES_H_ */

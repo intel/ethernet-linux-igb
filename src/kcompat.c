@@ -654,6 +654,7 @@ free_skb:
 	return -ENOMEM;
 } 
 
+#if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(5,4)))
 int _kc_pci_save_state(struct pci_dev *pdev)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
@@ -713,6 +714,7 @@ void _kc_pci_restore_state(struct pci_dev *pdev)
 #endif
 	}
 }
+#endif /* !(RHEL_RELEASE_CODE >= RHEL 5.4) */
 
 #ifdef HAVE_PCI_ERS
 void _kc_free_netdev(struct net_device *netdev)
@@ -1101,3 +1103,9 @@ int _kc_ethtool_op_set_flags(struct net_device *dev, u32 data, u32 supported)
 	return 0;
 }
 #endif /* < 2.6.36 */
+
+/******************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39) )
+#if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(6,0)))
+#endif /* !(RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(6,0)) */
+#endif /* < 2.6.39 */

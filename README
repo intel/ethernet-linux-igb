@@ -369,24 +369,37 @@ Default Value: 1 (enabled)
 
 DMAC
 ----
-Valid Range: 0-1
+Valid Range: 0, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 
+9000, 10000.
 Default Value: 0 (disabled)
-  Enables or disables DMA Coalescing feature. DMA (Direct Memory Access) allows
-  the network device to move packet data directly to the system's memory, 
-  reducing CPU utilitzation. However, the frequency and random intervals at
-  which packets arrive do not allow the system to enter a lower power state. 
-  DMA Coalescing allows the adapter to collect packets before it initiates a 
-  DMA event. This may increase network latency but also increases the chances 
-  that the system will enter a lower power state. 
+  Enables or disables DMA Coalescing feature. Values are in usec’s and increase
+  the internal DMA Coalescing feature’s internal timer.  DMA (Direct Memory 
+  Access) allows the network device to move packet data directly to the 
+  system's memory, reducing CPU utilization. However, the frequency and random
+  intervals at which packets arrive do not allow the system to enter a lower 
+  power state. DMA Coalescing allows the adapter to collect packets before it 
+  initiates a DMA event. This may increase network latency but also increases
+  the chances that the system will enter a lower power state. 
 
-  Turning on DMA Coalescing may save energy with kernel 2.6.32 and later. 
-  InterruptThrottleRate (ITR) should be set to dynamic. This will impart the 
-  greatest chance for your system to consume less power. DMA Coalescing is 
-  effective in helping potentially saving the platform power only when it is 
-  enabled across all active ports.
+  Turning on DMA Coalescing may save energy with kernel 2.6.32 and later. This
+  will impart the greatest chance for your system to consume less power. DMA 
+  Coalescing is effective in helping potentially saving the platform power only
+  when it is enabled across all active ports.
+
+  InterruptThrottleRate (ITR) should be set to dynamic. When ITR=0, DMA 
+  Coalescing is automatically disabled. 
  
   A whitepaper containing information on how to best configure your platform 
   is available on the Intel website.
+
+MDD (Malicious Driver Detection)
+--------------------------------
+Valid Range: 0, 1; 0 = Disable, 1 = Enable
+Default Value: 1
+
+This parameter is only relevant for I350 devices operating in SR-IOV mode. When
+this parameter is set, the driver detects malicious VF driver and disables its
+TX/RX queues until a VF driver reset occurs.
  
 
 Additional Configurations

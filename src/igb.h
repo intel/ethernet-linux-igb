@@ -355,7 +355,10 @@ enum e1000_ring_flags_t {
 #endif /* IGB_LRO */
 	IGB_RING_FLAG_RX_LB_VLAN_BSWAP,
 	IGB_RING_FLAG_TX_CTX_IDX,
-	IGB_RING_FLAG_TX_DETECT_HANG
+	IGB_RING_FLAG_TX_DETECT_HANG,
+#ifdef NETIF_F_RXHASH
+	IGB_RING_FLAG_RX_HASH
+#endif
 };
 struct igb_mac_addr {
 	u8 addr[ETH_ALEN];
@@ -432,10 +435,6 @@ struct igb_adapter {
 	struct work_struct watchdog_task;
 	bool fc_autoneg;
 	u8  tx_timeout_factor;
-#ifdef ETHTOOL_PHYS_ID
-	struct timer_list blink_timer;
-	unsigned long led_status;
-#endif
 
 	u32 max_frame_size;
 
@@ -485,6 +484,8 @@ struct igb_adapter {
 	u32 lli_port;
 	u32 lli_size;
 	unsigned int vfs_allocated_count;
+	/* Malicious Driver Detection flag. Valid only when SR-IOV is enabled */
+	bool mdd;
 	int int_mode;
 	u32 rss_queues;
 	u32 vmdq_pools;
@@ -495,6 +496,7 @@ struct igb_adapter {
 #ifdef CONFIG_IGB_VMDQ_NETDEV
 	struct net_device *vmdq_netdev[IGB_MAX_VMDQ_QUEUES];
 #endif
+	int dmac;
 };
 
 #ifdef CONFIG_IGB_VMDQ_NETDEV
@@ -516,17 +518,32 @@ struct igb_vmdq_adapter {
 #define IGB_FLAG_QUAD_PORT_A       (1 << 4)
 #define IGB_FLAG_QUEUE_PAIRS       (1 << 5)
 #define IGB_FLAG_EEE               (1 << 6)
-#define IGB_FLAG_DMAC              (1 << 7)
 
-
-/* DMA Coalescing defines */
 #define IGB_MIN_TXPBSIZE           20408
 #define IGB_TX_BUF_4096            4096
+
 #define IGB_DMCTLX_DCFLUSH_DIS     0x80000000  /* Disable DMA Coal Flush */
+
+/* DMA Coalescing defines */
+#define IGB_DMAC_DISABLE          0
+#define IGB_DMAC_MIN            250
+#define IGB_DMAC_500            500
+#define IGB_DMAC_EN_DEFAULT    1000
+#define IGB_DMAC_2000          2000
+#define IGB_DMAC_3000          3000
+#define IGB_DMAC_4000          4000
+#define IGB_DMAC_5000          5000
+#define IGB_DMAC_6000          6000
+#define IGB_DMAC_7000          7000
+#define IGB_DMAC_8000          8000
+#define IGB_DMAC_9000          9000
+#define IGB_DMAC_MAX          10000
+
 
 #define IGB_82576_TSYNC_SHIFT 19
 #define IGB_82580_TSYNC_SHIFT 24
 #define IGB_TS_HDR_LEN        16
+
 /* CEM Support */
 #define FW_HDR_LEN           0x4
 #define FW_CMD_DRV_INFO      0xDD

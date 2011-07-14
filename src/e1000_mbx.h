@@ -54,7 +54,7 @@
 #define E1000_VT_MSGTYPE_CTS      0x20000000  /* Indicates that VF is still
                                                  clear to send requests */
 #define E1000_VT_MSGINFO_SHIFT    16
-/* bits 23:16 are used for exra info for certain messages */
+/* bits 23:16 are used for extra info for certain messages */
 #define E1000_VT_MSGINFO_MASK     (0xFF << E1000_VT_MSGINFO_SHIFT)
 
 #define E1000_VF_RESET            0x01 /* VF requests reset */
@@ -70,6 +70,7 @@
 #define E1000_VF_SET_PROMISC_MULTICAST    (0x02 << E1000_VT_MSGINFO_SHIFT)
 
 #define E1000_PF_CONTROL_MSG      0x0100 /* PF control message */
+
 
 #define E1000_VF_MBX_INIT_TIMEOUT 2000 /* number of retries on mailbox */
 #define E1000_VF_MBX_INIT_DELAY   500  /* microseconds between retries */

@@ -39,6 +39,7 @@
 #define OPTION_UNSET   -1
 #define OPTION_DISABLED 0
 #define OPTION_ENABLED  1
+#define MAX_NUM_LIST_OPTS 15
 
 /* All parameters are treated the same, as an integer array of values.
  * This macro just reduces the need to repeat the same declaration code
@@ -77,7 +78,8 @@ IGB_PARAM(InterruptThrottleRate,
 	  "Maximum interrupts per second, per vector, (max 100000), default 3=adaptive");
 #define DEFAULT_ITR                    3
 #define MAX_ITR                   100000
-#define MIN_ITR                      120
+/* #define MIN_ITR                      120 */
+#define MIN_ITR                      0
 /* IntMode (Interrupt Mode)
  *
  * Valid Range: 0 - 2
@@ -162,6 +164,17 @@ IGB_PARAM(max_vfs, "Number of Virtual Functions: 0 = disable, 1-7 enable, defaul
 #define MAX_SRIOV         7
 #define MIN_SRIOV         0
 
+/* MDD (Enable Malicious Driver Detection)
+ *
+ * Only available when SR-IOV is enabled - max_vfs is greater than 0
+ * 
+ * Valid Range: 0, 1
+ *
+ * Default Value:  1
+ */
+IGB_PARAM(MDD, "Malicious Driver Detection (0/1), default 1 = enabled. "
+	  "Only available when max_vfs is greater than 0");
+
 
 /* QueuePairs (Enable TX/RX queue pairs for interrupt handling)
  *
@@ -185,11 +198,16 @@ IGB_PARAM(QueuePairs, "Enable TX/RX queue pairs for interrupt handling (0,1), de
 
 /* Enable/disable DMA Coalescing
  *
- * Valid Range: 0, 1
+ * Valid Values: 0(off), 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000,
+ * 9000, 10000(msec), 250(usec), 500(usec)
  *
  * Default Value: 0
  */
- IGB_PARAM(DMAC, "Enable/disable on parts that support the feature");
+ IGB_PARAM(DMAC, "Disable or set latency for DMA Coalescing ((0=off, 1000-10000(msec), 250, 500 (usec))");
+struct igb_opt_list {
+	int i;
+	char *str;
+};
 struct igb_option {
 	enum { enable_option, range_option, list_option } type;
 	const char *name;
@@ -202,7 +220,7 @@ struct igb_option {
 		} r;
 		struct { /* list_option info */
 			int nr;
-			struct igb_opt_list { int i; char *str; } *p;
+			struct igb_opt_list *p;
 		} l;
 	} arg;
 };
@@ -302,7 +320,8 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 				DPRINTK(PROBE, INFO, "%s turned off\n",
 				        opt.name);
 				if(hw->mac.type >= e1000_i350)
-					adapter->flags &= ~IGB_FLAG_DMAC;
+					adapter->dmac = IGB_DMAC_DISABLE;
+				adapter->rx_itr_setting = itr;
 				break;
 			case 1:
 				DPRINTK(PROBE, INFO, "%s set to dynamic mode\n",
@@ -618,21 +637,87 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 	{ /* DMAC -  Enable DMA Coalescing for capable adapters */
 
 		if (hw->mac.type >= e1000_i350) {
+			struct igb_opt_list list [] = {
+				{ IGB_DMAC_DISABLE, "DMAC Disable"},
+				{ IGB_DMAC_MIN, "DMAC 250 usec"},
+				{ IGB_DMAC_500, "DMAC 500 usec"},
+				{ IGB_DMAC_EN_DEFAULT, "DMAC 1000 usec"},
+				{ IGB_DMAC_2000, "DMAC 2000 usec"},
+				{ IGB_DMAC_3000, "DMAC 3000 usec"},
+				{ IGB_DMAC_4000, "DMAC 4000 usec"},
+				{ IGB_DMAC_5000, "DMAC 5000 usec"},
+				{ IGB_DMAC_6000, "DMAC 6000 usec"},
+				{ IGB_DMAC_7000, "DMAC 7000 usec"},
+				{ IGB_DMAC_8000, "DMAC 8000 usec"},
+				{ IGB_DMAC_9000, "DMAC 9000 usec"},
+				{ IGB_DMAC_MAX, "DMAC 10000 usec"}
+			};
 			struct igb_option opt = {
-				.type = enable_option,
+				.type = list_option,
 				.name = "DMA Coalescing",
-				.err  = "defaulting to Enabled",
-				.def  = OPTION_DISABLED
+				.err  = "using default of "__MODULE_STRING(IGB_DMAC_DISABLE),
+				.def  = IGB_DMAC_DISABLE,
+				.arg = { .l = { .nr = 13,
+					 	.p = list
+					}
+				}
 			};
 #ifdef module_param_array
 			if (num_DMAC > bd) {
 #endif
 				unsigned int dmac = DMAC[bd];
+				if (adapter->rx_itr_setting == IGB_DMAC_DISABLE)
+					dmac = IGB_DMAC_DISABLE;
 				igb_validate_option(&dmac, &opt, adapter);
-				adapter->flags |= dmac ? IGB_FLAG_DMAC : 0;
+				switch (dmac) {
+				case IGB_DMAC_DISABLE:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_MIN:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_500:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_EN_DEFAULT:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_2000:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_3000:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_4000:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_5000:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_6000:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_7000:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_8000:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_9000:
+					adapter->dmac = dmac;
+					break;
+				case IGB_DMAC_MAX:
+					adapter->dmac = dmac;
+					break;
+				default:
+					adapter->dmac = opt.def;
+					DPRINTK(PROBE, INFO,
+					"Invalid DMAC setting, "
+					"resetting DMAC to %d\n", opt.def);
+				}
 #ifdef module_param_array
-			} else 
-				adapter->flags |= opt.def ? IGB_FLAG_DMAC : 0;
+			} else
+				adapter->dmac = opt.def;
 #endif
 		}
 	}
@@ -681,6 +766,29 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 
 #endif
 		adapter->node = node_param;
+	}
+	{ /* MDD - Enable Malicious Driver Detection. Only available when
+	     SR-IOV is enabled. */
+		struct igb_option opt = {
+			.type = enable_option,
+			.name = "Malicious Driver Detection",
+			.err  = "defaulting to 1",
+			.def  = OPTION_ENABLED,
+			.arg  = { .r = { .min = OPTION_DISABLED,
+					 .max = OPTION_ENABLED } }
+		};
+
+#ifdef module_param_array
+		if (num_MDD > bd) {
+#endif
+			adapter->mdd = MDD[bd];
+			igb_validate_option((uint *)&adapter->mdd, &opt,
+					    adapter);
+#ifdef module_param_array
+		} else {
+			adapter->mdd = opt.def;
+		}
+#endif
 	}
 }
 

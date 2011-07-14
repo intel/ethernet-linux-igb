@@ -314,6 +314,7 @@ static s32 e1000_ready_nvm_eeprom(struct e1000_hw *hw)
 		/* Clear SK and CS */
 		eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
 		E1000_WRITE_REG(hw, E1000_EECD, eecd);
+		E1000_WRITE_FLUSH(hw);
 		usec_delay(1);
 
 		/*

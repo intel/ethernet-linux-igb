@@ -162,7 +162,7 @@ void igb_vmdq_set_rx_mode(struct net_device *dev)
 	/* Check for Promiscuous and All Multicast modes */
 	vmolr = E1000_READ_REG(hw, E1000_VMOLR(hw_queue));
 
-	/* clear the effected bits */
+	/* clear the affected bits */
 	vmolr &= ~(E1000_VMOLR_UPE | E1000_VMOLR_MPME |
 		   E1000_VMOLR_ROPE | E1000_VMOLR_ROMPE);
 

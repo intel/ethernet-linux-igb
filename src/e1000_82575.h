@@ -387,7 +387,7 @@ struct e1000_adv_tx_context_desc {
 #define E1000_FTQF_MASK_SOURCE_PORT_BP 0x80000000
 
 #define E1000_NVM_APME_82575          0x0400
-#define MAX_NUM_VFS                   8
+#define MAX_NUM_VFS                   7
 
 #define E1000_DTXSWC_MAC_SPOOF_MASK   0x000000FF /* Per VF MAC spoof control */
 #define E1000_DTXSWC_VLAN_SPOOF_MASK  0x0000FF00 /* Per VF VLAN spoof control */
@@ -452,6 +452,8 @@ struct e1000_adv_tx_context_desc {
 #define E1000_DTXCTL_OOS_ENABLE 0x0010
 #define E1000_DTXCTL_MDP_EN     0x0020
 #define E1000_DTXCTL_SPOOF_INT  0x0040
+
+#define E1000_EEPROM_PCS_AUTONEG_DISABLE_BIT    1 << 14
 
 #define ALL_QUEUES   0xFFFF
 

@@ -63,6 +63,8 @@ static s32  e1000_set_d0_lplu_state_82575(struct e1000_hw *hw,
                                           bool active);
 static s32  e1000_setup_copper_link_82575(struct e1000_hw *hw);
 static s32  e1000_setup_serdes_link_82575(struct e1000_hw *hw);
+static s32  e1000_get_media_type_82575(struct e1000_hw *hw);
+static s32  e1000_set_sfp_media_type_82575(struct e1000_hw *hw);
 static s32  e1000_valid_led_default_82575(struct e1000_hw *hw, u16 *data);
 static s32  e1000_write_phy_reg_sgmii_82575(struct e1000_hw *hw,
                                             u32 offset, u16 data);
@@ -311,34 +313,11 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	struct e1000_dev_spec_82575 *dev_spec = &hw->dev_spec._82575;
-	u32 ctrl_ext = 0;
 
 	DEBUGFUNC("e1000_init_mac_params_82575");
 
-	/* Set media type */
-        /*
-	 * The 82575 uses bits 22:23 for link mode. The mode can be changed
-         * based on the EEPROM. We cannot rely upon device ID. There
-         * is no distinguishable difference between fiber and internal
-         * SerDes mode on the 82575. There can be an external PHY attached
-         * on the SGMII interface. For this, we'll set sgmii_active to true.
-         */
-	hw->phy.media_type = e1000_media_type_copper;
-	dev_spec->sgmii_active = false;
-
-	ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
-	switch (ctrl_ext & E1000_CTRL_EXT_LINK_MODE_MASK) {
-	case E1000_CTRL_EXT_LINK_MODE_SGMII:
-		dev_spec->sgmii_active = true;
-		break;
-	case E1000_CTRL_EXT_LINK_MODE_1000BASE_KX:
-	case E1000_CTRL_EXT_LINK_MODE_PCIE_SERDES:
-		hw->phy.media_type = e1000_media_type_internal_serdes;
-		break;
-	default:
-		break;
-	}
-
+	/* Derives media type */
+	e1000_get_media_type_82575(hw);
 	/* Set mta register count */
 	mac->mta_reg_count = 128;
 	/* Set uta register count */
@@ -909,7 +888,12 @@ static s32 e1000_acquire_nvm_82575(struct e1000_hw *hw)
 		}
 	}
 
-	ret_val = e1000_acquire_nvm_generic(hw);
+
+	switch (hw->mac.type) {
+	default:
+		ret_val = e1000_acquire_nvm_generic(hw);
+	}
+
 	if (ret_val)
 		e1000_release_swfw_sync_82575(hw, E1000_SWFW_EEP_SM);
 
@@ -928,6 +912,10 @@ static void e1000_release_nvm_82575(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_release_nvm_82575");
 
+	switch (hw->mac.type) {
+	default:
+		e1000_release_nvm_generic(hw);
+	}
 	e1000_release_swfw_sync_82575(hw, E1000_SWFW_EEP_SM);
 }
 
@@ -1420,12 +1408,14 @@ static s32 e1000_setup_serdes_link_82575(struct e1000_hw *hw)
 {
 	u32 ctrl_ext, ctrl_reg, reg;
 	bool pcs_autoneg;
+	s32 ret_val = E1000_SUCCESS;
+	u16 data;
 
 	DEBUGFUNC("e1000_setup_serdes_link_82575");
 
 	if ((hw->phy.media_type != e1000_media_type_internal_serdes) &&
 	    !e1000_sgmii_active_82575(hw))
-		return E1000_SUCCESS;
+		return ret_val;
 
 	/*
 	 * On the 82575, SerDes loopback mode persists until it is
@@ -1464,6 +1454,18 @@ static s32 e1000_setup_serdes_link_82575(struct e1000_hw *hw)
 		pcs_autoneg = false;
 		/* fall through to default case */
 	default:
+		if (hw->mac.type == e1000_82575 ||
+		    hw->mac.type == e1000_82576) {
+			ret_val = hw->nvm.ops.read(hw, NVM_COMPAT, 1, &data);
+			if (ret_val) {
+				DEBUGOUT("NVM Read Error\n");
+				return ret_val;
+			}
+
+			if (data & E1000_EEPROM_PCS_AUTONEG_DISABLE_BIT)
+				pcs_autoneg = false;
+		}
+
 		/*
 		 * non-SGMII modes only supports a speed of 1000/Full for the
 		 * link so it is best to just force the MAC and let the pcs
@@ -1510,7 +1512,217 @@ static s32 e1000_setup_serdes_link_82575(struct e1000_hw *hw)
 	if (!e1000_sgmii_active_82575(hw))
 		e1000_force_mac_fc_generic(hw);
 
-	return E1000_SUCCESS;
+	return ret_val;
+}
+
+/**
+ *  e1000_get_media_type_82575 - derives current media type.
+ *  @hw: pointer to the HW structure
+ *
+ *  The media type is chosen reflecting few settings.
+ *  The following are taken into account:
+ *  - link mode set in the current port Init Control Word #3
+ *  - current link mode settings in CSR register
+ *  - MDIO vs. I2C PHY control interface chosen
+ *  - SFP module media type
+ **/
+static s32 e1000_get_media_type_82575(struct e1000_hw *hw)
+{
+	u32 lan_id = 0;
+	s32 ret_val = E1000_ERR_CONFIG;
+	struct e1000_dev_spec_82575 *dev_spec = &hw->dev_spec._82575;
+	u32 ctrl_ext = 0;
+	u32 current_link_mode = 0;
+	u16 init_ctrl_wd_3 = 0;
+	u8 init_ctrl_wd_3_offset = 0;
+	u8 init_ctrl_wd_3_bit_offset = 0;
+
+	/* Set internal phy as default */
+	dev_spec->sgmii_active = false;
+	dev_spec->module_plugged = false;
+
+	/*
+	 * Check if NVM access method is attached already.
+	 * If it is then Init Control Word #3 is considered
+	 * otherwise runtime CSR register content is taken.
+	 */
+
+	/* Get CSR setting */
+	ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
+
+	/* Get link mode setting */
+	if (hw->nvm.ops.read) {
+		/* Take link mode from EEPROM */
+
+		/*
+		 * Get LAN port ID to derive its
+		 * adequate Init Control Word #3
+		 */
+		lan_id = ((E1000_READ_REG(hw, E1000_STATUS) &
+		      E1000_STATUS_LAN_ID_MASK) >> E1000_STATUS_LAN_ID_OFFSET);
+		/*
+		 * Derive Init Control Word #3 offset
+		 * and mask to pick up link mode setting.
+		 */
+		if (hw->mac.type < e1000_82580) {
+			init_ctrl_wd_3_offset = lan_id ?
+			   NVM_INIT_CONTROL3_PORT_A : NVM_INIT_CONTROL3_PORT_B;
+			init_ctrl_wd_3_bit_offset = NVM_WORD24_LNK_MODE_OFFSET;
+		} else {
+			init_ctrl_wd_3_offset =
+			                    NVM_82580_LAN_FUNC_OFFSET(lan_id) +
+			                    NVM_INIT_CONTROL3_PORT_A;
+			init_ctrl_wd_3_bit_offset =
+			                      NVM_WORD24_82580_LNK_MODE_OFFSET;
+		}
+		/* Read Init Control Word #3*/
+		hw->nvm.ops.read(hw, init_ctrl_wd_3_offset, 1, &init_ctrl_wd_3);
+		current_link_mode = init_ctrl_wd_3;
+		/*
+		 * Switch to CSR for all but internal PHY.
+		 */
+		if ((init_ctrl_wd_3 << (E1000_CTRL_EXT_LINK_MODE_OFFSET -
+		    init_ctrl_wd_3_bit_offset)) !=
+		    E1000_CTRL_EXT_LINK_MODE_GMII) {
+			current_link_mode = ctrl_ext;
+			init_ctrl_wd_3_bit_offset =
+			                      E1000_CTRL_EXT_LINK_MODE_OFFSET;
+		}
+	} else {
+		/* Take link mode from CSR */
+		current_link_mode = ctrl_ext;
+		init_ctrl_wd_3_bit_offset = E1000_CTRL_EXT_LINK_MODE_OFFSET;
+	}
+
+	/*
+	 * Align link mode bits to
+	 * their CTRL_EXT location.
+	 */
+	current_link_mode <<= (E1000_CTRL_EXT_LINK_MODE_OFFSET -
+	                       init_ctrl_wd_3_bit_offset);
+	current_link_mode &= E1000_CTRL_EXT_LINK_MODE_MASK;
+
+	switch (current_link_mode) {
+
+	case E1000_CTRL_EXT_LINK_MODE_1000BASE_KX:
+		hw->phy.media_type = e1000_media_type_internal_serdes;
+		current_link_mode = E1000_CTRL_EXT_LINK_MODE_1000BASE_KX;
+		break;
+	case E1000_CTRL_EXT_LINK_MODE_GMII:
+		hw->phy.media_type = e1000_media_type_copper;
+		current_link_mode = E1000_CTRL_EXT_LINK_MODE_GMII;
+		break;
+	case E1000_CTRL_EXT_LINK_MODE_SGMII:
+	case E1000_CTRL_EXT_LINK_MODE_PCIE_SERDES:
+		/* Get phy control interface type set (MDIO vs. I2C)*/
+		if (e1000_sgmii_uses_mdio_82575(hw)) {
+			hw->phy.media_type = e1000_media_type_copper;
+			dev_spec->sgmii_active = true;
+			current_link_mode = E1000_CTRL_EXT_LINK_MODE_SGMII;
+		} else {
+			ret_val = e1000_set_sfp_media_type_82575(hw);
+			if (ret_val != E1000_SUCCESS)
+				goto out;
+			if (hw->phy.media_type ==
+				e1000_media_type_internal_serdes) {
+				current_link_mode =
+				         E1000_CTRL_EXT_LINK_MODE_PCIE_SERDES;
+			} else if (hw->phy.media_type ==
+				e1000_media_type_copper) {
+				current_link_mode =
+				               E1000_CTRL_EXT_LINK_MODE_SGMII;
+			}
+		}
+		break;
+	default:
+		DEBUGOUT("Link mode mask doesn't fit bit field size");
+		goto out;
+	}
+	/*
+	 * Do not change current link mode setting
+	 * if media type is fibre or has not been
+	 * recognized.
+	 */
+	if ((hw->phy.media_type != e1000_media_type_unknown) &&
+	    (hw->phy.media_type != e1000_media_type_fiber)) {
+		/* Update link mode */
+		ctrl_ext &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
+		E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext |
+		                current_link_mode);
+	}
+
+	ret_val = E1000_SUCCESS;
+out:
+	/*
+	 * If media type was not identified then return media type
+	 * defined by the CTRL_EXT settings.
+	 */
+	if (hw->phy.media_type == e1000_media_type_unknown) {
+		if (current_link_mode == E1000_CTRL_EXT_LINK_MODE_SGMII)
+			hw->phy.media_type = e1000_media_type_copper;
+		else
+			hw->phy.media_type = e1000_media_type_internal_serdes;
+	}
+
+	return ret_val;
+}
+
+/**
+ *  e1000_set_sfp_media_type_82575 - derives SFP module media type.
+ *  @hw: pointer to the HW structure
+ *
+ *  The media type is chosen based on SFP module.
+ *  compatibility flags retrieved from SFP ID EEPROM.
+ **/
+static s32 e1000_set_sfp_media_type_82575(struct e1000_hw *hw)
+{
+	s32 ret_val = E1000_ERR_CONFIG;
+	u32 ctrl_ext = 0;
+	struct e1000_dev_spec_82575 *dev_spec = &hw->dev_spec._82575;
+	struct sfp_e1000_flags eth_flags = {0};
+	u8 tranceiver_type = 0;
+
+	/* Turn I2C interface ON */
+	ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
+	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext | E1000_CTRL_I2C_ENA);
+
+	/* Read SFP module data */
+	ret_val = e1000_read_sfp_data_byte(hw,
+	               E1000_I2CCMD_SFP_DATA_ADDR(E1000_SFF_IDENTIFIER_OFFSET),
+	                                          &tranceiver_type);
+	if (ret_val != E1000_SUCCESS)
+		goto out;
+	ret_val = e1000_read_sfp_data_byte(hw,
+	                E1000_I2CCMD_SFP_DATA_ADDR(E1000_SFF_ETH_FLAGS_OFFSET),
+	                                           (u8 *)&eth_flags);
+	if (ret_val != E1000_SUCCESS)
+		goto out;
+	/*
+	 * Check if there is some SFP
+	 * module plugged and powered
+	 */
+	if ((tranceiver_type == E1000_SFF_IDENTIFIER_SFP) ||
+	    (tranceiver_type == E1000_SFF_IDENTIFIER_SFF)) {
+		dev_spec->module_plugged = true;
+		if (eth_flags.e1000_base_lx || eth_flags.e1000_base_sx) {
+			hw->phy.media_type = e1000_media_type_internal_serdes;
+		} else if (eth_flags.e1000_base_t) {
+			dev_spec->sgmii_active = true;
+			hw->phy.media_type = e1000_media_type_copper;
+		} else {
+				hw->phy.media_type = e1000_media_type_unknown;
+				DEBUGOUT("PHY module has not been "
+					 "recognized");
+				goto out;
+		}
+	} else {
+		hw->phy.media_type = e1000_media_type_unknown;
+	}
+	ret_val = E1000_SUCCESS;
+out:
+	/* Restore I2C interface setting */
+	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
+	return ret_val;
 }
 
 /**
@@ -1878,7 +2090,8 @@ void e1000_vmdq_set_anti_spoofing_pf(struct e1000_hw *hw, bool enable, int pf)
 				   E1000_DTXSWC_VLAN_SPOOF_MASK);
 			/* The PF can spoof - it has to in order to
 			 * support emulation mode NICs */
-			dtxswc ^= (1 << pf | 1 << (pf + MAX_NUM_VFS));
+			dtxswc ^=
+			  (1 << pf | 1 << (pf + E1000_DTXSWC_VLAN_SPOOF_SHIFT));
 		} else {
 			dtxswc &= ~(E1000_DTXSWC_MAC_SPOOF_MASK |
 				    E1000_DTXSWC_VLAN_SPOOF_MASK);
@@ -1893,7 +2106,8 @@ void e1000_vmdq_set_anti_spoofing_pf(struct e1000_hw *hw, bool enable, int pf)
 			/* The PF can spoof - it has to in order to
 			 * support emulation mode NICs
 			 */
-			dtxswc ^= (1 << pf | 1 << (pf + MAX_NUM_VFS));
+			dtxswc ^=
+			  (1 << pf | 1 << (pf + E1000_DTXSWC_VLAN_SPOOF_SHIFT));
 		} else {
 			dtxswc &= ~(E1000_DTXSWC_MAC_SPOOF_MASK |
 				    E1000_DTXSWC_VLAN_SPOOF_MASK);
@@ -2101,6 +2315,7 @@ static s32 e1000_reset_hw_82580(struct e1000_hw *hw)
 		ctrl |= E1000_CTRL_RST;
 
 	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
+	E1000_WRITE_FLUSH(hw);
 
 	/* Add delay to insure DEV_RST has time to complete */
 	if (global_device_reset)

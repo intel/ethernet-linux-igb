@@ -40,16 +40,6 @@
 #ifdef ETHTOOL_OPS_COMPAT
 #include "kcompat_ethtool.c"
 #endif
-
-#ifdef ETHTOOL_SPFLAGS
-enum igb_pflags {
-	IGB_DMAC = (1 << 0),
-};
-#define IGB_N_PFLAGS ARRAY_SIZE(igb_gstrings_pflags)
-static const char igb_gstrings_pflags[][ETH_GSTRING_LEN] = {
-       "dma_coal",
-};
-#endif /* ETHTOOL_SPFLAGS */
 #ifdef ETHTOOL_GSTATS
 struct igb_stats {
 	char stat_string[ETH_GSTRING_LEN];
@@ -57,7 +47,6 @@ struct igb_stats {
 	int stat_offset;
 };
 
-#endif
 #define IGB_STAT(_name, _stat) { \
 	.stat_string = _name, \
 	.sizeof_stat = FIELD_SIZEOF(struct igb_adapter, _stat), \
@@ -186,7 +175,7 @@ static int igb_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 				     ADVERTISED_Autoneg);
 
 		ecmd->port = PORT_FIBRE;
-	}
+	} 
 
 	ecmd->transceiver = XCVR_INTERNAL;
 
@@ -692,10 +681,12 @@ static void igb_get_regs(struct net_device *netdev,
 	regs_buff[548] = E1000_READ_REG(hw, E1000_TDFT);
 	regs_buff[549] = E1000_READ_REG(hw, E1000_TDFHS);
 	regs_buff[550] = E1000_READ_REG(hw, E1000_TDFPC);
-	regs_buff[551] = adapter->stats.o2bgptc;
-	regs_buff[552] = adapter->stats.b2ospc;
-	regs_buff[553] = adapter->stats.o2bspc;
-	regs_buff[554] = adapter->stats.b2ogprc;
+	if (hw->mac.type > e1000_82580) {
+		regs_buff[551] = adapter->stats.o2bgptc;
+		regs_buff[552] = adapter->stats.b2ospc;
+		regs_buff[553] = adapter->stats.o2bspc;
+		regs_buff[554] = adapter->stats.b2ogprc;
+	}
 }
 
 static int igb_get_eeprom_len(struct net_device *netdev)
@@ -827,10 +818,7 @@ static void igb_get_drvinfo(struct net_device *netdev,
 		 (adapter->fw_version & 0x0FF0) >> 4,
 		 adapter->fw_version & 0x000F);
 
-	strncpy(drvinfo->bus_info, pci_name(adapter->pdev), 32);
-#ifdef ETHTOOL_GPFLAGS
-	drvinfo->n_priv_flags = IGB_N_PFLAGS;
-#endif /* ETHTOOL_GPFLAGS */
+	strncpy(drvinfo->bus_info, pci_name(adapter->pdev), sizeof(drvinfo->bus_info) -1);
 	drvinfo->n_stats = IGB_STATS_LEN;
 	drvinfo->testinfo_len = IGB_TEST_LEN;
 	drvinfo->regdump_len = igb_get_regs_len(netdev);
@@ -1604,6 +1592,7 @@ static int igb_run_loopback_test(struct igb_adapter *adapter)
 		msleep(200);
 
 		good_cnt = igb_clean_test_rings(rx_ring, tx_ring, size);
+		printk("CWM: loopback_test:good_cnt=%x\n", good_cnt);
 		if (good_cnt != 64) {
 			ret_val = 13;
 			break;
@@ -1634,11 +1623,13 @@ static int igb_loopback_test(struct igb_adapter *adapter, u64 *data)
 	if (*data)
 		goto err_loopback;
 	*data = igb_run_loopback_test(adapter);
+
 	igb_loopback_cleanup(adapter);
 
 err_loopback:
 	igb_free_desc_rings(adapter);
 out:
+	printk("CMW:igb_loopback:*data=%x\n", (uint)*data);
 	return *data;
 }
 
@@ -1864,8 +1855,32 @@ static int igb_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 }
 
 /* bit defines for adapter->led_status */
-#define IGB_LED_ON		0
+#ifdef HAVE_ETHTOOL_SET_PHYS_ID
+static int igb_set_phys_id(struct net_device *netdev,
+                           enum ethtool_phys_id_state state)
+{
+        struct igb_adapter *adapter = netdev_priv(netdev);
+        struct e1000_hw *hw = &adapter->hw;
 
+        switch (state) {
+        case ETHTOOL_ID_ACTIVE:
+		e1000_blink_led(hw);
+                return 2;
+        case ETHTOOL_ID_ON:
+                e1000_led_on(hw);
+                break;
+        case ETHTOOL_ID_OFF:
+                e1000_led_off(hw);
+                break;
+        case ETHTOOL_ID_INACTIVE:
+		e1000_led_off(hw);
+		e1000_cleanup_led(hw);
+                break;
+        }
+
+        return 0;
+}
+#else
 static int igb_phys_id(struct net_device *netdev, u32 data)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
@@ -1885,11 +1900,11 @@ static int igb_phys_id(struct net_device *netdev, u32 data)
 	msleep_interruptible(timeout);
 
 	e1000_led_off(hw);
-	clear_bit(IGB_LED_ON, &adapter->led_status);
 	e1000_cleanup_led(hw);
 
 	return 0;
 }
+#endif /* HAVE_ETHTOOL_SET_PHYS_ID */
 
 static int igb_set_coalesce(struct net_device *netdev,
 			    struct ethtool_coalesce *ec)
@@ -1917,8 +1932,7 @@ static int igb_set_coalesce(struct net_device *netdev,
 
 	/* If ITR is disabled, disable DMAC */
 	if (ec->rx_coalesce_usecs == 0) {
-		if (adapter->flags & IGB_FLAG_DMAC)
-			adapter->flags &= ~IGB_FLAG_DMAC;
+		adapter->dmac = IGB_DMAC_DISABLE;
 	}
 	
 	/* convert to rate of irq's per second */
@@ -1985,8 +1999,6 @@ static int igb_get_sset_count(struct net_device *netdev, int sset)
 		return IGB_STATS_LEN;
 	case ETH_SS_TEST:
 		return IGB_TEST_LEN;
-	case ETH_SS_PRIV_FLAGS:
-		return IGB_N_PFLAGS;
 	default:
 		return -ENOTSUPP;
 	}
@@ -2113,7 +2125,6 @@ static int igb_set_flags(struct net_device *netdev, u32 data)
 
 #endif /* ETHTOOL_GFLAGS */
 #endif /* IGB_LRO */
-
 static struct ethtool_ops igb_ethtool_ops = {
 	.get_settings           = igb_get_settings,
 	.set_settings           = igb_set_settings,
@@ -2145,7 +2156,11 @@ static struct ethtool_ops igb_ethtool_ops = {
 #endif
 	.self_test              = igb_diag_test,
 	.get_strings            = igb_get_strings,
+#ifdef HAVE_ETHTOOL_SET_PHYS_ID
+	.set_phys_id            = igb_set_phys_id,
+#else
 	.phys_id                = igb_phys_id,
+#endif /* HAVE_ETHTOOL_SET_PHYS_ID */
 #ifdef HAVE_ETHTOOL_GET_SSET_COUNT
 	.get_sset_count         = igb_get_sset_count,
 #else
@@ -2163,14 +2178,12 @@ static struct ethtool_ops igb_ethtool_ops = {
 	.get_flags              = ethtool_op_get_flags,
 	.set_flags              = igb_set_flags,
 #endif /* ETHTOOL_GFLAGS */
-#endif
-#ifdef ETHTOOL_GPFLAGS
-#endif /* ETHTOOL_GPFLAGS */
-#ifdef ETHTOOL_SPFLAGS
-#endif /*ETHTOOL_GPFLAGS */
+#endif /* IGB_LRO */
 };
 
 void igb_set_ethtool_ops(struct net_device *netdev)
 {
 	SET_ETHTOOL_OPS(netdev, &igb_ethtool_ops);
 }
+
+#endif	/* SIOCETHTOOL */
