@@ -91,6 +91,8 @@ static s32 e1000_validate_nvm_checksum_with_offset(struct e1000_hw *hw,
 						u16 offset);
 static s32 e1000_validate_nvm_checksum_i350(struct e1000_hw *hw);
 static s32 e1000_update_nvm_checksum_i350(struct e1000_hw *hw);
+static void e1000_write_vfta_i350(struct e1000_hw *hw, u32 offset, u32 value);
+static void e1000_clear_vfta_i350(struct e1000_hw *hw);
 
 static const u16 e1000_82580_rxpbs_table[] =
 	{ 36, 72, 144, 1, 2, 4, 8, 16,
@@ -252,6 +254,12 @@ s32 e1000_init_nvm_params_82575(struct e1000_hw *hw)
 	 */
 	size += NVM_WORD_SIZE_BASE_SHIFT;
 
+	/* Just in case size is out of range, cap it to the largest
+	 * EEPROM size supported
+	 */
+	if (size > 15)
+		size = 15;
+
 	nvm->word_size = 1 << size;
 	nvm->opcode_bits        = 8;
 	nvm->delay_usec         = 1;
@@ -375,10 +383,17 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	mac->ops.config_collision_dist = e1000_config_collision_dist_82575;
 	/* multicast address update */
 	mac->ops.update_mc_addr_list = e1000_update_mc_addr_list_generic;
-	/* writing VFTA */
-	mac->ops.write_vfta = e1000_write_vfta_generic;
-	/* clearing VFTA */
-	mac->ops.clear_vfta = e1000_clear_vfta_generic;
+	if (hw->mac.type == e1000_i350) {
+		/* writing VFTA */
+		mac->ops.write_vfta = e1000_write_vfta_i350;
+		/* clearing VFTA */
+		mac->ops.clear_vfta = e1000_clear_vfta_i350;
+	} else {
+		/* writing VFTA */
+		mac->ops.write_vfta = e1000_write_vfta_generic;
+		/* clearing VFTA */
+		mac->ops.clear_vfta = e1000_clear_vfta_generic;
+	}
 	/* ID LED init */
 	mac->ops.id_led_init = e1000_id_led_init_generic;
 	/* blink LED */
@@ -2635,3 +2650,52 @@ out:
 
 	return ret_val;
 }
+
+/* Due to a hw errata, if the host tries to  configure the VFTA register
+ * while performing queries from the BMC or DMA, then the VFTA in some
+ * cases won't be written.
+ */
+
+/**
+ *  e1000_clear_vfta_i350 - Clear VLAN filter table
+ *  @hw: pointer to the HW structure
+ *
+ *  Clears the register array which contains the VLAN filter table by
+ *  setting all the values to 0.
+ **/
+void e1000_clear_vfta_i350(struct e1000_hw *hw)
+{
+	u32 offset;
+	int i;
+
+	DEBUGFUNC("e1000_clear_vfta_350");
+
+	for (offset = 0; offset < E1000_VLAN_FILTER_TBL_SIZE; offset++) {
+		for (i = 0; i < 10; i++)
+			E1000_WRITE_REG_ARRAY(hw, E1000_VFTA, offset, 0);
+
+		E1000_WRITE_FLUSH(hw);
+	}
+}
+
+/**
+ *  e1000_write_vfta_i350 - Write value to VLAN filter table
+ *  @hw: pointer to the HW structure
+ *  @offset: register offset in VLAN filter table
+ *  @value: register value written to VLAN filter table
+ *
+ *  Writes value at the given offset in the register array which stores
+ *  the VLAN filter table.
+ **/
+void e1000_write_vfta_i350(struct e1000_hw *hw, u32 offset, u32 value)
+{
+	int i;
+
+	DEBUGFUNC("e1000_write_vfta_350");
+
+	for (i = 0; i < 10; i++)
+		E1000_WRITE_REG_ARRAY(hw, E1000_VFTA, offset, value);
+
+	E1000_WRITE_FLUSH(hw);
+}
+

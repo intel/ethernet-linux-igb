@@ -757,6 +757,10 @@
 #define E1000_ICR_THS           0x00800000 /* ICR.THS: Thermal Sensor Event*/
 #define E1000_ICR_MDDET         0x10000000 /* Malicious Driver Detect */
 
+#define E1000_ITR_MASK          0x000FFFFF /* ITR value bitfield */
+#define E1000_ITR_MULT          256        /* ITR mulitplier in nsec */
+
+
 /* Extended Interrupt Cause Read */
 #define E1000_EICR_RX_QUEUE0    0x00000001 /* Rx Queue 0 Interrupt */
 #define E1000_EICR_RX_QUEUE1    0x00000002 /* Rx Queue 1 Interrupt */
@@ -1094,6 +1098,16 @@
                            E1000_GCR_TXD_NO_SNOOP         | \
                            E1000_GCR_TXDSCW_NO_SNOOP      | \
                            E1000_GCR_TXDSCR_NO_SNOOP)
+
+/* mPHY address control and data registers */
+#define E1000_MPHY_ADDR_CTL             0x0024 /* Address Control Reg */
+#define E1000_MPHY_ADDR_CTL_OFFSET_MASK 0xFFFF0000
+#define E1000_MPHY_DATA                 0x0E10 /* Data Register */
+
+/* AFE CSR Offset for PCS CLK */
+#define E1000_MPHY_PCS_CLK_REG_OFFSET       0x0004
+/* Override for near end digital loopback. */
+#define E1000_MPHY_PCS_CLK_REG_DIGINELBEN   0x10
 
 /* PHY Control Register */
 #define MII_CR_SPEED_SELECT_MSB 0x0040  /* bits 6,13: 10=1000, 01=100, 00=10 */
@@ -1719,4 +1733,5 @@
 #define E1000_STATUS_LAN_ID_MASK        0x00000000C /* Mask for Lan ID field */
 #define E1000_STATUS_LAN_ID_OFFSET      2           /* Lan ID bit field offset
                                                      * in status register */
+#define E1000_VFTA_ENTRIES		128
 #endif /* _E1000_DEFINES_H_ */

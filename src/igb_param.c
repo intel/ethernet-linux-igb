@@ -204,6 +204,17 @@ IGB_PARAM(QueuePairs, "Enable TX/RX queue pairs for interrupt handling (0,1), de
  * Default Value: 0
  */
  IGB_PARAM(DMAC, "Disable or set latency for DMA Coalescing ((0=off, 1000-10000(msec), 250, 500 (usec))");
+
+#ifndef IGB_NO_LRO
+/* Enable/disable Large Receive Offload
+ *
+ * Valid Values: 0(off), 1(on)
+ *
+ * Default Value: 0
+ */
+ IGB_PARAM(LRO, "Large Receive Offload (0,1), default 0=off");
+
+#endif
 struct igb_opt_list {
 	int i;
 	char *str;
@@ -721,6 +732,28 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 #endif
 		}
 	}
+#ifndef IGB_NO_LRO
+	{ /* LRO - Enable Large Receive Offload */
+		struct igb_option opt = {
+			.type = enable_option,
+			.name = "LRO - Large Receive Offload",
+			.err  = "defaulting to Disabled",
+			.def  = OPTION_DISABLED
+		};
+		struct net_device *netdev = adapter->netdev;
+#ifdef module_param_array
+		if (num_LRO > bd) {
+#endif
+			unsigned int lro = LRO[bd];
+			igb_validate_option(&lro, &opt, adapter);
+			netdev->features |= lro ? NETIF_F_LRO : 0;
+#ifdef module_param_array
+		} else if (opt.def == OPTION_ENABLED) {
+			netdev->features |= NETIF_F_LRO;
+		}
+#endif
+	}
+#endif /* IGB_NO_LRO */
 	{ /* Node assignment */
 		static struct igb_option opt = {
 			.type = range_option,
@@ -755,6 +788,7 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			}
 #ifdef module_param_array
 		}
+#endif
 
 		/* check sanity of the value */
 		if (node_param != -1 && !node_online(node_param)) {
@@ -764,7 +798,6 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 			node_param = opt.def;
 		}
 
-#endif
 		adapter->node = node_param;
 	}
 	{ /* MDD - Enable Malicious Driver Detection. Only available when

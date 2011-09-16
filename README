@@ -35,8 +35,6 @@ Channel Bonding documentation can be found in the Linux kernel source:
 /Documentation/networking/bonding.txt
 
 The igb driver supports IEEE 1588 time stamping for kernels 2.6.30 and above.  
-A basic tutorial for the technology can be found at:
-http://ieee1588.nist.gov/tutorial-basic.pdf
 
 The driver information previously displayed in the /proc filesystem is not
 supported in this release.  Alternatively, you can use ethtool (version 1.6
@@ -460,8 +458,8 @@ Additional Configurations
   - The maximum MTU setting for Jumbo Frames is 9216.  This value coincides
     with the maximum Jumbo Frames size of 9234 bytes.
 
-  - Using Jumbo Frames at 10 or 100 Mbps may result in poor performance or
-    loss of link.
+  - Using Jumbo frames at 10 or 100 Mbps is not supported and may result in
+    poor performance or loss of link.
 
   ethtool
   -------

@@ -467,7 +467,6 @@
 #define E1000_VMVIR(_n)        (0x03700 + (4 * (_n)))
 #define E1000_DVMOLR(_n)       (0x0C038 + (0x40 * (_n))) /* DMA VM offload */
 #define E1000_VTCTRL(_n)       (0x10000 + (0x100 * (_n))) /* VT Control */
-/* Time Sync */
 #define E1000_TSYNCRXCTL 0x0B620 /* Rx Time Sync Control register - RW */
 #define E1000_TSYNCTXCTL 0x0B614 /* Tx Time Sync Control register - RW */
 #define E1000_TSYNCRXCFG 0x05F50 /* Time Sync Rx Configuration - RW */

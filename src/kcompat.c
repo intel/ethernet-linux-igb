@@ -612,6 +612,24 @@ DECLARE_BITMAP(_kcompat_node_online_map, MAX_NUMNODES) = {1};
 #endif /* < 2.6.10 */
 
 /*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,13) )
+char *_kc_kstrdup(const char *s, unsigned int gfp)
+{
+	size_t len;
+	char *buf;
+
+	if (!s)
+		return NULL;
+
+	len = strlen(s) + 1;
+	buf = kmalloc(len, gfp);
+	if (buf)
+		memcpy(buf, s, len);
+	return buf;
+}
+#endif /* < 2.6.13 */
+
+/*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14) )
 void *_kc_kzalloc(size_t size, int flags)
 {
@@ -1075,37 +1093,27 @@ void _kc_netif_set_real_num_tx_queues(struct net_device *dev, unsigned int txq)
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36) )
+static const u32 _kc_flags_dup_features =
+	(ETH_FLAG_LRO | ETH_FLAG_NTUPLE | ETH_FLAG_RXHASH);
+
+u32 _kc_ethtool_op_get_flags(struct net_device *dev)
+{
+	return dev->features & _kc_flags_dup_features;
+}
+
 int _kc_ethtool_op_set_flags(struct net_device *dev, u32 data, u32 supported)
 {
-	unsigned long features = dev->features;
-
 	if (data & ~supported)
 		return -EINVAL;
 
-#ifdef NETIF_F_LRO
-	features &= ~NETIF_F_LRO;
-	if (data & ETH_FLAG_LRO)
-		features |= NETIF_F_LRO;
-#endif
-#ifdef NETIF_F_NTUPLE
-	features &= ~NETIF_F_NTUPLE;
-	if (data & ETH_FLAG_NTUPLE)
-		features |= NETIF_F_NTUPLE;
-#endif
-#ifdef NETIF_F_RXHASH
-	features &= ~NETIF_F_RXHASH;
-	if (data & ETH_FLAG_RXHASH)
-		features |= NETIF_F_RXHASH;
-#endif
-
-	dev->features = features;
-
+	dev->features = ((dev->features & ~_kc_flags_dup_features) |
+			 (data & _kc_flags_dup_features));
 	return 0;
 }
 #endif /* < 2.6.36 */
 
 /******************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39) )
-#if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(6,0)))
+#if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(6,1)))
 #endif /* !(RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(6,0)) */
 #endif /* < 2.6.39 */

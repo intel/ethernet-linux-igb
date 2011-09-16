@@ -30,7 +30,7 @@
 #ifndef _IGB_H_
 #define _IGB_H_
 
-#ifdef IGB_LRO
+#ifndef IGB_NO_LRO
 #include <net/tcp.h>
 #endif
 
@@ -64,6 +64,10 @@ struct igb_adapter;
 
 #include "kcompat.h"
 
+#ifdef HAVE_SCTP
+#include <linux/sctp.h>
+#endif
+
 #include "e1000_api.h"
 #include "e1000_82575.h"
 #include "e1000_manage.h"
@@ -89,6 +93,7 @@ struct igb_adapter;
 
 /* TX/RX descriptor defines */
 #define IGB_DEFAULT_TXD                  256
+#define IXGBE_DEFAULT_TX_WORK		 128
 #define IGB_MIN_TXD                       80
 #define IGB_MAX_TXD                     4096
 
@@ -108,7 +113,6 @@ struct igb_adapter;
 
 #define IGB_MAX_VF_MC_ENTRIES             30
 #define IGB_MAX_VF_FUNCTIONS               8
-#define IGB_MAX_VFTA_ENTRIES             128
 #define IGB_MAX_UTA_ENTRIES              128
 #define MAX_EMULATION_MAC_ADDRS           16
 #define OUI_LEN                            3
@@ -195,74 +199,84 @@ struct vf_data_storage {
 
 #define IGB_MNG_VLAN_NONE -1
 
-#ifdef IGB_LRO
-#define IGB_LRO_MAX 32	/*Maximum number of LRO descriptors*/
-#define IGB_LRO_GLOBAL 10
-
+#ifndef IGB_NO_LRO
+#define IGB_LRO_MAX 32 /*Maximum number of LRO descriptors*/
 struct igb_lro_stats {
 	u32 flushed;
 	u32 coal;
 	u32 recycled;
 };
 
-struct igb_lro_desc {
-	struct  hlist_node lro_node;
-	struct  sk_buff *skb;
-	u32   source_ip;
-	u32   dest_ip;
-	u16   source_port;
-	u16   dest_port;
-	u16   vlan_tag;
-	u16   len;
-	u32   next_seq;
-	u32   ack_seq;
-	u16   window;
-	u16   mss;
-	u16   opt_bytes;
-	u16   psh:1;
-	u32   tsval;
-	u32   tsecr;
-	u32   append_cnt;
+/*
+ * igb_lro_header - header format to be aggregated by LRO
+ * @iph: IP header without options
+ * @tcp: TCP header
+ * @ts:  Optional TCP timestamp data in TCP options
+ *
+ * This structure relies on the check above that verifies that the header
+ * is IPv4 and does not contain any options.
+ */
+struct igb_lrohdr {
+	struct iphdr iph;
+	struct tcphdr th; 
+	__be32 ts[0];
 };
 
 struct igb_lro_list {
-	struct hlist_head active;
-	struct hlist_head free;
-	int active_cnt;
+	struct sk_buff_head active;
 	struct igb_lro_stats stats;
 };
 
-#endif /* IGB_LRO */
+#endif /* IGB_NO_LRO */
+struct igb_cb {
+#ifndef IGB_NO_LRO
+	union {				/* Union defining head/tail partner */
+		struct sk_buff *head;
+		struct sk_buff *tail;
+	};
+	__be32	tsecr;			/* timestamp echo response */
+	u32	tsval;			/* timestamp value in host order */
+	u32	next_seq;		/* next expected sequence number */
+	u16	free;			/* 65521 minus total size */
+	u16	mss;			/* size of data portion of packet */
+	u16	append_cnt;		/* number of skb's appended */
+#endif /* IGB_NO_LRO */
+#ifdef HAVE_VLAN_RX_REGISTER
+	u16	vid;			/* VLAN tag */
+#endif
+};
+#define IGB_CB(skb) ((struct igb_cb *)(skb)->cb)
+
+#define IGB_TX_FLAGS_CSUM		0x00000001
+#define IGB_TX_FLAGS_VLAN		0x00000002
+#define IGB_TX_FLAGS_TSO		0x00000004
+#define IGB_TX_FLAGS_IPV4		0x00000008
+#define IGB_TX_FLAGS_TSTAMP		0x00000010
+#define IGB_TX_FLAGS_VLAN_MASK		0xffff0000
+#define IGB_TX_FLAGS_VLAN_SHIFT		        16
+
 /* wrapper around a pointer to a socket buffer,
  * so a DMA handle can be stored along with the buffer */
-struct igb_buffer {
+struct igb_tx_buffer {
+	union e1000_adv_tx_desc *next_to_watch;
+	unsigned long time_stamp;
+	struct sk_buff *skb;
+	unsigned int bytecount;
+	u16 gso_segs;
+	__be16 protocol;
+	dma_addr_t dma;
+	u32 length;
+	u32 tx_flags;
+};
+
+struct igb_rx_buffer {
 	struct sk_buff *skb;
 	dma_addr_t dma;
-	union {
-		/* TX */
-		struct {
-			unsigned long time_stamp;
-			u16 length;
-			u16 next_to_watch;
-			unsigned int bytecount;
-#ifdef NETIF_F_TSO
-			u16 gso_segs;
-#endif
-#ifdef HAVE_HW_TIME_STAMP
-			u8 shtx;
-#endif
-			u8 mapped_as_page;
-		};
-
 #ifndef CONFIG_IGB_DISABLE_PACKET_SPLIT
-		/* RX */
-		struct {
-			struct page *page;
-			dma_addr_t page_dma;
-			u32 page_offset;
-		};
+	struct page *page;
+	dma_addr_t page_dma;
+	u32 page_offset;
 #endif
-	};
 };
 
 struct igb_tx_queue_stats {
@@ -279,21 +293,30 @@ struct igb_rx_queue_stats {
 	u64 alloc_failed;
 };
 
+struct igb_ring_container {
+	struct igb_ring *ring;		/* pointer to linked list of rings */
+	unsigned int total_bytes;	/* total bytes processed this int */
+	unsigned int total_packets;	/* total packets processed this int */
+	u16 work_limit;			/* total work allowed per interrupt */
+	u8 count;			/* total number of rings in vector */
+	u8 itr;				/* current ITR setting for ring */
+};
+
 struct igb_q_vector {
-	struct igb_adapter *adapter; /* backlink */
-	struct igb_ring *rx_ring;
-	struct igb_ring *tx_ring;
+	struct igb_adapter *adapter;	/* backlink */
+	int cpu;			/* CPU for DCA */
+	u32 eims_value;			/* EIMS mask value */
+
+	struct igb_ring_container rx, tx;
+
 	struct napi_struct napi;
 	int numa_node;
-
-	u32 eims_value;
-	u16 cpu;
 
 	u16 itr_val;
 	u8 set_itr;
 	void __iomem *itr_register;
 
-#ifdef IGB_LRO
+#ifndef IGB_NO_LRO
 	struct igb_lro_list *lrolist;   /* LRO list for queue vector*/
 #endif
 	char name[IFNAMSIZ + 9];
@@ -306,7 +329,10 @@ struct igb_ring {
 	struct igb_q_vector *q_vector;  /* backlink to q_vector */
 	struct net_device *netdev;      /* back pointer to net_device */
 	struct device *dev;             /* device for dma mapping */
-	struct igb_buffer *buffer_info; /* array of buffer info structs */
+	union {				/* array of buffer info structs */
+		struct igb_tx_buffer *tx_buffer_info;
+		struct igb_rx_buffer *rx_buffer_info;
+	};
 	void *desc;                     /* descriptor ring memory */
 	unsigned long flags;            /* ring specific flags */
 	void __iomem *tail;             /* pointer to ring tail register */
@@ -317,11 +343,7 @@ struct igb_ring {
 	u32 size;                       /* length of desc. ring in bytes */
 
 	/* everything past this point are written often */
-	unsigned int total_bytes ____cacheline_aligned_in_smp;
-	unsigned int total_packets;
-	u16 itr;
-
-	u16 next_to_clean;
+	u16 next_to_clean ____cacheline_aligned_in_smp;
 	u16 next_to_use;
 
 	union {
@@ -348,17 +370,13 @@ struct igb_ring {
 } ____cacheline_internodealigned_in_smp;
 
 enum e1000_ring_flags_t {
+#ifndef HAVE_NDO_SET_FEATURES
 	IGB_RING_FLAG_RX_CSUM,
+#endif
 	IGB_RING_FLAG_RX_SCTP_CSUM,
-#ifdef IGB_LRO
-	IGB_RING_FLAG_RX_LRO,
-#endif /* IGB_LRO */
 	IGB_RING_FLAG_RX_LB_VLAN_BSWAP,
 	IGB_RING_FLAG_TX_CTX_IDX,
 	IGB_RING_FLAG_TX_DETECT_HANG,
-#ifdef NETIF_F_RXHASH
-	IGB_RING_FLAG_RX_HASH
-#endif
 };
 struct igb_mac_addr {
 	u8 addr[ETH_ALEN];
@@ -388,18 +406,30 @@ struct igb_mac_addr {
 #define ring_queue_index(ring) (ring->queue_index)
 #endif /* CONFIG_IGB_VMDQ_NETDEV */
 
+/* igb_test_staterr - tests bits within Rx descriptor status and error fields */
+static inline __le32 igb_test_staterr(union e1000_adv_rx_desc *rx_desc,
+				      const u32 stat_err_bits)
+{
+	return rx_desc->wb.upper.status_error & cpu_to_le32(stat_err_bits);
+}
+
 /* igb_desc_unused - calculate if we have unused descriptors */
 static inline u16 igb_desc_unused(const struct igb_ring *ring)
 {
-	if (ring->next_to_clean > ring->next_to_use)
-		return ring->next_to_clean - ring->next_to_use - 1;
+	u16 ntc = ring->next_to_clean;
+	u16 ntu = ring->next_to_use;
 
-	return ring->count + ring->next_to_clean - ring->next_to_use - 1;
+	return ((ntc > ntu) ? 0 : ring->count) + ntc - ntu - 1;
 }
 
 /* board specific private data structure */
 struct igb_adapter {
+#ifdef HAVE_VLAN_RX_REGISTER
+	/* vlgrp must be first member of structure */
 	struct vlan_group *vlgrp;
+#else
+	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
+#endif
 	struct net_device *netdev;
 
 	unsigned long state;
@@ -410,6 +440,7 @@ struct igb_adapter {
 
 
 	/* TX */
+	u16 tx_work_limit;
 	u32 tx_timeout_count;
 	int num_tx_queues;
 	struct igb_ring *tx_ring[IGB_MAX_TX_QUEUES];
@@ -426,6 +457,7 @@ struct igb_adapter {
 	u32 en_mng_pt;
 	u16 link_speed;
 	u16 link_duplex;
+	u8 port_num;
 
 	/* Interrupt Throttle Rate */
 	u32 rx_itr_setting;
@@ -443,7 +475,7 @@ struct igb_adapter {
 #ifndef HAVE_NETDEV_STATS_IN_NETDEV
 	struct net_device_stats net_stats;
 #endif
-#ifdef IGB_LRO
+#ifndef IGB_NO_LRO
 	struct igb_lro_stats lro_stats;
 #endif
 #ifdef HAVE_HW_TIME_STAMP
@@ -497,16 +529,22 @@ struct igb_adapter {
 	struct net_device *vmdq_netdev[IGB_MAX_VMDQ_QUEUES];
 #endif
 	int dmac;
+	u32 *shadow_vfta;
 };
 
 #ifdef CONFIG_IGB_VMDQ_NETDEV
 struct igb_vmdq_adapter {
+#ifdef HAVE_VLAN_RX_REGISTER
+	/* vlgrp must be first member of structure */
+	struct vlan_group *vlgrp;
+#else
+	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
+#endif
 	struct igb_adapter *real_adapter;
 	struct net_device *vnetdev;
 	struct net_device_stats net_stats;
 	struct igb_ring *tx_ring;
 	struct igb_ring *rx_ring;
-	struct vlan_group *vlgrp;
 };
 #endif
 
@@ -518,6 +556,7 @@ struct igb_vmdq_adapter {
 #define IGB_FLAG_QUAD_PORT_A       (1 << 4)
 #define IGB_FLAG_QUEUE_PAIRS       (1 << 5)
 #define IGB_FLAG_EEE               (1 << 6)
+#define IGB_FLAG_DMAC              (1 << 7)
 
 #define IGB_MIN_TXPBSIZE           20408
 #define IGB_TX_BUF_4096            4096
@@ -553,6 +592,7 @@ struct igb_vmdq_adapter {
 #define FW_UNUSED_VER        0x0
 #define FW_MAX_RETRIES       3
 #define FW_STATUS_SUCCESS    0x1
+#define FW_FAMILY_DRV_VER    0Xffffffff
 
 struct e1000_fw_hdr {
 	u8 cmd;
@@ -595,7 +635,7 @@ extern void igb_setup_tctl(struct igb_adapter *);
 extern void igb_setup_rctl(struct igb_adapter *);
 extern netdev_tx_t igb_xmit_frame_ring(struct sk_buff *, struct igb_ring *);
 extern void igb_unmap_and_free_tx_resource(struct igb_ring *,
-                                           struct igb_buffer *);
+                                           struct igb_tx_buffer *);
 extern void igb_alloc_rx_buffers(struct igb_ring *, u16);
 extern void igb_clean_rx_ring(struct igb_ring *);
 extern void igb_update_stats(struct igb_adapter *);
@@ -613,5 +653,8 @@ extern int igb_available_rars(struct igb_adapter *adapter);
 extern s32 igb_vlvf_set(struct igb_adapter *, u32, bool, u32);
 extern void igb_configure_vt_default_pool(struct igb_adapter *adapter);
 extern void igb_enable_vlan_tags(struct igb_adapter *adapter);
+#ifndef HAVE_VLAN_RX_REGISTER
+extern void igb_vlan_mode(struct net_device *, u32);
+#endif
 
 #endif /* _IGB_H_ */
