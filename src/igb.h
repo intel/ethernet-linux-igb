@@ -93,7 +93,7 @@ struct igb_adapter;
 
 /* TX/RX descriptor defines */
 #define IGB_DEFAULT_TXD                  256
-#define IXGBE_DEFAULT_TX_WORK		 128
+#define IGB_DEFAULT_TX_WORK		 128
 #define IGB_MIN_TXD                       80
 #define IGB_MAX_TXD                     4096
 

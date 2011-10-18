@@ -1736,7 +1736,6 @@ static inline int _kc_skb_padto(struct sk_buff *skb, unsigned int len)
 		return 0;
 	return _kc_skb_pad(skb, len - size);
 }
-
 #endif /* < 2.6.18 */
 
 /*****************************************************************************/
@@ -2081,6 +2080,8 @@ static inline int _kc_skb_is_gso_v6(const struct sk_buff *skb)
 #ifndef DEFINE_PCI_DEVICE_TABLE
 #define DEFINE_PCI_DEVICE_TABLE(_table) struct pci_device_id _table[]
 #endif /* DEFINE_PCI_DEVICE_TABLE */
+
+#else /* < 2.6.25 */
 
 #endif /* < 2.6.25 */
 

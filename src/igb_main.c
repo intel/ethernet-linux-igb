@@ -56,7 +56,7 @@
 
 #define MAJ 3
 #define MIN 2
-#define BUILD 9
+#define BUILD 10
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "." __stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
 char igb_driver_name[] = "igb";
@@ -2498,7 +2498,7 @@ static int __devinit igb_sw_init(struct igb_adapter *adapter)
 	adapter->rx_ring_count = IGB_DEFAULT_RXD;
 
 	/* set default work limits */
-	adapter->tx_work_limit = IXGBE_DEFAULT_TX_WORK;
+	adapter->tx_work_limit = IGB_DEFAULT_TX_WORK;
 
 	adapter->max_frame_size = netdev->mtu + ETH_HLEN + ETH_FCS_LEN +
 					      VLAN_HLEN;
@@ -3296,12 +3296,12 @@ void igb_unmap_and_free_tx_resource(struct igb_ring *ring,
 {
 	if (tx_buffer->skb) {
 		dev_kfree_skb_any(tx_buffer->skb);
-		if (tx_buffer->dma)
+		if (tx_buffer->length)
 			dma_unmap_single(ring->dev,
 			                 tx_buffer->dma,
 			                 tx_buffer->length,
 			                 DMA_TO_DEVICE);
-	} else if (tx_buffer->dma) {
+	} else if (tx_buffer->length) {
 		dma_unmap_page(ring->dev,
 		               tx_buffer->dma,
 		               tx_buffer->length,
@@ -3309,7 +3309,7 @@ void igb_unmap_and_free_tx_resource(struct igb_ring *ring,
 	}
 	tx_buffer->next_to_watch = NULL;
 	tx_buffer->skb = NULL;
-	tx_buffer->dma = 0;
+	tx_buffer->length = 0;
 	/* buffer_info must be completely set up in the transmit path */
 }
 
@@ -6008,11 +6008,10 @@ static bool igb_clean_tx_irq(struct igb_q_vector *q_vector)
 		                 tx_buffer->dma,
 		                 tx_buffer->length,
 		                 DMA_TO_DEVICE);
+		tx_buffer->length = 0;
 
 		/* clear last DMA location and unmap remaining buffers */
 		while (tx_desc != eop_desc) {
-			tx_buffer->dma = 0;
-
 			tx_buffer++;
 			tx_desc++;
 			i++;
@@ -6023,16 +6022,14 @@ static bool igb_clean_tx_irq(struct igb_q_vector *q_vector)
 			}
 
 			/* unmap any remaining paged data */
-			if (tx_buffer->dma) {
+			if (tx_buffer->length) {
 				dma_unmap_page(tx_ring->dev,
 				               tx_buffer->dma,
 				               tx_buffer->length,
 				               DMA_TO_DEVICE);
+				tx_buffer->length = 0;
 			}
 		}
-
-		/* clear last DMA location */
-		tx_buffer->dma = 0;
 
 		/* move us one more past the eop_desc for start of next pkt */
 		tx_buffer++;
