@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2010 Intel Corporation.
+  Copyright(c) 2007-2012 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -44,6 +44,7 @@
 #define E1000_BARCTRL_FLSIZE		0x0700 /* BAR ctrl Flsize */
 #define E1000_BARCTRL_CSRSIZE		0x2000 /* BAR ctrl CSR size */
 #define E1000_I350_BARCTRL		0x5BFC /* BAR ctrl reg */
+#define E1000_I350_DTXMXPKTSZ		0x355C /* Maximum sent packet size reg*/
 #define E1000_SCTL	0x00024  /* SerDes Control - RW */
 #define E1000_FCAL	0x00028  /* Flow Control Address Low - RW */
 #define E1000_FCAH	0x0002C  /* Flow Control Address High -RW */
@@ -403,9 +404,9 @@
 #define E1000_FFMT	0x09000  /* Flexible Filter Mask Table - RW Array */
 #define E1000_FFVT	0x09800  /* Flexible Filter Value Table - RW Array */
 /* Flexible Host Filter Table */
-#define E1000_FHFT(_n)	(0x09000 + (_n * 0x100))
+#define E1000_FHFT(_n)	(0x09000 + ((_n) * 0x100))
 /* Ext Flexible Host Filter Table */
-#define E1000_FHFT_EXT(_n)	(0x09A00 + (_n * 0x100))
+#define E1000_FHFT_EXT(_n)	(0x09A00 + ((_n) * 0x100))
 
 
 #define E1000_KMRNCTRLSTA	0x00034 /* MAC-PHY interface - RW */
@@ -575,7 +576,7 @@
 #define E1000_THHIGHTC	0x0810C /* High Threshold Control */
 #define E1000_THSTAT	0x08110 /* Thermal Sensor Status */
 
-/*Energy Efficient Ethernet "EEE" registers */
+/* Energy Efficient Ethernet "EEE" registers */
 #define E1000_IPCNFG	0x0E38 /* Internal PHY Configuration */
 #define E1000_LTRC	0x01A0 /* Latency Tolerance Reporting Control */
 #define E1000_EEER	0x0E30 /* Energy Efficient Ethernet "EEE"*/
@@ -588,5 +589,6 @@
 #define E1000_B2OGPRC	0x04158 /* BMC2OS packets received by host */
 #define E1000_O2BGPTC	0x08FE4 /* OS2BMC packets received by BMC */
 #define E1000_O2BSPC	0x0415C /* OS2BMC packets transmitted by host */
+
 
 #endif

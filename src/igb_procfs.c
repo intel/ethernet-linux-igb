@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2010 Intel Corporation.
+  Copyright(c) 2007-2012 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -801,7 +801,7 @@ void igb_del_proc_entries(struct igb_adapter *adapter)
 	int index, i;
 	char buf[16];	/* much larger than the sensor number will ever be */
 
-	if ( igb_top_dir == NULL )
+	if (igb_top_dir == NULL)
 		return;
 
 	for (i = 0; i < E1000_MAX_SENSORS; i++) {
@@ -816,23 +816,21 @@ void igb_del_proc_entries(struct igb_adapter *adapter)
 					   adapter->therm_dir[i]);
 		}
 		snprintf(buf, sizeof(buf), "sensor_%d", i);
-		remove_proc_entry(buf ,adapter->therm_dir[i]);
+		remove_proc_entry(buf, adapter->info_dir);
 	}
 
 	if (adapter->info_dir != NULL) {
 		for (index = 0; ; index++) {
-			if (igb_proc_entries[index].read == NULL) {
+			if (igb_proc_entries[index].read == NULL)
 				break;
-			}
 		        remove_proc_entry(igb_proc_entries[index].name,
 					  adapter->info_dir); 
 		}
-		remove_proc_entry("stats", adapter->eth_dir);
+		remove_proc_entry("info", adapter->eth_dir);
 	}
 
-	if (adapter->eth_dir != NULL) {
+	if (adapter->eth_dir != NULL)
 		remove_proc_entry(pci_name(adapter->pdev), igb_top_dir);
-	}
 }
 
 /* called from igb_main.c */
@@ -844,9 +842,8 @@ void igb_procfs_exit(struct igb_adapter *adapter)
 int igb_procfs_topdir_init(void) 
 {
 	igb_top_dir = proc_mkdir("driver/igb", NULL);
-	if (igb_top_dir == NULL) {
+	if (igb_top_dir == NULL)
 		return (-ENOMEM);
-	}
 
 	return 0;
 }

@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2010 Intel Corporation.
+  Copyright(c) 2007-2012 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -1271,6 +1271,7 @@
 #define NVM_VERSION			0x0005
 #define NVM_SERDES_AMPLITUDE		0x0006 /* SERDES output amplitude */
 #define NVM_PHY_CLASS_WORD		0x0007
+
 #define NVM_ETS_CFG			0x003E
 #define NVM_ETS_LTHRES_DELTA_MASK	0x07C0
 #define NVM_ETS_LTHRES_DELTA_SHIFT	6
@@ -1302,12 +1303,12 @@
 #define E1000_NVM_CFG_DONE_PORT_2	0x100000 /* ...for third port */
 #define E1000_NVM_CFG_DONE_PORT_3	0x200000 /* ...for fourth port */
 
-#define NVM_82580_LAN_FUNC_OFFSET(a)	(a ? (0x40 + (0x40 * a)) : 0)
+#define NVM_82580_LAN_FUNC_OFFSET(a)	((a) ? (0x40 + (0x40 * (a))) : 0)
 
 /* Mask bits for fields in Word 0x24 of the NVM */
 #define NVM_WORD24_COM_MDIO		0x0008 /* MDIO interface shared */
 #define NVM_WORD24_EXT_MDIO		0x0004 /* MDIO accesses routed extrnl */
-/* Offset of Link Mode bits for 82575 up to Kawela */
+/* Offset of Link Mode bits for 82575/82576 */
 #define NVM_WORD24_LNK_MODE_OFFSET	8
 /* Offset of Link Mode bits for 82580 up */
 #define NVM_WORD24_82580_LNK_MODE_OFFSET	4
@@ -1681,6 +1682,8 @@
 #define E1000_DMACR_DMAC_LX_MASK	0x30000000
 #define E1000_DMACR_DMAC_LX_SHIFT	28
 #define E1000_DMACR_DMAC_EN		0x80000000 /* Enable DMA Coalescing */
+/* DMA Coalescing BMC-to-OS Watchdog Enable */
+#define E1000_DMACR_DC_BMC2OSW_EN	0x00008000
 
 /* DMA Coalescing Transmit Threshold */
 #define E1000_DMCTXTH_DMCTTHR_MASK	0x00000FFF

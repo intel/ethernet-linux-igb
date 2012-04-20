@@ -4,7 +4,7 @@
 .\"
 .\" * Other names and brands may be claimed as the property of others.
 .\"
-.TH igb 1 "March 14, 2011"
+.TH igb 1 "January 5, 2012"
 
 .SH NAME
 igb \-This file describes the Linux* Base Driver for the Gigabit Family of Adapters.
@@ -80,18 +80,16 @@ Causes an immediate interrupt if the board receives a packet smaller than the sp
 .B IntMode
 .IP
 .B Valid Range:    
-0-2
+0-2 (0 = Legacy Int, 1 = MSI and 2 = MSI-X)
 .IP
 .B Default Value:
 2
 .IP
-0 - Legacy Interrupts, single queue
-1 - MSI interrupts, single queue
-2 - MSI-X interrupts, single queue (default)
-.IP
-Allows changing interrupt mode and MQ status at load time, without requiring
-a recompile. If the driver fails to enable a specific interrupt mode, it will
-fail back to lesser capabilities.
+IntMode controls allow load time control over the type of interrupt
+registered for by the driver.  MSI-X is required for multiple queue
+support, and some kernels and combinations of kernel .config options will
+force a lower level of interrupt support.  'cat /proc/interrupts' will show
+different values for each type of interrupt.
 .IP
 .B RSS
 .IP

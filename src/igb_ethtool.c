@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2010 Intel Corporation.
+  Copyright(c) 2007-2012 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -32,6 +32,9 @@
 
 #ifdef SIOCETHTOOL
 #include <linux/ethtool.h>
+#ifdef CONFIG_PM_RUNTIME
+#include <linux/pm_runtime.h>
+#endif /* CONFIG_PM_RUNTIME */
 
 #include "igb.h"
 #include "igb_regtest.h"
@@ -859,7 +862,6 @@ clear_reset:
 	clear_bit(__IGB_RESETTING, &adapter->state);
 	return err;
 }
-
 static bool reg_pattern_test(struct igb_adapter *adapter, u64 *data,
 			     int reg, u32 mask, u32 write)
 {
@@ -1260,22 +1262,22 @@ static int igb_integrated_phy_loopback(struct igb_adapter *adapter)
 	hw->mac.autoneg = FALSE;
 
 	if (hw->phy.type == e1000_phy_m88) {
-		/* Auto-MDI/MDIX Off */
-		e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, 0x0808);
-		/* reset to update Auto-MDI/MDIX */
-		e1000_write_phy_reg(hw, PHY_CONTROL, 0x9140);
-		/* autoneg off */
-		e1000_write_phy_reg(hw, PHY_CONTROL, 0x8140);
-	} else if (hw->phy.type >= e1000_phy_82580) {
+			/* Auto-MDI/MDIX Off */
+			e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, 0x0808);
+			/* reset to update Auto-MDI/MDIX */
+			e1000_write_phy_reg(hw, PHY_CONTROL, 0x9140);
+			/* autoneg off */
+			e1000_write_phy_reg(hw, PHY_CONTROL, 0x8140);
+	} else {
 		/* enable MII loopback */
-		e1000_write_phy_reg(hw, I82577_PHY_LBK_CTRL, 0x8041);
+		if (hw->phy.type == e1000_phy_82580) 
+			e1000_write_phy_reg(hw, I82577_PHY_LBK_CTRL, 0x8041);
 	}
 
-	ctrl_reg = E1000_READ_REG(hw, E1000_CTRL);
-
-	/* force 1000, set loopback */
+	/* force 1000, set loopback  */
 	e1000_write_phy_reg(hw, PHY_CONTROL, 0x4140);
 
+	ctrl_reg = E1000_READ_REG(hw, E1000_CTRL);
 	/* Now set up the MAC to the same speed/duplex as the PHY. */
 	ctrl_reg = E1000_READ_REG(hw, E1000_CTRL);
 	ctrl_reg &= ~E1000_CTRL_SPD_SEL; /* Clear the speed sel bits */
@@ -1295,9 +1297,8 @@ static int igb_integrated_phy_loopback(struct igb_adapter *adapter)
 	 */
 	if (hw->phy.type == e1000_phy_m88)
 		igb_phy_disable_receiver(adapter);
-
+	
 	udelay(500);
-
 	return 0;
 }
 
@@ -1377,13 +1378,13 @@ static void igb_loopback_cleanup(struct igb_adapter *adapter)
 	    (hw->device_id == E1000_DEV_ID_DH89XXCC_BACKPLANE) ||
             (hw->device_id == E1000_DEV_ID_DH89XXCC_SFP)) {
 		u32 reg;
-                
+
 		/* Disable near end loopback on DH89xxCC */
 		reg = E1000_READ_REG(hw, E1000_MPHY_ADDR_CTL);
                 reg = (reg & E1000_MPHY_ADDR_CTL_OFFSET_MASK ) |
                         E1000_MPHY_PCS_CLK_REG_OFFSET;
         	E1000_WRITE_REG(hw, E1000_MPHY_ADDR_CTL, reg);
-        	
+
 		reg = E1000_READ_REG(hw, E1000_MPHY_DATA);
         	reg &= ~E1000_MPHY_PCS_CLK_REG_DIGINELBEN;
         	E1000_WRITE_REG(hw, E1000_MPHY_DATA, reg);
@@ -1401,7 +1402,6 @@ static void igb_loopback_cleanup(struct igb_adapter *adapter)
 		e1000_phy_commit(hw);
 	}
 }
-
 static void igb_create_lbtest_frame(struct sk_buff *skb,
 				    unsigned int frame_size)
 {
@@ -1574,8 +1574,11 @@ out:
 
 static int igb_link_test(struct igb_adapter *adapter, u64 *data)
 {
-	struct e1000_hw *hw = &adapter->hw;
+	u32 link;
+	int i, time;
+
 	*data = 0;
+	time = 0;
 	if (adapter->hw.phy.media_type == e1000_media_type_internal_serdes) {
 		int i = 0;
 		adapter->hw.mac.serdes_has_link = FALSE;
@@ -1585,20 +1588,26 @@ static int igb_link_test(struct igb_adapter *adapter, u64 *data)
 		do {
 			e1000_check_for_link(&adapter->hw);
 			if (adapter->hw.mac.serdes_has_link)
-				return *data;
+				goto out;
 			msleep(20);
 		} while (i++ < 3750);
 
 		*data = 1;
 	} else {
-		e1000_check_for_link(&adapter->hw);
-		if (adapter->hw.mac.autoneg)
-			msleep(5000);
-
-		if (!(E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_LU))
+		for (i=0; i < IGB_MAX_LINK_TRIES; i++) {
+		link = igb_has_link(adapter);
+			if (link)
+				goto out;
+			else {
+				time++;
+				msleep(1000);
+			}
+		}
+		if (!link)
 			*data = 1;
 	}
-	return *data;
+	out:
+		return *data;
 }
 
 static void igb_diag_test(struct net_device *netdev,
@@ -1621,8 +1630,8 @@ static void igb_diag_test(struct net_device *netdev,
 		dev_info(pci_dev_to_dev(adapter->pdev), "offline testing starting\n");
 
 		/* power up link for link test */
-		igb_power_up_link(adapter);
-
+		 	igb_power_up_link(adapter);
+		
 		/* Link test performed before hardware reset so autoneg doesn't
 		 * interfere with test result */
 		if (igb_link_test(adapter, &data[4]))
@@ -1647,7 +1656,8 @@ static void igb_diag_test(struct net_device *netdev,
 
 		igb_reset(adapter);
 		/* power up link for loopback test */
-		igb_power_up_link(adapter);
+			igb_power_up_link(adapter);
+
 		if (igb_loopback_test(adapter, &data[3]))
 			eth_test->flags |= ETH_TEST_FL_FAILED;
 
@@ -2038,11 +2048,37 @@ static void igb_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 			p += ETH_GSTRING_LEN;
 			sprintf(p, "rx_queue_%u_alloc_failed", i);
 			p += ETH_GSTRING_LEN;
+			sprintf(p, "rx_queue_%u_csum_good", i);
+			p += ETH_GSTRING_LEN;
+			sprintf(p, "rx_queue_%u_hdr_split", i);
+			p += ETH_GSTRING_LEN;
+			sprintf(p, "rx_queue_%u_lli_int", i);
+			p += ETH_GSTRING_LEN;
+			sprintf(p, "rx_queue_%u_pif_count", i);
+			p += ETH_GSTRING_LEN;
 		}
 /*		BUG_ON(p - data != IGB_STATS_LEN * ETH_GSTRING_LEN); */
 		break;
 	}
 }
+
+#ifdef CONFIG_PM_RUNTIME
+static int igb_ethtool_begin(struct net_device *netdev)
+{
+	struct igb_adapter *adapter = netdev_priv(netdev);
+
+	pm_runtime_get_sync(&adapter->pdev->dev);
+
+	return 0;
+}
+
+static void igb_ethtool_complete(struct net_device *netdev)
+{
+	struct igb_adapter *adapter = netdev_priv(netdev);
+
+	pm_runtime_put(&adapter->pdev->dev);
+}
+#endif /* CONFIG_PM_RUNTIME */
 
 #ifndef HAVE_NDO_SET_FEATURES
 static u32 igb_get_rx_csum(struct net_device *netdev)
@@ -2278,6 +2314,10 @@ static struct ethtool_ops igb_ethtool_ops = {
 #endif
 	.get_coalesce           = igb_get_coalesce,
 	.set_coalesce           = igb_set_coalesce,
+#ifdef CONFIG_PM_RUNTIME
+	.begin			= igb_ethtool_begin,
+	.complete		= igb_ethtool_complete,
+#endif /* CONFIG_PM_RUNTIME */
 #ifndef HAVE_NDO_SET_FEATURES
 	.get_rx_csum            = igb_get_rx_csum,
 	.set_rx_csum            = igb_set_rx_csum,

@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2010 Intel Corporation.
+  Copyright(c) 2007-2012 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -155,6 +155,9 @@ static s32 e1000_init_phy_params_82575(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_init_phy_params_82575");
 
+	phy->ops.read_i2c_byte = e1000_read_i2c_byte_generic;
+	phy->ops.write_i2c_byte = e1000_write_i2c_byte_generic;
+
 	if (hw->phy.media_type != e1000_media_type_copper) {
 		phy->type = e1000_phy_none;
 		goto out;
@@ -188,12 +191,17 @@ static s32 e1000_init_phy_params_82575(struct e1000_hw *hw)
 	if (e1000_sgmii_active_82575(hw) && !e1000_sgmii_uses_mdio_82575(hw)) {
 		phy->ops.read_reg = e1000_read_phy_reg_sgmii_82575;
 		phy->ops.write_reg = e1000_write_phy_reg_sgmii_82575;
-	} else if (hw->mac.type >= e1000_82580) {
-		phy->ops.read_reg = e1000_read_phy_reg_82580;
-		phy->ops.write_reg = e1000_write_phy_reg_82580;
 	} else {
-		phy->ops.read_reg = e1000_read_phy_reg_igp;
-		phy->ops.write_reg = e1000_write_phy_reg_igp;
+		switch (hw->mac.type) {
+		case e1000_82580:
+		case e1000_i350:
+			phy->ops.read_reg = e1000_read_phy_reg_82580;
+			phy->ops.write_reg = e1000_write_phy_reg_82580;
+			break;
+		default:
+			phy->ops.read_reg = e1000_read_phy_reg_igp;
+			phy->ops.write_reg = e1000_write_phy_reg_igp;
+		}
 	}
 
 	/* Set phy->phy_addr and phy->id. */
@@ -309,7 +317,7 @@ s32 e1000_init_nvm_params_82575(struct e1000_hw *hw)
 	nvm->ops.update = e1000_update_nvm_checksum_generic;
 	nvm->ops.valid_led_default = e1000_valid_led_default_82575;
 
-	/* override genric family function pointers for specific descendants */
+	/* override generic family function pointers for specific descendants */
 	switch (hw->mac.type) {
 	case e1000_82580:
 		nvm->ops.validate = e1000_validate_nvm_checksum_82580;
@@ -361,8 +369,7 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	mac->has_fwsm = true;
 	/* ARC supported; valid only if manageability features are enabled. */
 	mac->arc_subsystem_valid =
-		(E1000_READ_REG(hw, E1000_FWSM) & E1000_FWSM_MODE_MASK)
-			? true : false;
+		!!(E1000_READ_REG(hw, E1000_FWSM) & E1000_FWSM_MODE_MASK);
 
 	/* Function pointers */
 
@@ -426,6 +433,9 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 				e1000_get_thermal_sensor_data_generic;
 	mac->ops.init_thermal_sensor_thresh =
 				e1000_init_thermal_sensor_thresh_generic;
+	/* acquire SW_FW sync */
+	mac->ops.acquire_swfw_sync = e1000_acquire_swfw_sync_82575;
+	mac->ops.release_swfw_sync = e1000_release_swfw_sync_82575;
 
 	/* set lan id for port to determine which phy lock to use */
 	hw->mac.ops.set_lan_id(hw);
@@ -468,7 +478,7 @@ static s32 e1000_acquire_phy_82575(struct e1000_hw *hw)
 	else if (hw->bus.func == E1000_FUNC_3)
 		mask = E1000_SWFW_PHY3_SM;
 
-	return e1000_acquire_swfw_sync_82575(hw, mask);
+	return hw->mac.ops.acquire_swfw_sync(hw, mask);
 }
 
 /**
@@ -490,7 +500,7 @@ static void e1000_release_phy_82575(struct e1000_hw *hw)
 	else if (hw->bus.func == E1000_FUNC_3)
 		mask = E1000_SWFW_PHY3_SM;
 
-	e1000_release_swfw_sync_82575(hw, mask);
+	hw->mac.ops.release_swfw_sync(hw, mask);
 }
 
 /**
@@ -902,8 +912,7 @@ static s32 e1000_acquire_nvm_82575(struct e1000_hw *hw)
 			/* Clear all access error flags */
 			E1000_WRITE_REG(hw, E1000_EECD, eecd |
 					E1000_EECD_ERROR_CLR);
-			DEBUGOUT("Nvm bit banging access error"
-				" detected and cleared.\n");
+			DEBUGOUT("Nvm bit banging access error detected and cleared.\n");
 		}
 	}
 	if (hw->mac.type == e1000_82580) {
@@ -912,17 +921,12 @@ static s32 e1000_acquire_nvm_82575(struct e1000_hw *hw)
 			/* Clear access error flag */
 			E1000_WRITE_REG(hw, E1000_EECD, eecd |
 					E1000_EECD_BLOCKED);
-			DEBUGOUT("Nvm bit banging access"
-				" error detected and cleared.\n");
+			DEBUGOUT("Nvm bit banging access error detected and cleared.\n");
 		}
 	}
 
 
-	switch (hw->mac.type) {
-	default:
-		ret_val = e1000_acquire_nvm_generic(hw);
-	}
-
+	ret_val = e1000_acquire_nvm_generic(hw);
 	if (ret_val)
 		e1000_release_swfw_sync_82575(hw, E1000_SWFW_EEP_SM);
 
@@ -941,10 +945,8 @@ static void e1000_release_nvm_82575(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_release_nvm_82575");
 
-	switch (hw->mac.type) {
-	default:
-		e1000_release_nvm_generic(hw);
-	}
+	e1000_release_nvm_generic(hw);
+
 	e1000_release_swfw_sync_82575(hw, E1000_SWFW_EEP_SM);
 }
 
@@ -1115,6 +1117,7 @@ static s32 e1000_check_for_link_82575(struct e1000_hw *hw)
 		 * continue to check for link.
 		 */
 		hw->mac.get_link_status = !hw->mac.serdes_has_link;
+
 	} else {
 		ret_val = e1000_check_for_copper_link_generic(hw);
 	}
@@ -1181,11 +1184,9 @@ static s32 e1000_get_pcs_speed_and_duplex_82575(struct e1000_hw *hw,
 	pcs = E1000_READ_REG(hw, E1000_PCS_LSTAT);
 
 	/*
-	 * The link up bit determines when link is up on autoneg. The sync ok
-	 * gets set once both sides sync up and agree upon link. Stable link
-	 * can be determined by checking for both link up and link sync ok
+	 * The link up bit determines when link is up on autoneg.
 	 */
-	if ((pcs & E1000_PCS_LSTS_LINK_OK) && (pcs & E1000_PCS_LSTS_SYNK_OK)) {
+	if (pcs & E1000_PCS_LSTS_LINK_OK) {
 		mac->serdes_has_link = true;
 
 		/* Detect and store PCS speed */
@@ -1663,7 +1664,7 @@ static s32 e1000_get_media_type_82575(struct e1000_hw *hw)
 		}
 		break;
 	default:
-		DEBUGOUT("Link mode mask doesn't fit bit field size");
+		DEBUGOUT("Link mode mask doesn't fit bit field size\n");
 		goto out;
 	}
 	/*
@@ -1739,8 +1740,7 @@ static s32 e1000_set_sfp_media_type_82575(struct e1000_hw *hw)
 			hw->phy.media_type = e1000_media_type_copper;
 		} else {
 				hw->phy.media_type = e1000_media_type_unknown;
-				DEBUGOUT("PHY module has not been "
-					 "recognized");
+				DEBUGOUT("PHY module has not been recognized\n");
 				goto out;
 		}
 	} else {
@@ -2332,7 +2332,7 @@ static s32 e1000_reset_hw_82580(struct e1000_hw *hw)
 	msec_delay(10);
 
 	/* Determine whether or not a global dev reset is requested */
-	if (global_device_reset && e1000_acquire_swfw_sync_82575(hw,
+	if (global_device_reset && hw->mac.ops.acquire_swfw_sync(hw,
 	    swmbsw_mask))
 			global_device_reset = false;
 
@@ -2379,7 +2379,7 @@ static s32 e1000_reset_hw_82580(struct e1000_hw *hw)
 
 	/* Release semaphore */
 	if (global_device_reset)
-		e1000_release_swfw_sync_82575(hw, swmbsw_mask);
+		hw->mac.ops.release_swfw_sync(hw, swmbsw_mask);
 
 	return ret_val;
 }
@@ -2535,8 +2535,7 @@ static s32 e1000_update_nvm_checksum_82580(struct e1000_hw *hw)
 
 	ret_val = hw->nvm.ops.read(hw, NVM_COMPATIBILITY_REG_3, 1, &nvm_data);
 	if (ret_val) {
-		DEBUGOUT("NVM Read Error while updating checksum"
-			" compatibility bit.\n");
+		DEBUGOUT("NVM Read Error while updating checksum compatibility bit.\n");
 		goto out;
 	}
 
@@ -2546,8 +2545,7 @@ static s32 e1000_update_nvm_checksum_82580(struct e1000_hw *hw)
 		ret_val = hw->nvm.ops.write(hw, NVM_COMPATIBILITY_REG_3, 1,
 					    &nvm_data);
 		if (ret_val) {
-			DEBUGOUT("NVM Write Error while updating checksum"
-				" compatibility bit.\n");
+			DEBUGOUT("NVM Write Error while updating checksum compatibility bit.\n");
 			goto out;
 		}
 	}
@@ -2740,6 +2738,7 @@ s32 e1000_set_i2c_bb(struct e1000_hw *hw)
  *  e1000_read_i2c_byte_generic - Reads 8 bit word over I2C
  *  @hw: pointer to hardware structure
  *  @byte_offset: byte offset to read
+ *  @dev_addr: device address
  *  @data: value read
  *
  *  Performs byte read operation over I2C interface at
@@ -2760,7 +2759,7 @@ s32 e1000_read_i2c_byte_generic(struct e1000_hw *hw, u8 byte_offset,
 	swfw_mask = E1000_SWFW_PHY0_SM;
 
 	do {
-		if (e1000_acquire_swfw_sync_82575(hw, swfw_mask)
+		if (hw->mac.ops.acquire_swfw_sync(hw, swfw_mask)
 		    != E1000_SUCCESS) {
 			status = E1000_ERR_SWFW_SYNC;
 			goto read_byte_out;
@@ -2808,7 +2807,7 @@ s32 e1000_read_i2c_byte_generic(struct e1000_hw *hw, u8 byte_offset,
 		break;
 
 fail:
-		e1000_release_swfw_sync_82575(hw, swfw_mask);
+		hw->mac.ops.release_swfw_sync(hw, swfw_mask);
 		msec_delay(100);
 		e1000_i2c_bus_clear(hw);
 		retry++;
@@ -2819,7 +2818,7 @@ fail:
 
 	} while (retry < max_retry);
 
-	e1000_release_swfw_sync_82575(hw, swfw_mask);
+	hw->mac.ops.release_swfw_sync(hw, swfw_mask);
 
 read_byte_out:
 
@@ -2830,6 +2829,7 @@ read_byte_out:
  *  e1000_write_i2c_byte_generic - Writes 8 bit word over I2C
  *  @hw: pointer to hardware structure
  *  @byte_offset: byte offset to write
+ *  @dev_addr: device address
  *  @data: value to write
  *
  *  Performs byte write operation over I2C interface at
@@ -2847,7 +2847,7 @@ s32 e1000_write_i2c_byte_generic(struct e1000_hw *hw, u8 byte_offset,
 
 	swfw_mask = E1000_SWFW_PHY0_SM;
 
-	if (e1000_acquire_swfw_sync_82575(hw, swfw_mask) != E1000_SUCCESS) {
+	if (hw->mac.ops.acquire_swfw_sync(hw, swfw_mask) != E1000_SUCCESS) {
 		status = E1000_ERR_SWFW_SYNC;
 		goto write_byte_out;
 	}
@@ -2891,7 +2891,7 @@ fail:
 			DEBUGOUT("I2C byte write error.\n");
 	} while (retry < max_retry);
 
-	e1000_release_swfw_sync_82575(hw, swfw_mask);
+	hw->mac.ops.release_swfw_sync(hw, swfw_mask);
 
 write_byte_out:
 

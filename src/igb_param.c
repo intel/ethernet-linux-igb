@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2010 Intel Corporation.
+  Copyright(c) 2007-2012 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -137,7 +137,7 @@ IGB_PARAM(LLISize, "Low Latency Interrupt on Packet Size (0-1500), default 0=off
 IGB_PARAM(RSS, "Number of Receive-Side Scaling Descriptor Queues (0-8), default 1=number of cpus");
 
 #define DEFAULT_RSS       1
-#define MAX_RSS           ((adapter->hw.mac.type == e1000_82575) ? 4 : 8)
+#define MAX_RSS           8
 #define MIN_RSS           0
 
 /* VMDQ (Enable VMDq multiqueue receive)
@@ -557,6 +557,15 @@ void __devinit igb_check_options(struct igb_adapter *adapter)
 				break;
 			}
 		}
+
+		switch (hw->mac.type) {
+		case e1000_82575:
+			opt.arg.r.max = 4;
+			break;
+		default:
+			break;
+		}
+
 #ifdef module_param_array
 		if (num_RSS > bd) {
 #endif

@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2010 Intel Corporation.
+  Copyright(c) 2007-2012 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -88,6 +88,7 @@ bool igb_thermal_present(struct kobject *kobj)
 
 	if (adapter == NULL)
 		return false;
+
 	status = e1000_set_i2c_bb(&(adapter->hw));
 	if (status != E1000_SUCCESS)
 		return false; 
@@ -95,6 +96,7 @@ bool igb_thermal_present(struct kobject *kobj)
 	status = e1000_init_thermal_sensor_thresh(&(adapter->hw));
 	if (status != E1000_SUCCESS)
 		return false; 
+
 	return true;
 }
 

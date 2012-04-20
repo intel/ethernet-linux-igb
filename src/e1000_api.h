@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2010 Intel Corporation.
+  Copyright(c) 2007-2012 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -102,6 +102,7 @@ s32 e1000_mng_write_cmd_header(struct e1000_hw *hw,
 s32 e1000_mng_write_dhcp_info(struct e1000_hw *hw, u8 *buffer, u16 length);
 s32 e1000_get_thermal_sensor_data(struct e1000_hw *hw);
 s32 e1000_init_thermal_sensor_thresh(struct e1000_hw *hw);
+
 
 
 /*

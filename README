@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Ethernet Network Connection
 ===========================================================
 
-October 17, 2011
+March 5, 2012
 
 Contents
 ========
@@ -268,15 +268,14 @@ than the specified size.
 
 IntMode
 -------
-Valid Range:    0-2
-Default Value:  2
-0 - Legacy Interrupts, single queue
-1 - MSI interrupts, single queue
-2 - MSI-X interrupts, single queue (default)
+Valid Range: 0 - 2 (0 = Legacy Int, 1 = MSI and 2 = MSI-X)
+Default Value: 2
 
-Allows changing interrupt mode and MQ status at load time, without requiring
-a recompile. If the driver fails to enable a specific interrupt mode, it will
-fail back to lesser capabilities.
+IntMode controls allow load time control over the type of interrupt
+registered for by the driver.  MSI-X is required for multiple queue
+support, and some kernels and combinations of kernel .config options will
+force a lower level of interrupt support.  'cat /proc/interrupts' will show
+different values for each type of interrupt.
 
 RSS
 ---
@@ -319,11 +318,11 @@ max_vfs
 Valid Range:   0-7
 Default Value: 0
 
-  If the value is greater than 0 it will also force the VMDq parameter to be 1 
-  or more.
+If the value is greater than 0 it will also force the VMDq parameter to be 1 
+or more.
 
-  This parameter adds support for SR-IOV.  It causes the driver to spawn up to 
-  max_vfs worth of virtual function.  
+This parameter adds support for SR-IOV.  It causes the driver to spawn up to 
+max_vfs worth of virtual function.  
 
 QueuePairs
 ----------
@@ -347,48 +346,48 @@ Default Value: -1 (off)
   -1: uses the driver default of allocating memory on whichever processor is
       running insmod/modprobe. 
 
-  The Node parameter will allow you to pick which NUMA node you want to have 
-  the adapter allocate memory from.  All driver structures, in-memory queues, 
-  and receive buffers will be allocated on the node specified.  This parameter
-  is only useful when interrupt affinity is specified, otherwise some portion 
-  of the time the interrupt could run on a different core than the memory is 
-  allocated on, causing slower memory access and impacting throughput, CPU, or
-  both.
+The Node parameter will allow you to pick which NUMA node you want to have the
+adapter allocate memory from.  All driver structures, in-memory queues, and 
+receive buffers will be allocated on the node specified.  This parameter is
+only useful when interrupt affinity is specified, otherwise some portion of the
+time the interrupt could run on a different core than the memory is allocated 
+on, causing slower memory access and impacting throughput, CPU, or both.
 
 EEE
 ---
 Valid Range:  0-1
 Default Value: 1 (enabled)
 
-  A link between two EEE-compliant devices will result in periodic bursts of 
-  data followed by periods where the link is in an idle state. This Low
-  Power Idle (LPI) state is supported in both 1Gbps and 100Mbps link speeds. 
-  NOTE: EEE support requires autonegotiation.
+A link between two EEE-compliant devices will result in periodic bursts of 
+data followed by periods where the link is in an idle state. This Low
+Power Idle (LPI) state is supported in both 1Gbps and 100Mbps link speeds. 
+NOTE: EEE support requires autonegotiation.
 
 DMAC
 ----
 Valid Range: 0, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 
 9000, 10000.
 Default Value: 0 (disabled)
-  Enables or disables DMA Coalescing feature. Values are in usec’s and increase
-  the internal DMA Coalescing feature’s internal timer.  DMA (Direct Memory 
-  Access) allows the network device to move packet data directly to the 
-  system's memory, reducing CPU utilization. However, the frequency and random
-  intervals at which packets arrive do not allow the system to enter a lower 
-  power state. DMA Coalescing allows the adapter to collect packets before it 
-  initiates a DMA event. This may increase network latency but also increases
-  the chances that the system will enter a lower power state. 
+  
+Enables or disables DMA Coalescing feature. Values are in usec’s and increase
+the internal DMA Coalescing feature’s internal timer.  DMA (Direct Memory 
+Access) allows the network device to move packet data directly to the 
+system's memory, reducing CPU utilization. However, the frequency and random
+intervals at which packets arrive do not allow the system to enter a lower 
+power state. DMA Coalescing allows the adapter to collect packets before it 
+initiates a DMA event. This may increase network latency but also increases
+the chances that the system will enter a lower power state. 
 
-  Turning on DMA Coalescing may save energy with kernel 2.6.32 and later. This
-  will impart the greatest chance for your system to consume less power. DMA 
-  Coalescing is effective in helping potentially saving the platform power only
-  when it is enabled across all active ports.
+Turning on DMA Coalescing may save energy with kernel 2.6.32 and later. This
+will impart the greatest chance for your system to consume less power. DMA 
+Coalescing is effective in helping potentially saving the platform power only
+when it is enabled across all active ports.
 
-  InterruptThrottleRate (ITR) should be set to dynamic. When ITR=0, DMA 
-  Coalescing is automatically disabled. 
+InterruptThrottleRate (ITR) should be set to dynamic. When ITR=0, DMA 
+Coalescing is automatically disabled. 
  
-  A whitepaper containing information on how to best configure your platform 
-  is available on the Intel website.
+A whitepaper containing information on how to best configure your platform 
+is available on the Intel website.
 
 MDD (Malicious Driver Detection)
 --------------------------------
@@ -499,10 +498,12 @@ Additional Configurations
   time for the driver to process an interrupt. Multiqueue is off by default.
 
   REQUIREMENTS: MSI-X support is required for Multiqueue. If MSI-X is not 
-  found, the system will fallback to MSI or to Legacy interrupts.
-  This driver supports multiqueue in kernel versions 2.6.24 and greater.
-  This driver supports receive multiqueue on all kernels that support MSI-X.
-  NOTE: Do not use MSI-X with the 2.6.19 or 2.6.20 kernels.
+  found, the system will fallback to MSI or to Legacy interrupts. This driver
+  supports multiqueue in kernel versions 2.6.24 and greater. This driver 
+  supports receive multiqueue on all kernels that support MSI-X. 
+  NOTES: Do not use MSI-X with the 2.6.19 or 2.6.20 kernels.
+  On some kernels a reboot is required to switch between a single queue mode
+  and multiqueue modes, or vice-versa.
 
   LRO
   ---
@@ -735,6 +736,12 @@ Software Issues:
 
        "-cpu qemu64,model=13"
 
+  Host may reboot after removing PF when VF is active in guest
+  ------------------------------------------------------------
+  Using kernel versions earlier than 3.2, do not unload the PF driver with 
+  active VFs. Doing this will cause your VFs to stop working until you reload
+  the PF driver and may cause a spontaneous reboot of your system.
+
 
 Support
 =======
@@ -755,7 +762,7 @@ License
 =======
 
 Intel Gigabit Linux driver.
-Copyright(c) 1999 - 2011 Intel Corporation.
+Copyright(c) 1999 - 2012 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms and conditions of the GNU General Public License,
