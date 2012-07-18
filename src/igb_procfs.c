@@ -68,9 +68,15 @@ bool igb_thermal_present(struct igb_adapter *adapter)
 		return false;
 	hw = &adapter->hw;
 
-	status = e1000_set_i2c_bb(hw);
-	if (status != E1000_SUCCESS)
-		return false;
+	/*
+	 * Only set I2C bit-bang mode if an external thermal sensor is
+	 * supported on this device.
+	 */
+	if (adapter->ets) {
+		status = e1000_set_i2c_bb(hw);
+		if (status != E1000_SUCCESS)
+			return false;
+	}
 
 	status = hw->mac.ops.init_thermal_sensor_thresh(hw);
 	if (status != E1000_SUCCESS)

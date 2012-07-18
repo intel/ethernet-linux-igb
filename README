@@ -283,10 +283,13 @@ Valid Range:   0-8
 Default Value: 1
 
 0 - Assign up to whichever is less, number of CPUS or number of queues
-X - Assign X queues where X is less than the maximum number of queues
+X - Assign X queues where X is less than or equal to maximum number of queues.
+    The driver allows maximum supported queue value. For example, I350-based 
+    adapters allow RSS=8 (where 8-queues is the maximum allowable queues).
 
 Note: for 82575-based adapters the maximum number of queues is 4; for 
-82576-based and newer adapters it is 8.
+82576-based and newer adapters it is 8; for I210-based adapters it is 4 queues;
+and for I211-based adapters it is 2 queues.
 
 This parameter is also affected by the VMDq parameter in that it will limit the
 queues more.

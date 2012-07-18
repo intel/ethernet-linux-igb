@@ -123,7 +123,6 @@ struct igb_adapter;
 #define OUI_LEN                            3
 #define IGB_MAX_VMDQ_QUEUES                8
 
-#define E1000_DMACDC	0x3F1C
 
 struct vf_data_storage {
 	unsigned char vf_mac_addresses[ETH_ALEN];
@@ -179,8 +178,6 @@ struct vf_data_storage {
  */
 /* Supported Rx Buffer Sizes */
 #define IGB_RXBUFFER_512   512
-#define IGB_RXBUFFER_2048  2048
-#define IGB_RXBUFFER_256   256
 #define IGB_RXBUFFER_16384 16384
 #define IGB_RX_HDR_LEN     IGB_RXBUFFER_512
 
@@ -301,10 +298,6 @@ struct igb_rx_queue_stats {
 	u64 drops;
 	u64 csum_err;
 	u64 alloc_failed;
-	u64 csum_good;
-	u64 rx_hdr_split;
-	u64 lli_int;
-	u64 pif_count;
 };
 
 struct igb_ring_container {
@@ -564,8 +557,6 @@ struct igb_adapter {
 #endif
 	int vferr_refcount;
 	int dmac;
-	u64 dmac_entries;
-	int count;
 	u32 *shadow_vfta;
 
 	/* External Thermal Sensor support flag */

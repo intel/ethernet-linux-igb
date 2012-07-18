@@ -2048,14 +2048,6 @@ static void igb_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 			p += ETH_GSTRING_LEN;
 			sprintf(p, "rx_queue_%u_alloc_failed", i);
 			p += ETH_GSTRING_LEN;
-			sprintf(p, "rx_queue_%u_csum_good", i);
-			p += ETH_GSTRING_LEN;
-			sprintf(p, "rx_queue_%u_hdr_split", i);
-			p += ETH_GSTRING_LEN;
-			sprintf(p, "rx_queue_%u_lli_int", i);
-			p += ETH_GSTRING_LEN;
-			sprintf(p, "rx_queue_%u_pif_count", i);
-			p += ETH_GSTRING_LEN;
 		}
 /*		BUG_ON(p - data != IGB_STATS_LEN * ETH_GSTRING_LEN); */
 		break;

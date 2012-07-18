@@ -59,7 +59,7 @@
 
 #define MAJ 3
 #define MIN 4
-#define BUILD 7
+#define BUILD 8
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "." __stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
 char igb_driver_name[] = "igb";
@@ -1677,86 +1677,6 @@ void igb_reinit_locked(struct igb_adapter *adapter)
 	clear_bit(__IGB_RESETTING, &adapter->state);
 }
 
-static void igb_setup_flex_filter(struct igb_adapter *adapter, int filter_id,
-				  int filter_len, u8 *filter, u8 *mask)
-{
-	struct e1000_hw *hw = &adapter->hw;
-	int i = 0, j, k;
-	u32 fhft;
-
-	while (i < filter_len) {
-		for (j = 0; j < 8; j+= 4) {
-			fhft = 0;
-			for (k = 0; k < 4; k++)
-				fhft |= ((u32)(filter[i + j + k])) << (k * 8);
-			E1000_WRITE_REG_ARRAY(hw, E1000_FHFT(filter_id),
-					      (i/2) + (j/4), fhft);
-		}
-		E1000_WRITE_REG_ARRAY(hw, E1000_FHFT(filter_id),
-				      (i/2) + 2, mask[i/8]);
-		i += 8;
-	}
-	E1000_WRITE_REG_ARRAY(hw, E1000_FHFT(filter_id),
-			      63, filter_len);
-	E1000_WRITE_FLUSH(hw);
-}
-
-static void igb_setup_flex_filter_wakeup(struct igb_adapter *adapter)
-{
-	struct e1000_hw *hw = &adapter->hw;
-	u8 pattern[64];
-	u8 mask[8];
-
-	/* clear pattern to match and mask */
-	memset(pattern, 0, 64);
-	memset(mask, 0, 8);
-
-	/*
-	 * This pattern is set to match on the following in a packet:
-	 * 0x00: xx xx xx xx xx xx xx xx  xx xx xx xx 08 00 45 00
-	 * 0x10: xx xx xx xx xx xx xx 11  xx xx xx xx xx xx xx xx
-	 * 0x20: xx xx xx xx 00 07 00 86  xx xx ff ff ff ff ff ff
-	 * 0x30: m0 m1 m2 m3 m4 m5 xx xx  xx xx xx xx xx xx xx xx
-	 *
-	 * Where m0-m5 are the 6 bytes of the mac address in network order
-	 */
-
-	/* ethertype should be IP which is 0x8000 */
-	pattern[0x0C] = 0x08;
-	pattern[0x0D] = 0x00;
-
-	/* verify IPv4 and header length 20 */
-	pattern[0x0E] = 0x45;
-	pattern[0x0F] = 0x00;
-	mask[1] = 0xF0;
-
-	/* verify L3 protocol is UDP */
-	pattern[0x17] = 0x11;
-	mask[2] = 0x80;
-
-	/* verify source and destination port numbers */
-	pattern[0x24] = 0x00;
-	pattern[0x25] = 0x07;
-	pattern[0x26] = 0x00;
-	pattern[0x27] = 0x86;
-	mask[4] = 0xF0;
-
-	/* add start pattern of 6 bytes all 0xFF */
-	memset(&pattern[0x2a], 0xff, 6);
-	mask[5] = 0xFC;
-
-	/* add mac address */
-	memcpy(&pattern[0x30], hw->mac.addr, 6);
-	mask[6] |= 0x3F;
-
-	E1000_WRITE_REG(hw, E1000_WUC, 0);
-	E1000_WRITE_REG(hw, E1000_WUFC, 0);
-
-	igb_setup_flex_filter(adapter, 0, 64, pattern, mask);
-
-	E1000_WRITE_REG(hw, E1000_WUC, E1000_WUC_PME_EN);
-	E1000_WRITE_REG(hw, E1000_WUFC, E1000_WUFC_FLX0);
-}
 void igb_reset(struct igb_adapter *adapter)
 {
 	struct pci_dev *pdev = adapter->pdev;
@@ -1869,10 +1789,14 @@ void igb_reset(struct igb_adapter *adapter)
 		dev_err(pci_dev_to_dev(pdev), "Hardware Error\n");
 
 	igb_init_dmac(adapter, pba);
-	/* External thermal sensor support is limited to certain i350 devices */
-	if (adapter->ets) {
-		/* Re-initialize external thermal sensor interface */
-		e1000_set_i2c_bb(hw);
+	/* Re-initialize the thermal sensor on i350 devices. */
+	if (mac->type == e1000_i350 && hw->bus.func == 0) {
+		/*
+		 * If present, re-initialize the external thermal sensor
+		 * interface.
+		 */
+		if (adapter->ets)
+			e1000_set_i2c_bb(hw);
 		e1000_init_thermal_sensor_thresh(hw);
 	}
 	if (!netif_running(adapter->netdev))
@@ -1882,8 +1806,6 @@ void igb_reset(struct igb_adapter *adapter)
 
 	/* Enable h/w to recognize an 802.1Q VLAN Ethernet packet */
 	E1000_WRITE_REG(hw, E1000_VET, ETHERNET_IEEE_VLAN_TYPE);
-
-	igb_setup_flex_filter_wakeup(adapter);
 
 	e1000_get_phy_info(hw);
 }
@@ -2426,27 +2348,26 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 		 pba_str);
 
 
-	/* External thermal sensor support is limited to certain i350 devices */
+	/* Initialize the thermal sensor on i350 devices. */
 	if (hw->mac.type == e1000_i350 && hw->bus.func == 0) {
 		u16 ets_word;
 
 		/*
-		 * Read the external sensor to determine if this i350 device
-		 * supports an external thermal sensor
+		 * Read the NVM to determine if this i350 device supports an
+		 * external thermal sensor.
 		 */
 		e1000_read_nvm(hw, NVM_ETS_CFG, 1, &ets_word);
-		if (ets_word != 0x0000 && ets_word != 0xFFFF) {
+		if (ets_word != 0x0000 && ets_word != 0xFFFF)
 			adapter->ets = true;
+		else
+			adapter->ets = false;
 #ifdef IGB_SYSFS
-			igb_sysfs_init(adapter);
+		igb_sysfs_init(adapter);
 #else
 #ifdef IGB_PROCFS
-			igb_procfs_init(adapter);
+		igb_procfs_init(adapter);
 #endif /* IGB_PROCFS */
 #endif /* IGB_SYSFS */
-		} else {
-			adapter->ets = false;
-		}
 	} else {
 		adapter->ets = false;
 	}
@@ -3282,10 +3203,6 @@ void igb_setup_rctl(struct igb_adapter *adapter)
 
 	/* enable LPE to prevent packets larger than max_frame_size */
 	rctl |= E1000_RCTL_LPE;
-	/* enable store bad packets for SV driver only */
-	rctl |= E1000_RCTL_SBP;
-	/* initalize counter for other SV stuff */
-	adapter->count = 0;
 
 	/* disable queue 0 to prevent tail write w/o re-config */
 	E1000_WRITE_REG(hw, E1000_RXDCTL(0), 0);
@@ -4154,10 +4071,6 @@ static void igb_watchdog_task(struct work_struct *work)
 			if (hw->mac.type == e1000_i350) {
 				thstat = E1000_READ_REG(hw, E1000_THSTAT);
 				ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
-			printk("%s: Checking for Thermal Status..thstat=%x \n",
-				netdev->name, thstat);
-			printk("%s: Thermal Status..ctrl_ext=%x \n",
-				netdev->name, ctrl_ext);
 				if ((hw->phy.media_type ==
 					e1000_media_type_copper) &&
 					!(ctrl_ext &
@@ -5247,7 +5160,6 @@ void igb_update_stats(struct igb_adapter *adapter)
 	adapter->stats.prc1522 += E1000_READ_REG(hw, E1000_PRC1522);
 	adapter->stats.symerrs += E1000_READ_REG(hw, E1000_SYMERRS);
 	adapter->stats.sec += E1000_READ_REG(hw, E1000_SEC);
-	adapter->dmac_entries += E1000_READ_REG(hw, E1000_DMACDC);
 
 	mpc = E1000_READ_REG(hw, E1000_MPC);
 	adapter->stats.mpc += mpc;
@@ -6679,7 +6591,6 @@ static inline void igb_rx_checksum(struct igb_ring *ring,
 	if (igb_test_staterr(rx_desc, E1000_RXD_STAT_TCPCS |
 				      E1000_RXD_STAT_UDPCS))
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
-	ring->rx_stats.csum_good++;
 }
 
 #ifdef NETIF_F_RXHASH
@@ -7316,16 +7227,6 @@ static bool igb_clean_rx_irq(struct igb_q_vector *q_vector, int budget)
 		igb_rx_checksum(rx_ring, rx_desc, skb);
 		igb_rx_vlan(rx_ring, rx_desc, skb);
 
-		if (rx_desc->wb.lower.lo_dword.hs_rss.hdr_info &
-		    cpu_to_le16(E1000_RXDADV_SPH))
-			rx_ring->rx_stats.rx_hdr_split++;
-		if (igb_test_staterr(rx_desc, E1000_RXDADV_ERR_HBO))
-			printk("igb_rx:HBO bit set..\n");
-		if (igb_test_staterr(rx_desc, E1000_RXD_STAT_DYNINT))
-			rx_ring->rx_stats.lli_int++;
-		if (igb_test_staterr(rx_desc, E1000_RXD_STAT_PIF))
-			rx_ring->rx_stats.pif_count++;
-
 		total_bytes += skb->len;
 		total_packets++;
 
@@ -7810,6 +7711,10 @@ void igb_vlan_mode(struct net_device *netdev, u32 features)
 #endif
 
 	if (enable) {
+		/* enable VLAN tag insert/strip */
+		ctrl = E1000_READ_REG(hw, E1000_CTRL);
+		ctrl |= E1000_CTRL_VME;
+		E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 
 		/* Disable CFI check */
 		rctl = E1000_READ_REG(hw, E1000_RCTL);
@@ -8657,6 +8562,7 @@ static void igb_init_fw(struct igb_adapter *adapter)
 			fw_cmd.hdr.cmd_or_resp.cmd_resv = FW_CMD_RESERVED;
 			fw_cmd.port_num = hw->bus.func;
 			fw_cmd.drv_version = FW_FAMILY_DRV_VER;
+			fw_cmd.hdr.checksum = 0;
 			fw_cmd.hdr.checksum = e1000_calculate_checksum((u8 *)&fw_cmd,
 			                                           (FW_HDR_LEN +
 			                                            fw_cmd.hdr.buf_len));

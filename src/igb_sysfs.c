@@ -89,9 +89,15 @@ bool igb_thermal_present(struct kobject *kobj)
 	if (adapter == NULL)
 		return false;
 
-	status = e1000_set_i2c_bb(&(adapter->hw));
-	if (status != E1000_SUCCESS)
-		return false; 
+	/*
+	 * Only set I2C bit-bang mode if an external thermal sensor is
+	 * supported on this device.
+	 */
+	if (adapter->ets) {
+		status = e1000_set_i2c_bb(&(adapter->hw));
+		if (status != E1000_SUCCESS)
+			return false;
+	}
 
 	status = e1000_init_thermal_sensor_thresh(&(adapter->hw));
 	if (status != E1000_SUCCESS)
