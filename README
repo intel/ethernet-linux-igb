@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Ethernet Network Connection
 ===========================================================
 
-March 5, 2012
+October 5, 2012
 
 Contents
 ========
@@ -18,7 +18,7 @@ In This Release
 ===============
 
 This file describes the igb Linux* Base Driver for Intel Ethernet Network 
-Connection.  This driver supports kernel versions 2.4.x and 2.6.x. 
+Connection.  This driver supports the 2.4.x, 2.6.x, and 3.x kernels.
 
 This driver is only supported as a loadable module at this time.  Intel is
 not supplying patches against the kernel source to allow for static linking
@@ -136,21 +136,23 @@ If your kernel supports DCA, the driver will build by default with DCA enabled.
 Command Line Parameters
 =======================
 
-If the driver is built as a module, the  following optional parameters
-are used by entering them on the command line with the modprobe command
-using this syntax:
+If the driver is built as a module, the  following optional parameters are used by entering them on the command line with the modprobe command using this syntax:
 
      modprobe igb [<option>=<VAL1>,<VAL2>,...]
+
+There needs to be a <VAL#> for each network port in the system supported by this driver. The values will be applied to each instance, in function order. 
 
 For example:
 
      modprobe igb InterruptThrottleRate=16000,16000
 
+In this case, there are two network ports supported by igb in the system. The default value for each parameter is generally the recommended setting, unless otherwise noted.
 
-The default value for each parameter is generally the recommended setting,
-unless otherwise noted.
 
-NOTES:  For more information about the InterruptThrottleRate,
+NOTES:  For more information about the AutoNeg, Duplex, and Speed parameters, 
+        see the Speed and Duplex Configuration section in this document.
+        
+        For more information about the InterruptThrottleRate,
         parameter, see the application note at:
         http://www.intel.com/design/network/applnots/ap450.htm
 
@@ -472,6 +474,37 @@ Additional Configurations
 
   http://ftp.kernel.org/pub/software/network/ethtool/.
 
+  Speed and Duplex Configuration
+  ------------------------------
+  In addressing speed and duplex configuration issues, you need to 
+  distinguish between copper-based adapters and fiber-based adapters. 
+
+
+  In the default mode, an Intel(R) Network Adapter using copper connections 
+  will attempt to auto-negotiate with its link partner to
+  determine the best setting. If the adapter cannot establish link with the 
+  link partner using auto-negotiation, you may need to manually configure the 
+  adapter and link partner to identical settings to establish link and pass
+  packets. This should only be needed when attempting to link with an older 
+  switch that does not support auto-negotiation or one that has been forced 
+  to a specific speed or duplex mode. Your link partner must match the 
+  setting you choose. 
+  
+  Speed and Duplex are configured through the ethtool* utility. ethtool is 
+  included with all versions of Red Hat after Red Hat 7.2. For other Linux
+  distributions, download and install ethtool from the following website: 
+  <a href="http://ftp.kernel.org/pub/software/network/ethtool/.
+
+  Caution: Only experienced network administrators should force speed and 
+  duplex manually. The settings at the switch must always match the adapter 
+  settings. Adapter performance may suffer or your adapter may not 
+  operate if you configure the adapter differently from your switch.
+
+  An Intel® Network Adapter using fiber-based connections, however, will not 
+  attempt auto-negotiate with its link partner since those adapters operate 
+  only in full duplex, and only at their native speed. 
+
+  
   Enabling Wake on LAN* (WoL)
   ---------------------------
   WoL is configured through the ethtool* utility.  ethtool is included with
@@ -535,6 +568,36 @@ Additional Configurations
   recycling
 
   NOTE: IPv6 and UDP are not supported by LRO.
+
+  
+  IEEE 1588 Precision Time Protocol (PTP) Hardware Clock (PHC)
+  ---
+
+  Precision Time Protocol (PTP) is an implementation of the IEEE 1588
+  specification allowing network cards to synchronize their clocks over a 
+  PTP-enabled network. It works through a series of synchronization and delay
+  notification transactions that allow a software daemon to implement a PID
+  controller to synchronize the network card clocks.
+  
+  NOTE: PTP requires 3.0.0 or later kernel version that has PTP support
+        enabled in the kernel and a user-space software daemon.
+  
+  IGB_PTP is a compile time flag. The user can enable it at compile time to add
+  support for PTP from the driver. The flag is used by adding
+  CFLAGS_EXTRA="-DIGB_PTP" to the make file when it's being compiled.
+
+     make CFLAGS_EXTRA="-DIGB_PTP" install
+
+  Please note that the driver will fail to compile if your kernel does not
+  support PTP.
+  
+  You can verify that the driver is using PTP by looking at the system log to
+  see whether a PHC was attempted to be registered or not. If you have a kernel
+  and version of ethtool with PTP support, you can check the PTP support in the
+  driver by executing:
+
+     ethtool -T ethX
+
 
   MAC and VLAN anti-spoofing feature
   ----------------------------------
