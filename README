@@ -15,7 +15,7 @@ Contents
 - Support
 
 In This Release
-===============
+================
 
 This file describes the igb Linux* Base Driver for Intel Ethernet Network 
 Connection.  This driver supports the 2.4.x, 2.6.x, and 3.x kernels.
@@ -478,7 +478,6 @@ Additional Configurations
   ------------------------------
   In addressing speed and duplex configuration issues, you need to 
   distinguish between copper-based adapters and fiber-based adapters. 
-
 
   In the default mode, an Intel(R) Network Adapter using copper connections 
   will attempt to auto-negotiate with its link partner to
