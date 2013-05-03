@@ -1,7 +1,7 @@
 ################################################################################
 #
 # Intel(R) Gigabit Ethernet Linux driver
-# Copyright(c) 2007-2012 Intel Corporation.
+# Copyright(c) 2007-2013 Intel Corporation.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms and conditions of the GNU General Public License,
@@ -33,12 +33,17 @@ FAMILYH = e1000_82575.h e1000_i210.h
 # core driver files
 CFILES = igb_main.c $(FAMILYC) e1000_mac.c e1000_nvm.c e1000_phy.c \
 	 e1000_manage.c igb_param.c igb_ethtool.c kcompat.c e1000_api.c \
-	 e1000_mbx.c igb_vmdq.c igb_sysfs.c igb_procfs.c igb_ptp.c
+	 e1000_mbx.c igb_vmdq.c igb_procfs.c igb_hwmon.c
 HFILES = igb.h e1000_hw.h e1000_osdep.h e1000_defines.h e1000_mac.h \
 	 e1000_nvm.h e1000_manage.h $(FAMILYH) kcompat.h e1000_regs.h \
 	 e1000_api.h igb_regtest.h e1000_mbx.h igb_vmdq.h
 ifeq (,$(BUILD_KERNEL))
 BUILD_KERNEL=$(shell uname -r)
+endif
+
+# Use IGB_PTP compile flag to enable IEEE-1588 PTP (documented in README)
+ifeq ($(filter %IGB_PTP,$(CFLAGS_EXTRA)),-DIGB_PTP)
+  CFILES += igb_ptp.c
 endif
 
 DRIVER_NAME=igb

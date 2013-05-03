@@ -1,7 +1,7 @@
 Linux* Base Driver for Intel(R) Ethernet Network Connection
 ===========================================================
 
-October 5, 2012
+April 22, 2013
 
 Contents
 ========
@@ -91,16 +91,9 @@ NOTE: For the build to work properly, the currently running kernel MUST
    The install locations listed above are the default locations.  They
    might not be correct for certain Linux distributions.  
 
-5. Load the module using either the insmod or modprobe command:
+5. Load the module using the modprobe command:
 
      modprobe igb
-
-     insmod igb
-
-   Note that for 2.6 kernels the insmod command can be used if the full
-   path to the driver module is specified.  For example:
-
-     insmod /lib/modules/<KERNEL VERSION>/kernel/drivers/net/igb/igb.ko
 
    With 2.6 based kernels also make sure that older igb drivers are
    removed from the kernel, before loading the new module:
@@ -317,6 +310,9 @@ Supports enabling VMDq pools as this is needed to support SR-IOV.
 This parameter is forced to 1 or more if the max_vfs module parameter is used. 
 In addition the number of queues available for RSS is limited if this is set to
 1 or greater.
+
+NOTE: When either SR-IOV mode or VMDq mode is enabled, hardware VLAN filtering 
+and VLAN tag stripping/insertion will remain enabled.
  
 max_vfs
 -------
@@ -329,6 +325,15 @@ or more.
 This parameter adds support for SR-IOV.  It causes the driver to spawn up to 
 max_vfs worth of virtual function.  
 
+  NOTE: When either SR-IOV mode or VMDq mode is enabled, hardware VLAN 
+  filtering and VLAN tag stripping/insertion will remain enabled.
+  Please remove the old VLAN filter before the new VLAN filter is added.
+  For example, 
+  
+    ip link set eth0 vf 0 vlan 100     // set vlan 100 for VF 0
+    ip link set eth0 vf 0 vlan 0       // Delete vlan 100 
+    ip link set eth0 vf 0 vlan 200     // set a new vlan 200 for VF 0
+  
 QueuePairs
 ----------
 Valid Range:  0-1
@@ -349,7 +354,7 @@ Default Value: -1 (off)
   0 - n: where n is the number of the NUMA node that should be used to 
          allocate memory for this adapter port. 
   -1: uses the driver default of allocating memory on whichever processor is
-      running insmod/modprobe. 
+      running modprobe. 
 
 The Node parameter will allow you to pick which NUMA node you want to have the
 adapter allocate memory from.  All driver structures, in-memory queues, and 
