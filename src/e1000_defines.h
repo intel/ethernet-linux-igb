@@ -728,6 +728,7 @@
 #define E1000_MDICNFG_PHY_MASK		0x03E00000
 #define E1000_MDICNFG_PHY_SHIFT		21
 
+
 #define E1000_THSTAT_LOW_EVENT		0x20000000 /* Low thermal threshold */
 #define E1000_THSTAT_MID_EVENT		0x00200000 /* Mid thermal threshold */
 #define E1000_THSTAT_HIGH_EVENT		0x00002000 /* High thermal threshold */

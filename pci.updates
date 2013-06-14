@@ -62,6 +62,7 @@
 		108e 7b19  Sun Dual Port GbE PCIe 2.0 Low Profile Adapter, MMF
 		8086 0003  Ethernet Server Adapter I350-F4
 		8086 0004  Ethernet Server Adapter I350-F2
+		8086 0005  Ethernet Server Adapter I350-F1
 		8086 00a3  Ethernet Server Adapter I350-F4
 		8086 00a4  Ethernet Server Adapter I350-F2
 	1523  I350 Gigabit Backplane Connection

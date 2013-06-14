@@ -62,8 +62,8 @@
 #define VERSION_SUFFIX
 
 #define MAJ 4
-#define MIN 2
-#define BUILD 16
+#define MIN 3
+#define BUILD 0
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "." __stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
 char igb_driver_name[] = "igb";
