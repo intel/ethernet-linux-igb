@@ -89,3 +89,7 @@
 	157b  I210 Gigabit Network Connection
 	157c  I210 Gigabit Backplane Connection
 	1539  I211 Gigabit Network Connection
+	1f40  Ethernet Connection I354 1.0 GbE Backplane
+		1028 05f1 Ethernet Connection I354 1.0 GbE Backplane
+	1f41  Ethernet Connection I354 
+	1f45  Ethernet Connection I354 2.5 GbE Backplane

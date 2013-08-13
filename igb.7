@@ -4,7 +4,7 @@
 .\"
 .\" * Other names and brands may be claimed as the property of others.
 .\"
-.TH igb 1 "January 5, 2012"
+.TH igb 1 "June 3, 2013"
 
 .SH NAME
 igb \-This file describes the Linux* Base Driver for the Gigabit Family of Adapters.
@@ -16,6 +16,8 @@ modprobe igb [<option>=<VAL1>,<VAL2>,...]
 This driver is intended for \fB2.4.x\fR and \fB2.6.x\fR kernels.  This driver includes support for Intel(R) Itanium(R)2-based systems.
 .LP
 This driver is only supported as a loadable module at this time.  Intel is not supplying patches against the kernel source toallow for static linking of the driver.  For questions related to hardware requirements, refer to the documentation supplied with your Intel adapter.  All hardware requirements listed apply to use with Linux.
+.LP
+This driver supports 2.5 Gbps operating speed on 2500BASE-KX only for I354-based network connections.
 .SH OPTIONS
 The following optional parameters are used by entering them on the command line with the modprobe command.  
 For example:
