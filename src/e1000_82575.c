@@ -651,6 +651,11 @@ static s32 e1000_get_phy_id_82575(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_get_phy_id_82575");
 
+	/* i354 devices can have a PHY that needs an extra read for id */
+	if (hw->mac.type == e1000_i354)
+		e1000_get_phy_id(hw);
+		
+		
 	/*
 	 * For SGMII PHYs, we try the list of possible addresses until
 	 * we find one that works.  For non-SGMII PHYs
