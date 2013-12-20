@@ -23,7 +23,7 @@ The following optional parameters are used by entering them on the command line 
 For example:
 .IP
 modprobe igb InterruptThrottleRate=16000,16000
-.IP
+.LP
 .B InterruptThrottleRate
 .IP
 .B Valid Range: 
@@ -38,13 +38,15 @@ throughput while keeping CPU utilization low.  However this setting may
 result in slower overall transfer speeds if network traffic consists 
 mostly of small packets.  If this is the case, change this value to 0. 
 .IP
+InterrupThrottleRate (ITR) should be set to dynamic. When ITR=0, DMA Coalescing is automatically disabled. A whitepaper containing information on how to best configure your platform is available on the Intel website.
+.IP
 Un-supported Adapters: InterruptThrottleRate is NOT supported by 82542, 82543 or 82544-based adapters.
 .IP
 .B NOTE: 
 InterruptThrottleRate takes precedence over the TxAbsIntDelay and RxAbsIntDelay parameters.  Inother words, minimizing the receive and/or transmit absolute delays does not force the controller to generate more interrupts than what the Interrupt Throttle Rate allows.
 .IP
 See the section "InterruptThrottleRate" in README.
-.IP
+.LP
 .B LLIPort
 .IP
 .B Valid Range:
@@ -56,7 +58,7 @@ See the section "InterruptThrottleRate" in README.
 LLI is configured with the LLIPort command-line parameter, which specifies which TCP port should generate Low Latency Interrupts.
 .IP
 For example, using LLIPort=80 would cause the board to generate an immediate interrupt upon receipt of any packet sent to TCPport 80 on the local machine.
-.IP
+.LP
 .B LLIPush
 .IP
 .B Valid Range:
@@ -68,7 +70,7 @@ For example, using LLIPort=80 would cause the board to generate an immediate int
 Can be set to be enabled or disabled (default). It is most effective in an environment with many small transactions.
 .IP
 NOTE: Enabling LLIPush may allow a denial of service attack.
-.IP
+.LP
 .B LLISize
 .IP
 .B Valid Range:
@@ -78,7 +80,7 @@ NOTE: Enabling LLIPush may allow a denial of service attack.
 0
 .IP
 Causes an immediate interrupt if the board receives a packet smaller than the specified size. 
-.IP
+.LP
 .B IntMode
 .IP
 .B Valid Range:    
@@ -92,7 +94,7 @@ registered for by the driver.  MSI-X is required for multiple queue
 support, and some kernels and combinations of kernel .config options will
 force a lower level of interrupt support.  'cat /proc/interrupts' will show
 different values for each type of interrupt.
-.IP
+.LP
 .B RSS
 .IP
 .B Valid Range:   
@@ -112,14 +114,14 @@ and for I211-based adapters it is 2 queues.
 .IP
 This parameter is also affected by the VMDq parameter in that it will limit the
 queues more.
-.IP
+.LP
 VMDQ
 .IP
 Model 0  1  2  3+
 82575 4  4  3  1
 82576 8  2  2  2
 82580 8  1  1  1
-.IP
+.LP
 .B VMDQ
 .IP
 .B Valid Range:  
@@ -137,7 +139,7 @@ Supports enabling VMDq pools as this is needed to support SR-IOV.
 .IP
 This parameter is forced to 1 or more if the max_vfs module parameter is used. 
 In addition the number of queues available for RSS is limited if this is set to 1 or greater.
-.IP
+.LP
 .B max_vfs
 .IP
 .B Valid Range:   
@@ -151,7 +153,7 @@ more.
 .IP
 This parameter adds support for SR-IOV.  It causes the driver to spawn up to 
 max_vfs worth of virtual function.  
-.IP
+.LP
 .B QueuePairs
 .IP
 .B Valid Range:  
@@ -166,7 +168,7 @@ separate vectors.
 This option can be overridden to 1 if there are not sufficient interrupts
 available.  This can occur if any combination of RSS, VMDQ, and max_vfs 
 results in more than 4 queues being used. 
-.IP
+.LP
 .B Node
 .IP
 .B Valid Range:   
@@ -181,7 +183,7 @@ results in more than 4 queues being used.
 .IP
 The Node parameter will allow you to pick which NUMA node you want to have 
 the adapter allocate memory from.  All driver structures, in-memory queues, and receive buffers will be allocated on the node specified.  This parameter is onlyuseful when interrupt affinity is specified, otherwise some portion of the time the interrupt could run on a different core than the memory is allocated on, causing slower memory access and impacting throughput, CPU, or both.
-.IP
+.LP
 .B EEE
 .IP
 .B Valid Range:
@@ -195,7 +197,7 @@ data followed by periods where the link is in an idle state. This Low
 Power Idle (LPI) state is supported in both 1Gbps and 100Mbps link speeds.
 .IP
 NOTE: EEE support requires autonegotiation.
-.IP
+.LP
 .B DMAC
 .IP
 .B Valid Range: 
@@ -204,21 +206,10 @@ NOTE: EEE support requires autonegotiation.
 .B Default Value: 
 0 (disabled)
 .IP
-Enables or disables DMA Coalescing feature. Values are in usec’s and increase the internal DMA Coalescing feature’s internal timer. DMA (Direct Memory Access) allows the network device to move packet data directly to the system's memory, 
-  reducing CPU utilitzation. However, the frequency and random intervals at
-  which packets arrive do not allow the system to enter a lower power state. 
-  DMA Coalescing allows the adapter to collect packets before it initiates a 
-  DMA event. This may increase network latency but also increases the chances 
-  that the system will enter a lower power state.
+Enables or disables DMA Coalescing feature. Values are in usec’s and increase the internal DMA Coalescing feature’s internal timer. DMA (Direct Memory Access) allows the network device to move packet data directly to the system's memory, reducing CPU utilitzation. However, the frequency and random intervals at which packets arrive do not allow the system to enter a lower power state. DMA Coalescing allows the adapter to collect packets before it initiates a DMA event. This may increase network latency but also increases the chances that the system will enter a lower power state.
 .IP
-Turning on DMA Coalescing may save energy with kernel 2.6.32 and later. This
-  will impart the greatest chance for your system to consume less power. DMA 
-  Coalescing is effective in helping potentially saving the platform power only
-  when it is enabled across all active ports.
-.IP
-InterruptThrottleRate (ITR) should be set to dynamic. When ITR=0, DMA 
-  Coalescing is automatically disabled. A whitepaper containing information on how to best configure your platform 
-  is available on the Intel website.
+Turning on DMA Coalescing may save energy with kernel 2.6.32 and later. This will impart the greatest chance for your system to consume less power. DMA Coalescing is effective in helping potentially saving the platform power only when it is enabled across all active ports.
+.LP
 .B MDD (Malicious Driver Detection)
 .IP
 .B Valid Range: 
