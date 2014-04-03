@@ -208,7 +208,7 @@ NOTE: EEE support requires autonegotiation.
 .IP
 Enables or disables DMA Coalescing feature. Values are in usec’s and increase the internal DMA Coalescing feature’s internal timer. DMA (Direct Memory Access) allows the network device to move packet data directly to the system's memory, reducing CPU utilitzation. However, the frequency and random intervals at which packets arrive do not allow the system to enter a lower power state. DMA Coalescing allows the adapter to collect packets before it initiates a DMA event. This may increase network latency but also increases the chances that the system will enter a lower power state.
 .IP
-Turning on DMA Coalescing may save energy with kernel 2.6.32 and later. This will impart the greatest chance for your system to consume less power. DMA Coalescing is effective in helping potentially saving the platform power only when it is enabled across all active ports.
+Turning on DMA Coalescing may save energy with kernel 2.6.32 and newer. This will impart the greatest chance for your system to consume less power. DMA Coalescing is effective in helping potentially saving the platform power only when it is enabled across all active ports.
 .LP
 .B MDD (Malicious Driver Detection)
 .IP

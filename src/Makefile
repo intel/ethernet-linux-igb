@@ -1,7 +1,7 @@
 ################################################################################
 #
 # Intel(R) Gigabit Ethernet Linux driver
-# Copyright(c) 2007-2013 Intel Corporation.
+# Copyright(c) 2007-2014 Intel Corporation.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms and conditions of the GNU General Public License,
@@ -13,8 +13,7 @@
 # more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+# this program; if not, see <htt;://www.gnu.org/licenses/>.
 #
 # The full GNU General Public License is included in this distribution in
 # the file called "COPYING".
@@ -47,6 +46,7 @@ ifeq ($(filter %IGB_PTP,$(CFLAGS_EXTRA)),-DIGB_PTP)
 endif
 
 DRIVER_NAME=igb
+
 
 ###########################################################################
 # Environment tests
@@ -153,7 +153,7 @@ EXTRA_CFLAGS += -DDRIVER_NAME=$(DRIVER_NAME)
 EXTRA_CFLAGS += -DDRIVER_NAME_CAPS=$(shell echo $(DRIVER_NAME) | tr '[a-z]' '[A-Z]')
 # standard flags for module builds
 EXTRA_CFLAGS += -DLINUX -D__KERNEL__ -DMODULE -O2 -pipe -Wall
-EXTRA_CFLAGS += -I$(KSRC)/generated/uapi -I/include -I.
+EXTRA_CFLAGS += -I$(KSRC)/include
 EXTRA_CFLAGS += $(shell [ -f $(KSRC)/include/linux/modversions.h ] && \
             echo "-DMODVERSIONS -DEXPORT_SYMTAB \
                   -include $(KSRC)/include/linux/modversions.h")
@@ -224,6 +224,7 @@ endif
 ifeq ($(SMP),1)
   EXTRA_CFLAGS += -D__SMP__
 endif
+
 
 ###########################################################################
 # Kernel Version Specific rules

@@ -53,6 +53,7 @@
 		103c 2226  Ethernet 1Gb 1-port 364i Adapter
 		108e 7b16  Quad Port GbE PCIe 2.0 ExpressModule, UTP
 		108e 7b18  Quad Port GbE PCIe 2.0 Low Profile Adapter, UTP
+		17aa 1074  Lenovo ThinkServer I350-T4 AnyFabric
 		8086 0001  Ethernet Server Adapter I350-T4
 		8086 0002  Ethernet Server Adapter I350-T2
 		8086 00a1  Ethernet Server Adapter I350-T4
@@ -83,12 +84,12 @@
 		103c 0003  Ethernet I210-T1 GbE NIC
 		8086 0001  Ethernet Server Adapter I210-T1
 		8086 0002  Ethernet Server Adapter I210-T1
-	1534  I210 Gigabit Network Connection
-	1536  I210 Gigabit Fiber Network Connection
-	1538  I210 Gigabit Network Connection
-	157b  I210 Gigabit Network Connection
-	157c  I210 Gigabit Backplane Connection
-	1539  I211 Gigabit Network Connection
+	1534  I210  Gigabit Network Connection
+	1536  I210  Gigabit Fiber Network Connection
+	1538  I210  Gigabit Network Connection
+	157b  I210  Gigabit Network Connection
+	157c  I210  Gigabit Backplane Connection
+	1539  I211  Gigabit Network Connection
 	1f40  Ethernet Connection I354 1.0 GbE Backplane
 		1028 05f1  Ethernet Connection I354 1.0 GbE Backplane
 	1f41  Ethernet Connection I354 
