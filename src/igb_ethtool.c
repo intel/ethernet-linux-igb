@@ -12,13 +12,11 @@
   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
   more details.
 
-  You should have received a copy of the GNU General Public License along with
-  this program; if not, see <htt;://www.gnu.org/licenses/>.
-
   The full GNU General Public License is included in this distribution in
   the file called "COPYING".
 
   Contact Information:
+  Linux NICS <linux.nics@intel.com>
   e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
@@ -295,8 +293,7 @@ static int igb_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 	/* When SoL/IDER sessions are active, autoneg/speed/duplex
 	 * cannot be changed */
 	if (e1000_check_reset_block(hw)) {
-		dev_err(pci_dev_to_dev(adapter->pdev), "Cannot change link "
-			"characteristics when SoL/IDER is active.\n");
+		dev_err(pci_dev_to_dev(adapter->pdev), "Cannot change link characteristics when SoL/IDER is active.\n");
 		return -EINVAL;
 	}
 
@@ -826,11 +823,13 @@ static void igb_get_drvinfo(struct net_device *netdev,
 	struct igb_adapter *adapter = netdev_priv(netdev);
 
 	strncpy(drvinfo->driver,  igb_driver_name, sizeof(drvinfo->driver) - 1);
-	strncpy(drvinfo->version, igb_driver_version, sizeof(drvinfo->version) - 1);
+	strncpy(drvinfo->version, igb_driver_version,
+		sizeof(drvinfo->version) - 1);
 
 	strncpy(drvinfo->fw_version, adapter->fw_version,
 		sizeof(drvinfo->fw_version) - 1);
-	strncpy(drvinfo->bus_info, pci_name(adapter->pdev), sizeof(drvinfo->bus_info) -1);
+	strncpy(drvinfo->bus_info, pci_name(adapter->pdev),
+		sizeof(drvinfo->bus_info) - 1);
 	drvinfo->n_stats = IGB_STATS_LEN;
 	drvinfo->testinfo_len = IGB_TEST_LEN;
 	drvinfo->regdump_len = igb_get_regs_len(netdev);
@@ -863,12 +862,12 @@ static int igb_set_ringparam(struct net_device *netdev,
 	if ((ring->rx_mini_pending) || (ring->rx_jumbo_pending))
 		return -EINVAL;
 
-	new_rx_count = min(ring->rx_pending, (u32)IGB_MAX_RXD);
-	new_rx_count = max(new_rx_count, (u16)IGB_MIN_RXD);
+	new_rx_count = min_t(u16, ring->rx_pending, (u32)IGB_MAX_RXD);
+	new_rx_count = max_t(u16, new_rx_count, (u16)IGB_MIN_RXD);
 	new_rx_count = ALIGN(new_rx_count, REQ_RX_DESCRIPTOR_MULTIPLE);
 
-	new_tx_count = min(ring->tx_pending, (u32)IGB_MAX_TXD);
-	new_tx_count = max(new_tx_count, (u16)IGB_MIN_TXD);
+	new_tx_count = min_t(u16, ring->tx_pending, (u32)IGB_MAX_TXD);
+	new_tx_count = max_t(u16, new_tx_count, (u16)IGB_MIN_TXD);
 	new_tx_count = ALIGN(new_tx_count, REQ_TX_DESCRIPTOR_MULTIPLE);
 
 	if ((new_tx_count == adapter->tx_ring_count) &&
@@ -891,9 +890,11 @@ static int igb_set_ringparam(struct net_device *netdev,
 	}
 
 	if (adapter->num_tx_queues > adapter->num_rx_queues)
-		temp_ring = vmalloc(adapter->num_tx_queues * sizeof(struct igb_ring));
+		temp_ring = vmalloc(adapter->num_tx_queues
+				    * sizeof(struct igb_ring));
 	else
-		temp_ring = vmalloc(adapter->num_rx_queues * sizeof(struct igb_ring));
+		temp_ring = vmalloc(adapter->num_rx_queues
+				    * sizeof(struct igb_ring));
 
 	if (!temp_ring) {
 		err = -ENOMEM;
@@ -972,21 +973,22 @@ static bool reg_pattern_test(struct igb_adapter *adapter, u64 *data,
 {
 	struct e1000_hw *hw = &adapter->hw;
 	u32 pat, val;
-	static const u32 _test[] =
-		{0x5A5A5A5A, 0xA5A5A5A5, 0x00000000, 0xFFFFFFFF};
+	static const u32 _test[] = {
+		0x5A5A5A5A, 0xA5A5A5A5, 0x00000000, 0xFFFFFFFF};
 	for (pat = 0; pat < ARRAY_SIZE(_test); pat++) {
 		E1000_WRITE_REG(hw, reg, (_test[pat] & write));
 		val = E1000_READ_REG(hw, reg) & mask;
 		if (val != (_test[pat] & write & mask)) {
-			dev_err(pci_dev_to_dev(adapter->pdev), "pattern test reg %04X "
-				"failed: got 0x%08X expected 0x%08X\n",
-			        E1000_REGISTER(hw, reg), val, (_test[pat] & write & mask));
+			dev_err(pci_dev_to_dev(adapter->pdev),
+				"pattern test reg %04X failed: got 0x%08X expected 0x%08X\n",
+				E1000_REGISTER(hw, reg), val, (_test[pat]
+					& write & mask));
 			*data = E1000_REGISTER(hw, reg);
-			return 1;
+			return true;
 		}
 	}
 
-	return 0;
+	return false;
 }
 
 static bool reg_set_and_check(struct igb_adapter *adapter, u64 *data,
@@ -997,14 +999,14 @@ static bool reg_set_and_check(struct igb_adapter *adapter, u64 *data,
 	E1000_WRITE_REG(hw, reg, write & mask);
 	val = E1000_READ_REG(hw, reg);
 	if ((write & mask) != (val & mask)) {
-		dev_err(pci_dev_to_dev(adapter->pdev), "set/check reg %04X test failed:"
-			" got 0x%08X expected 0x%08X\n", reg,
-			(val & mask), (write & mask));
+		dev_err(pci_dev_to_dev(adapter->pdev),
+			"set/check reg %04X test failed:got 0x%08X expected 0x%08X\n",
+			reg, (val & mask), (write & mask));
 		*data = E1000_REGISTER(hw, reg);
-		return 1;
+		return true;
 	}
 
-	return 0;
+	return false;
 }
 
 #define REG_PATTERN_TEST(reg, mask, write) \
@@ -1061,8 +1063,9 @@ static int igb_reg_test(struct igb_adapter *adapter, u64 *data)
 	E1000_WRITE_REG(hw, E1000_STATUS, toggle);
 	after = E1000_READ_REG(hw, E1000_STATUS) & toggle;
 	if (value != after) {
-		dev_err(pci_dev_to_dev(adapter->pdev), "failed STATUS register test "
-			"got: 0x%08X expected: 0x%08X\n", after, value);
+		dev_err(pci_dev_to_dev(adapter->pdev),
+			"failed STATUS register test got: 0x%08X expected: 0x%08X\n",
+			after, value);
 		*data = 1;
 		return 1;
 	}
@@ -1149,14 +1152,14 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 	/* Hook up test interrupt handler just for this test */
 	if (adapter->msix_entries) {
 		if (request_irq(adapter->msix_entries[0].vector,
-		                &igb_test_intr, 0, netdev->name, adapter)) {
+				&igb_test_intr, 0, netdev->name, adapter)) {
 			*data = 1;
 			return -1;
 		}
 	} else if (adapter->flags & IGB_FLAG_HAS_MSI) {
 		shared_int = FALSE;
 		if (request_irq(irq,
-		                igb_test_intr, 0, netdev->name, adapter)) {
+				igb_test_intr, 0, netdev->name, adapter)) {
 			*data = 1;
 			return -1;
 		}
@@ -1502,7 +1505,7 @@ static void igb_loopback_cleanup(struct igb_adapter *adapter)
 
 		/* Disable near end loopback on DH89xxCC */
 		reg = E1000_READ_REG(hw, E1000_MPHY_ADDR_CTL);
-		reg = (reg & E1000_MPHY_ADDR_CTL_OFFSET_MASK ) |
+		reg = (reg & E1000_MPHY_ADDR_CTL_OFFSET_MASK) |
 		       E1000_MPHY_PCS_CLK_REG_OFFSET;
 		E1000_WRITE_REG(hw, E1000_MPHY_ADDR_CTL, reg);
 
@@ -1696,8 +1699,7 @@ static int igb_loopback_test(struct igb_adapter *adapter, u64 *data)
 	 * sessions are active */
 	if (e1000_check_reset_block(&adapter->hw)) {
 		dev_err(pci_dev_to_dev(adapter->pdev),
-			"Cannot do PHY loopback test "
-			"when SoL/IDER is active.\n");
+			"Cannot do PHY loopback test when SoL/IDER is active.\n");
 		*data = 0;
 		goto out;
 	}
@@ -1740,11 +1742,11 @@ static int igb_link_test(struct igb_adapter *adapter, u64 *data)
 
 		*data = 1;
 	} else {
-		for (i=0; i < IGB_MAX_LINK_TRIES; i++) {
-		link = igb_has_link(adapter);
-			if (link)
+		for (i = 0; i < IGB_MAX_LINK_TRIES; i++) {
+			link = igb_has_link(adapter);
+			if (link) {
 				goto out;
-			else {
+			} else {
 				time++;
 				msleep(1000);
 			}
@@ -1752,8 +1754,8 @@ static int igb_link_test(struct igb_adapter *adapter, u64 *data)
 		if (!link)
 			*data = 1;
 	}
-	out:
-		return *data;
+out:
+	return *data;
 }
 
 static void igb_diag_test(struct net_device *netdev,
@@ -1776,7 +1778,7 @@ static void igb_diag_test(struct net_device *netdev,
 		dev_info(pci_dev_to_dev(adapter->pdev), "offline testing starting\n");
 
 		/* power up link for link test */
-	 	igb_power_up_link(adapter);
+		igb_power_up_link(adapter);
 
 		/* Link test performed before hardware reset so autoneg doesn't
 		 * interfere with test result */
@@ -1851,9 +1853,9 @@ static void igb_get_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 		return;
 
 	wol->supported = WAKE_UCAST | WAKE_MCAST |
-	                 WAKE_BCAST | WAKE_MAGIC |
-	                 WAKE_PHY;
-	
+			 WAKE_BCAST | WAKE_MAGIC |
+			 WAKE_PHY;
+
 	/* apply any specific unsupported masks here */
 	switch (adapter->hw.device_id) {
 	default:
@@ -1961,9 +1963,8 @@ static int igb_set_coalesce(struct net_device *netdev,
 	if ((ec->rx_coalesce_usecs > IGB_MAX_ITR_USECS) ||
 	    ((ec->rx_coalesce_usecs > 3) &&
 	     (ec->rx_coalesce_usecs < IGB_MIN_ITR_USECS)) ||
-	    (ec->rx_coalesce_usecs == 2))
-	    {
-	    	printk("set_coalesce:invalid parameter..");
+	    (ec->rx_coalesce_usecs == 2)) {
+		netdev_err(netdev, "set_coalesce:invalid parameter..");
 		return -EINVAL;
 	}
 
@@ -1980,9 +1981,8 @@ static int igb_set_coalesce(struct net_device *netdev,
 		adapter->tx_work_limit = ec->tx_max_coalesced_frames_irq;
 
 	/* If ITR is disabled, disable DMAC */
-	if (ec->rx_coalesce_usecs == 0) {
+	if (ec->rx_coalesce_usecs == 0)
 		adapter->dmac = IGB_DMAC_DISABLE;
-	}
 
 	/* convert to rate of irq's per second */
 	if (ec->rx_coalesce_usecs && ec->rx_coalesce_usecs <= 3)
@@ -2343,7 +2343,8 @@ static int igb_set_flags(struct net_device *netdev, u32 data)
 #endif /* ETHTOOL_GFLAGS */
 #endif /* HAVE_NDO_SET_FEATURES */
 #ifdef ETHTOOL_SADV_COAL
-static int igb_set_adv_coal(struct net_device *netdev, struct ethtool_value *edata)
+static int igb_set_adv_coal(struct net_device *netdev,
+			    struct ethtool_value *edata)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 
@@ -2389,10 +2390,12 @@ static int igb_set_adv_coal(struct net_device *netdev, struct ethtool_value *eda
 		break;
 	default:
 		adapter->dmac = IGB_DMAC_DISABLE;
-		printk("set_dmac: invalid setting, setting DMAC to %d\n",
+		netdev_info(netdev,
+			    "set_dmac: invalid setting, setting DMAC to %d\n",
 			adapter->dmac);
 	}
-	printk("%s: setting DMAC to %d\n", netdev->name, adapter->dmac);
+	netdev_info(netdev, "%s: setting DMAC to %d\n",
+		    netdev->name, adapter->dmac);
 	return 0;
 }
 
@@ -2525,7 +2528,7 @@ static int igb_set_eee(struct net_device *netdev,
 		if (edata->advertised &
 		    ~(ADVERTISE_100_FULL | ADVERTISE_1000_FULL)) {
 			dev_err(pci_dev_to_dev(adapter->pdev),
-				"EEE Advertisement supports only 100Tx and or 100T full duplex\n");
+				"EEE Advertisement supports 100Base-Tx Full Duplex(0x008) 1000Base-T Full Duplex(0x20) or both(0x028)\n");
 			return -EINVAL;
 		}
 
@@ -2562,9 +2565,11 @@ static int igb_get_rss_hash_opts(struct igb_adapter *adapter,
 	switch (cmd->flow_type) {
 	case TCP_V4_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* Fall through */
 	case UDP_V4_FLOW:
 		if (adapter->flags & IGB_FLAG_RSS_FIELD_IPV4_UDP)
 			cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* Fall through */
 	case SCTP_V4_FLOW:
 	case AH_ESP_V4_FLOW:
 	case AH_V4_FLOW:
@@ -2574,9 +2579,11 @@ static int igb_get_rss_hash_opts(struct igb_adapter *adapter,
 		break;
 	case TCP_V6_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* Fall through */
 	case UDP_V6_FLOW:
 		if (adapter->flags & IGB_FLAG_RSS_FIELD_IPV6_UDP)
 			cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* Fall through */
 	case SCTP_V6_FLOW:
 	case AH_ESP_V6_FLOW:
 	case AH_V6_FLOW:
@@ -2853,7 +2860,7 @@ static int igb_set_rxfh_indir(struct net_device *netdev,
 	if (indir->size != ARRAY_SIZE(adapter->rss_indir_tbl))
 		return -EINVAL;
 	for (i = 0; i < ARRAY_SIZE(adapter->rss_indir_tbl); i++)
-		if(indir->ring_index[i] >= adapter->rss_queues)
+		if (indir->ring_index[i] >= adapter->rss_queues)
 			return -EINVAL;
 
 	memcpy(adapter->rss_indir_tbl, indir->ring_index,
@@ -2894,7 +2901,7 @@ static unsigned int igb_max_rss_queues(struct igb_adapter *adapter)
 	case e1000_82580:
 	default:
 		max_rss_queues = IGB_MAX_RX_QUEUES;
-        break;
+		break;
 	}
 
 	return max_rss_queues;

@@ -237,6 +237,26 @@ The driver utilizes the ethtool interface for driver configuration and diagnosti
 The latest release of ethtool can be found from http://ftp.kernel.org/pub/software/network/ethtool/.  The driver then must be recompiled in order to take advantage of the latest ethtool features.
 .LP
 ethtool 1.6 only supports a limited set of ethtool options.  Support for a more complete ethtool feature set can be enabled by upgrading ethtool to ethtool-1.8.1.  
+.SH LRO
+Large Receive Offload (LRO) is a technique for increasing inbound throughput of high-bandwidth network connections by reducing CPU overhead. It works by aggregating multiple incoming packets from a single stream into a larger buffer before they are passed higher up the networking stack, thus reducing the number of packets that have to be processed. LRO combines multiple Ethernet frames into a single receive in the stack, thereby potentially decreasing CPU utilization for receives.
+.LP
+.B NOTE:
+LRO requires 2.4.22 or later kernel version.
+.LP
+IGB_LRO is a compile time flag. The user can enable it at compile time to add support for LRO from the driver. The flag is used by adding CFLAGS_EXTRA="-DIGB_LRO" to the make file when it's being compiled.
+.LP
+# make CFLAGS_EXTRA="-DIGB_LRO" install
+.LP
+You can verify that the driver is using LRO by looking at these counters in ethtool:
+.LP
+- lro_aggregated - counts total packets that were combined
+.LP
+- lro_flushed - counts the number of packets flushed out of LRO
+.LP
+- lro_recycled - counts the number of buffers returned to the ring from recycling
+.LP
+.B NOTE: 
+IPv6 and UDP are not supported by LRO.
 .SH SUPPORT
 For additional information, including supported adapters, building, and installation, see the README file included with the driver.
 .LP

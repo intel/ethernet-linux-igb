@@ -12,13 +12,11 @@
   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
   more details.
 
-  You should have received a copy of the GNU General Public License along with
-  this program; if not, see <htt;://www.gnu.org/licenses/>.
-
   The full GNU General Public License is included in this distribution in
   the file called "COPYING".
 
   Contact Information:
+  Linux NICS <linux.nics@intel.com>
   e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
@@ -1320,7 +1318,7 @@ static inline bool __kc_pcie_cap_has_sltctl(struct pci_dev *dev)
 
 	pos = pci_find_capability(dev, PCI_CAP_ID_EXP);
 	if (!pos)
-		return 0;
+		return false;
 	pci_read_config_word(dev, pos + PCI_EXP_FLAGS, &pcie_flags_reg);
 
 	return __kc_pcie_cap_version(dev) > 1 ||
@@ -1505,9 +1503,11 @@ int __kc_dma_set_mask_and_coherent(struct device *dev, u64 mask)
 
 	if (!err)
 		/* coherent mask for the same size will always succeed if
-		 * dma_set_mask does
+		 * dma_set_mask does. However we store the error anyways, due
+		 * to some kernels which use gcc's warn_unused_result on their
+		 * definition of dma_set_coherent_mask.
 		 */
-		dma_set_coherent_mask(dev, mask);
+		err = dma_set_coherent_mask(dev, mask);
 	return err;
 }
 #endif /* 3.13.0 */

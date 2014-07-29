@@ -12,13 +12,11 @@
   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
   more details.
 
-  You should have received a copy of the GNU General Public License along with
-  this program; if not, see <htt;://www.gnu.org/licenses/>.
-
   The full GNU General Public License is included in this distribution in
   the file called "COPYING".
 
   Contact Information:
+  Linux NICS <linux.nics@intel.com>
   e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
@@ -889,7 +887,6 @@ out:
 static s32 e1000_set_d0_lplu_state_82580(struct e1000_hw *hw, bool active)
 {
 	struct e1000_phy_info *phy = &hw->phy;
-	s32 ret_val = E1000_SUCCESS;
 	u32 data;
 
 	DEBUGFUNC("e1000_set_d0_lplu_state_82580");
@@ -917,7 +914,7 @@ static s32 e1000_set_d0_lplu_state_82580(struct e1000_hw *hw, bool active)
 	}
 
 	E1000_WRITE_REG(hw, E1000_82580_PHY_POWER_MGMT, data);
-	return ret_val;
+	return E1000_SUCCESS;
 }
 
 /**
@@ -937,7 +934,6 @@ static s32 e1000_set_d0_lplu_state_82580(struct e1000_hw *hw, bool active)
 s32 e1000_set_d3_lplu_state_82580(struct e1000_hw *hw, bool active)
 {
 	struct e1000_phy_info *phy = &hw->phy;
-	s32 ret_val = E1000_SUCCESS;
 	u32 data;
 
 	DEBUGFUNC("e1000_set_d3_lplu_state_82580");
@@ -965,7 +961,7 @@ s32 e1000_set_d3_lplu_state_82580(struct e1000_hw *hw, bool active)
 	}
 
 	E1000_WRITE_REG(hw, E1000_82580_PHY_POWER_MGMT, data);
-	return ret_val;
+	return E1000_SUCCESS;
 }
 
 /**
@@ -979,7 +975,7 @@ s32 e1000_set_d3_lplu_state_82580(struct e1000_hw *hw, bool active)
  **/
 static s32 e1000_acquire_nvm_82575(struct e1000_hw *hw)
 {
-	s32 ret_val;
+	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_acquire_nvm_82575");
 
@@ -1001,6 +997,7 @@ static s32 e1000_acquire_nvm_82575(struct e1000_hw *hw)
 			DEBUGOUT("Nvm bit banging access error detected and cleared.\n");
 		}
 	}
+
 	if (hw->mac.type == e1000_82580) {
 		u32 eecd = E1000_READ_REG(hw, E1000_EECD);
 		if (eecd & E1000_EECD_BLOCKED) {
@@ -1010,7 +1007,6 @@ static s32 e1000_acquire_nvm_82575(struct e1000_hw *hw)
 			DEBUGOUT("Nvm bit banging access error detected and cleared.\n");
 		}
 	}
-
 
 	ret_val = e1000_acquire_nvm_generic(hw);
 	if (ret_val)
@@ -1125,7 +1121,6 @@ static void e1000_release_swfw_sync_82575(struct e1000_hw *hw, u16 mask)
 static s32 e1000_get_cfg_done_82575(struct e1000_hw *hw)
 {
 	s32 timeout = PHY_CFG_TIMEOUT;
-	s32 ret_val = E1000_SUCCESS;
 	u32 mask = E1000_NVM_CFG_DONE_PORT_0;
 
 	DEBUGFUNC("e1000_get_cfg_done_82575");
@@ -1150,7 +1145,7 @@ static s32 e1000_get_cfg_done_82575(struct e1000_hw *hw)
 	    (hw->phy.type == e1000_phy_igp_3))
 		e1000_phy_init_script_igp3(hw);
 
-	return ret_val;
+	return E1000_SUCCESS;
 }
 
 /**
@@ -2488,11 +2483,17 @@ static s32 e1000_reset_hw_82580(struct e1000_hw *hw)
 		ctrl |= E1000_CTRL_RST;
 
 	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
-	E1000_WRITE_FLUSH(hw);
 
-	/* Add delay to insure DEV_RST has time to complete */
-	if (global_device_reset)
-		msec_delay(5);
+	switch (hw->device_id) {
+	case E1000_DEV_ID_DH89XXCC_SGMII:
+		break;
+	default:
+		E1000_WRITE_FLUSH(hw);
+		break;
+	}
+
+	/* Add delay to insure DEV_RST or RST has time to complete */
+	msec_delay(5);
 
 	ret_val = e1000_get_auto_rd_done_generic(hw);
 	if (ret_val) {
@@ -2894,7 +2895,6 @@ out:
  **/
 s32 e1000_set_eee_i350(struct e1000_hw *hw)
 {
-	s32 ret_val = E1000_SUCCESS;
 	u32 ipcnfg, eeer;
 
 	DEBUGFUNC("e1000_set_eee_i350");
@@ -2927,7 +2927,7 @@ s32 e1000_set_eee_i350(struct e1000_hw *hw)
 	E1000_READ_REG(hw, E1000_EEER);
 out:
 
-	return ret_val;
+	return E1000_SUCCESS;
 }
 
 /**
@@ -3656,7 +3656,6 @@ static const u8 e1000_emc_therm_limit[4] = {
  **/
 s32 e1000_get_thermal_sensor_data_generic(struct e1000_hw *hw)
 {
-	s32 status = E1000_SUCCESS;
 	u16 ets_offset;
 	u16 ets_cfg;
 	u16 ets_sensor;
@@ -3676,7 +3675,7 @@ s32 e1000_get_thermal_sensor_data_generic(struct e1000_hw *hw)
 	/* Return the internal sensor only if ETS is unsupported */
 	e1000_read_nvm(hw, NVM_ETS_CFG, 1, &ets_offset);
 	if ((ets_offset == 0x0000) || (ets_offset == 0xFFFF))
-		return status;
+		return E1000_SUCCESS;
 
 	e1000_read_nvm(hw, ets_offset, 1, &ets_cfg);
 	if (((ets_cfg & NVM_ETS_TYPE_MASK) >> NVM_ETS_TYPE_SHIFT)
@@ -3700,7 +3699,7 @@ s32 e1000_get_thermal_sensor_data_generic(struct e1000_hw *hw)
 					E1000_I2C_THERMAL_SENSOR_ADDR,
 					&data->sensor[i].temp);
 	}
-	return status;
+	return E1000_SUCCESS;
 }
 
 /**
@@ -3712,7 +3711,6 @@ s32 e1000_get_thermal_sensor_data_generic(struct e1000_hw *hw)
  **/
 s32 e1000_init_thermal_sensor_thresh_generic(struct e1000_hw *hw)
 {
-	s32 status = E1000_SUCCESS;
 	u16 ets_offset;
 	u16 ets_cfg;
 	u16 ets_sensor;
@@ -3740,7 +3738,7 @@ s32 e1000_init_thermal_sensor_thresh_generic(struct e1000_hw *hw)
 	/* Return the internal sensor only if ETS is unsupported */
 	e1000_read_nvm(hw, NVM_ETS_CFG, 1, &ets_offset);
 	if ((ets_offset == 0x0000) || (ets_offset == 0xFFFF))
-		return status;
+		return E1000_SUCCESS;
 
 	e1000_read_nvm(hw, ets_offset, 1, &ets_cfg);
 	if (((ets_cfg & NVM_ETS_TYPE_MASK) >> NVM_ETS_TYPE_SHIFT)
@@ -3771,5 +3769,5 @@ s32 e1000_init_thermal_sensor_thresh_generic(struct e1000_hw *hw)
 							low_thresh_delta;
 		}
 	}
-	return status;
+	return E1000_SUCCESS;
 }

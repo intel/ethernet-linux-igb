@@ -12,13 +12,11 @@
   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
   more details.
 
-  You should have received a copy of the GNU General Public License along with
-  this program; if not, see <htt;://www.gnu.org/licenses/>.
-
   The full GNU General Public License is included in this distribution in
   the file called "COPYING".
 
   Contact Information:
+  Linux NICS <linux.nics@intel.com>
   e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
@@ -917,7 +915,7 @@ s32 e1000_write_xmdio_reg(struct e1000_hw *hw, u16 addr, u8 dev_addr, u16 data)
 static s32 e1000_pll_workaround_i210(struct e1000_hw *hw)
 {
 	s32 ret_val;
-	u32 wuc, mdicnfg, ctrl_ext, reg_val;
+	u32 wuc, mdicnfg, ctrl, ctrl_ext, reg_val;
 	u16 nvm_word, phy_word, pci_word, tmp_nvm;
 	int i;
 
@@ -934,9 +932,9 @@ static s32 e1000_pll_workaround_i210(struct e1000_hw *hw)
 		nvm_word = E1000_INVM_DEFAULT_AL;
 	tmp_nvm = nvm_word | E1000_INVM_PLL_WO_VAL;
 	for (i = 0; i < E1000_MAX_PLL_TRIES; i++) {
-		/* check current state */
-		hw->phy.ops.read_reg(hw, (E1000_PHY_PLL_FREQ_PAGE |
-				     E1000_PHY_PLL_FREQ_REG), &phy_word);
+		/* check current state directly from internal PHY */
+		e1000_read_phy_reg_gs40g(hw, (E1000_PHY_PLL_FREQ_PAGE |
+					 E1000_PHY_PLL_FREQ_REG), &phy_word);
 		if ((phy_word & E1000_PHY_PLL_UNCONF)
 		    != E1000_PHY_PLL_UNCONF) {
 			ret_val = E1000_SUCCESS;
@@ -944,14 +942,17 @@ static s32 e1000_pll_workaround_i210(struct e1000_hw *hw)
 		} else {
 			ret_val = -E1000_ERR_PHY;
 		}
-		hw->phy.ops.reset(hw);
+		/* directly reset the internal PHY */
+		ctrl = E1000_READ_REG(hw, E1000_CTRL);
+		E1000_WRITE_REG(hw, E1000_CTRL, ctrl|E1000_CTRL_PHY_RST);
+
 		ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
 		ctrl_ext |= (E1000_CTRL_EXT_PHYPDEN | E1000_CTRL_EXT_SDLPE);
 		E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
 
 		E1000_WRITE_REG(hw, E1000_WUC, 0);
 		reg_val = (E1000_INVM_AUTOLOAD << 4) | (tmp_nvm << 16);
-		E1000_WRITE_REG(hw, E1000_EEARBC, reg_val);
+		E1000_WRITE_REG(hw, E1000_EEARBC_I210, reg_val);
 
 		e1000_read_pci_cfg(hw, E1000_PCI_PMCSR, &pci_word);
 		pci_word |= E1000_PCI_PMCSR_D3;
@@ -960,7 +961,7 @@ static s32 e1000_pll_workaround_i210(struct e1000_hw *hw)
 		pci_word &= ~E1000_PCI_PMCSR_D3;
 		e1000_write_pci_cfg(hw, E1000_PCI_PMCSR, &pci_word);
 		reg_val = (E1000_INVM_AUTOLOAD << 4) | (nvm_word << 16);
-		E1000_WRITE_REG(hw, E1000_EEARBC, reg_val);
+		E1000_WRITE_REG(hw, E1000_EEARBC_I210, reg_val);
 
 		/* restore WUC register */
 		E1000_WRITE_REG(hw, E1000_WUC, wuc);

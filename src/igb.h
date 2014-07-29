@@ -12,13 +12,11 @@
   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
   more details.
 
-  You should have received a copy of the GNU General Public License along with
-  this program; if not, see <htt;://www.gnu.org/licenses/>.
-
   The full GNU General Public License is included in this distribution in
   the file called "COPYING".
 
   Contact Information:
+  Linux NICS <linux.nics@intel.com>
   e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
@@ -63,13 +61,13 @@ struct igb_adapter;
 #include "e1000_manage.h"
 #include "e1000_mbx.h"
 
-#define IGB_ERR(args...) printk(KERN_ERR "igb: " args)
+#define IGB_ERR(args...) pr_err(KERN_ERR "igb: " args)
 
 #define PFX "igb: "
 #define DPRINTK(nlevel, klevel, fmt, args...) \
 	(void)((NETIF_MSG_##nlevel & adapter->msg_enable) && \
 	printk(KERN_##klevel PFX "%s: %s: " fmt, adapter->netdev->name, \
-		__FUNCTION__ , ## args))
+		__func__ , ## args))
 
 #ifdef HAVE_PTP_1588_CLOCK
 #include <linux/clocksource.h>
@@ -227,7 +225,7 @@ struct igb_lro_stats {
  */
 struct igb_lrohdr {
 	struct iphdr iph;
-	struct tcphdr th; 
+	struct tcphdr th;
 	__be32 ts[0];
 };
 
@@ -299,6 +297,7 @@ struct igb_tx_buffer {
 	unsigned int bytecount;
 	u16 gso_segs;
 	__be16 protocol;
+
 	DEFINE_DMA_UNMAP_ADDR(dma);
 	DEFINE_DMA_UNMAP_LEN(len);
 	u32 tx_flags;
@@ -357,9 +356,6 @@ struct igb_ring {
 		struct igb_tx_buffer *tx_buffer_info;
 		struct igb_rx_buffer *rx_buffer_info;
 	};
-#ifdef HAVE_PTP_1588_CLOCK
-	unsigned long last_rx_timestamp;
-#endif /* HAVE_PTP_1588_CLOCK */
 	void *desc;                     /* descriptor ring memory */
 	unsigned long flags;            /* ring specific flags */
 	void __iomem *tail;             /* pointer to ring tail register */
@@ -483,16 +479,10 @@ static inline struct netdev_queue *txring_txq(const struct igb_ring *tx_ring)
 }
 #endif /* CONFIG_BQL */
 
-// #ifdef EXT_THERMAL_SENSOR_SUPPORT
-// #ifdef IGB_PROCFS
-struct igb_therm_proc_data
-{
+struct igb_therm_proc_data {
 	struct e1000_hw *hw;
 	struct e1000_thermal_diode_data *sensor_data;
 };
-
-//  #endif /* IGB_PROCFS */
-// #endif /* EXT_THERMAL_SENSOR_SUPPORT */
 
 #ifdef IGB_HWMON
 #define IGB_HWMON_TYPE_LOC	0
@@ -648,6 +638,7 @@ struct igb_adapter {
 	struct sk_buff *ptp_tx_skb;
 	unsigned long ptp_tx_start;
 	unsigned long last_rx_ptp_check;
+	unsigned long last_rx_timestamp;
 	spinlock_t tmreg_lock;
 	struct cyclecounter cc;
 	struct timecounter tc;
@@ -752,15 +743,14 @@ struct igb_vmdq_adapter {
 struct e1000_fw_hdr {
 	u8 cmd;
 	u8 buf_len;
-	union
-	{
+	union {
 		u8 cmd_resv;
 		u8 ret_status;
 	} cmd_or_resp;
 	u8 checksum;
 };
 
-#pragma pack(push,1)
+#pragma pack(push, 1)
 struct e1000_fw_drv_info {
 	struct e1000_fw_hdr hdr;
 	u8 port_num;
@@ -773,7 +763,8 @@ struct e1000_fw_drv_info {
 enum e1000_state_t {
 	__IGB_TESTING,
 	__IGB_RESETTING,
-	__IGB_DOWN
+	__IGB_DOWN,
+	__IGB_PTP_TX_IN_PROGRESS,
 };
 
 extern char igb_driver_name[];
@@ -797,7 +788,7 @@ extern void igb_setup_tctl(struct igb_adapter *);
 extern void igb_setup_rctl(struct igb_adapter *);
 extern netdev_tx_t igb_xmit_frame_ring(struct sk_buff *, struct igb_ring *);
 extern void igb_unmap_and_free_tx_resource(struct igb_ring *,
-                                           struct igb_tx_buffer *);
+					   struct igb_tx_buffer *);
 extern void igb_alloc_rx_buffers(struct igb_ring *, u16);
 extern void igb_clean_rx_ring(struct igb_ring *);
 extern int igb_setup_queues(struct igb_adapter *adapter);
@@ -818,27 +809,6 @@ extern void igb_ptp_rx_rgtstamp(struct igb_q_vector *q_vector,
 extern void igb_ptp_rx_pktstamp(struct igb_q_vector *q_vector,
 				unsigned char *va,
 				struct sk_buff *skb);
-static inline void igb_ptp_rx_hwtstamp(struct igb_ring *rx_ring,
-				       union e1000_adv_rx_desc *rx_desc,
-				       struct sk_buff *skb)
-{
-	if (igb_test_staterr(rx_desc, E1000_RXDADV_STAT_TSIP)) {
-#ifdef CONFIG_IGB_DISABLE_PACKET_SPLIT
-		igb_ptp_rx_pktstamp(rx_ring->q_vector, skb->data, skb);
-		skb_pull(skb, IGB_TS_HDR_LEN);
-#endif
-		return;
-	}
-
-	if (igb_test_staterr(rx_desc, E1000_RXDADV_STAT_TS))
-		igb_ptp_rx_rgtstamp(rx_ring->q_vector, skb);
-
-	/* Update the last_rx_timestamp timer in order to enable watchdog check
-	 * for error case of latched timestamp on a dropped packet.
-	 */
-	rx_ring->last_rx_timestamp = jiffies;
-}
-
 extern int igb_ptp_hwtstamp_ioctl(struct net_device *netdev,
 				  struct ifreq *ifr, int cmd);
 #endif /* HAVE_PTP_1588_CLOCK */
@@ -847,7 +817,7 @@ extern int ethtool_ioctl(struct ifreq *);
 #endif
 extern int igb_write_mc_addr_list(struct net_device *netdev);
 extern int igb_add_mac_filter(struct igb_adapter *adapter, u8 *addr, u16 queue);
-extern int igb_del_mac_filter(struct igb_adapter *adapter, u8* addr, u16 queue);
+extern int igb_del_mac_filter(struct igb_adapter *adapter, u8 *addr, u16 queue);
 extern int igb_available_rars(struct igb_adapter *adapter);
 extern s32 igb_vlvf_set(struct igb_adapter *, u32, bool, u32);
 extern void igb_configure_vt_default_pool(struct igb_adapter *adapter);
@@ -863,8 +833,8 @@ void igb_sysfs_exit(struct igb_adapter *adapter);
 int igb_sysfs_init(struct igb_adapter *adapter);
 #else
 #ifdef IGB_PROCFS
-int igb_procfs_init(struct igb_adapter* adapter);
-void igb_procfs_exit(struct igb_adapter* adapter);
+int igb_procfs_init(struct igb_adapter *adapter);
+void igb_procfs_exit(struct igb_adapter *adapter);
 int igb_procfs_topdir_init(void);
 void igb_procfs_topdir_exit(void);
 #endif /* IGB_PROCFS */

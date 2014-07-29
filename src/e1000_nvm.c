@@ -12,13 +12,11 @@
   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
   more details.
 
-  You should have received a copy of the GNU General Public License along with
-  this program; if not, see <htt;://www.gnu.org/licenses/>.
-
   The full GNU General Public License is included in this distribution in
   the file called "COPYING".
 
   Contact Information:
+  Linux NICS <linux.nics@intel.com>
   e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
@@ -487,6 +485,9 @@ s32 e1000_read_nvm_eerd(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		data[i] = (E1000_READ_REG(hw, E1000_EERD) >>
 			   E1000_NVM_RW_REG_DATA);
 	}
+
+	if (ret_val)
+		DEBUGOUT1("NVM read error: %d\n", ret_val);
 
 	return ret_val;
 }
@@ -966,8 +967,12 @@ etrack_id:
 		hw->nvm.ops.read(hw, (NVM_ETRACK_WORD + 1), 1, &eeprom_verh);
 		fw_vers->etrack_id = (eeprom_verh << NVM_ETRACK_SHIFT)
 			| eeprom_verl;
+	} else if ((etrack_test & NVM_ETRACK_VALID) == 0) {
+		hw->nvm.ops.read(hw, NVM_ETRACK_WORD, 1, &eeprom_verh);
+		hw->nvm.ops.read(hw, (NVM_ETRACK_WORD + 1), 1, &eeprom_verl);
+		fw_vers->etrack_id = (eeprom_verh << NVM_ETRACK_SHIFT) |
+				     eeprom_verl;
 	}
-	return;
 }
 
 

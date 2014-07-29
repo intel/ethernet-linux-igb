@@ -665,7 +665,7 @@ ethtool:
 - lro_recycled - counts the number of buffers returned to the ring from
   recycling
 
-NOTE: IPv6 and UDP are not supported by LRO
+NOTE: IPv6 and UDP are not supported by LRO.
 
 
 IEEE 1588 Precision Time Protocol (PTP) Hardware Clock (PHC)

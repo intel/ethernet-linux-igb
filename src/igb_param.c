@@ -12,13 +12,11 @@
   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
   more details.
 
-  You should have received a copy of the GNU General Public License along with
-  this program; if not, see <htt;://www.gnu.org/licenses/>.
-
   The full GNU General Public License is included in this distribution in
   the file called "COPYING".
 
   Contact Information:
+  Linux NICS <linux.nics@intel.com>
   e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
@@ -85,7 +83,8 @@ IGB_PARAM(InterruptThrottleRate,
  *
  * Default Value: 2 (MSI-X)
  */
-IGB_PARAM(IntMode, "Change Interrupt Mode (0=Legacy, 1=MSI, 2=MSI-X), default 2");
+IGB_PARAM(IntMode,
+	"Change Interrupt Mode (0=Legacy, 1=MSI, 2=MSI-X), default 2");
 #define MAX_INTMODE                    IGB_INT_MODE_MSIX
 #define MIN_INTMODE                    IGB_INT_MODE_LEGACY
 
@@ -97,7 +96,8 @@ IGB_PARAM(Node, "set the starting node to allocate memory on, default -1");
  *
  * Default Value: 0 (disabled)
  */
-IGB_PARAM(LLIPort, "Low Latency Interrupt TCP Port (0-65535), default 0=off");
+IGB_PARAM(LLIPort,
+	"Low Latency Interrupt TCP Port (0-65535), default 0=off");
 
 #define DEFAULT_LLIPORT                0
 #define MAX_LLIPORT               0xFFFF
@@ -121,7 +121,8 @@ IGB_PARAM(LLIPush, "Low Latency Interrupt on TCP Push flag (0,1), default 0=off"
  *
  * Default Value: 0 (disabled)
  */
-IGB_PARAM(LLISize, "Low Latency Interrupt on Packet Size (0-1500), default 0=off");
+IGB_PARAM(LLISize,
+	"Low Latency Interrupt on Packet Size (0-1500), default 0=off");
 
 #define DEFAULT_LLISIZE                0
 #define MAX_LLISIZE                 1500
@@ -133,7 +134,8 @@ IGB_PARAM(LLISize, "Low Latency Interrupt on Packet Size (0-1500), default 0=off
  *
  * Default Value:  1
  */
-IGB_PARAM(RSS, "Number of Receive-Side Scaling Descriptor Queues (0-8), default 1, 0=number of cpus");
+IGB_PARAM(RSS,
+	"Number of Receive-Side Scaling Descriptor Queues (0-8), default 1, 0=number of cpus");
 
 #define DEFAULT_RSS       1
 #define MAX_RSS           8
@@ -145,7 +147,8 @@ IGB_PARAM(RSS, "Number of Receive-Side Scaling Descriptor Queues (0-8), default 
  *
  * Default Value:  0
  */
-IGB_PARAM(VMDQ, "Number of Virtual Machine Device Queues: 0-1 = disable, 2-8 enable, default 0");
+IGB_PARAM(VMDQ,
+	"Number of Virtual Machine Device Queues: 0-1 = disable, 2-8 enable, default 0");
 
 #define DEFAULT_VMDQ      0
 #define MAX_VMDQ          MAX_RSS
@@ -157,7 +160,8 @@ IGB_PARAM(VMDQ, "Number of Virtual Machine Device Queues: 0-1 = disable, 2-8 ena
  *
  * Default Value:  0
  */
-IGB_PARAM(max_vfs, "Number of Virtual Functions: 0 = disable, 1-7 enable, default 0");
+IGB_PARAM(max_vfs,
+	"Number of Virtual Functions: 0 = disable, 1-7 enable, default 0");
 
 #define DEFAULT_SRIOV     0
 #define MAX_SRIOV         7
@@ -166,13 +170,13 @@ IGB_PARAM(max_vfs, "Number of Virtual Functions: 0 = disable, 1-7 enable, defaul
 /* MDD (Enable Malicious Driver Detection)
  *
  * Only available when SR-IOV is enabled - max_vfs is greater than 0
- * 
+ *
  * Valid Range: 0, 1
  *
  * Default Value:  1
  */
-IGB_PARAM(MDD, "Malicious Driver Detection (0/1), default 1 = enabled. "
-	  "Only available when max_vfs is greater than 0");
+IGB_PARAM(MDD,
+	"Malicious Driver Detection (0/1), default 1 = enabled. Only available when max_vfs is greater than 0");
 
 #ifdef DEBUG
 
@@ -200,7 +204,8 @@ IGB_PARAM(DumpBuffers, "Dump Tx/Rx buffers on Tx hang or by request");
  *
  * Default Value:  1
  */
-IGB_PARAM(QueuePairs, "Enable Tx/Rx queue pairs for interrupt handling (0,1), default 1=on");
+IGB_PARAM(QueuePairs,
+	"Enable Tx/Rx queue pairs for interrupt handling (0,1), default 1=on");
 
 #define DEFAULT_QUEUE_PAIRS           1
 #define MAX_QUEUE_PAIRS               1
@@ -212,7 +217,8 @@ IGB_PARAM(QueuePairs, "Enable Tx/Rx queue pairs for interrupt handling (0,1), de
  *
  * Default Value: 1
  */
- IGB_PARAM(EEE, "Enable/disable on parts that support the feature");
+IGB_PARAM(EEE,
+	"Enable/disable on parts that support the feature");
 
 /* Enable/disable DMA Coalescing
  *
@@ -221,7 +227,8 @@ IGB_PARAM(QueuePairs, "Enable Tx/Rx queue pairs for interrupt handling (0,1), de
  *
  * Default Value: 0
  */
- IGB_PARAM(DMAC, "Disable or set latency for DMA Coalescing ((0=off, 1000-10000(msec), 250, 500 (usec))");
+IGB_PARAM(DMAC,
+	"Disable or set latency for DMA Coalescing ((0=off, 1000-10000(msec), 250, 500 (usec))");
 
 #ifndef IGB_NO_LRO
 /* Enable/disable Large Receive Offload
@@ -230,7 +237,7 @@ IGB_PARAM(QueuePairs, "Enable Tx/Rx queue pairs for interrupt handling (0,1), de
  *
  * Default Value: 0
  */
- IGB_PARAM(LRO, "Large Receive Offload (0,1), default 0=off");
+IGB_PARAM(LRO, "Large Receive Offload (0,1), default 0=off");
 
 #endif
 struct igb_opt_list {
@@ -333,7 +340,7 @@ void igb_check_options(struct igb_adapter *adapter)
 		struct igb_option opt = {
 			.type = range_option,
 			.name = "Interrupt Throttling Rate (ints/sec)",
-			.err  = "using default of " __MODULE_STRING(DEFAULT_ITR),
+			.err  = "using default of "__MODULE_STRING(DEFAULT_ITR),
 			.def  = DEFAULT_ITR,
 			.arg  = { .r = { .min = MIN_ITR,
 					 .max = MAX_ITR } }
@@ -347,7 +354,7 @@ void igb_check_options(struct igb_adapter *adapter)
 			switch (itr) {
 			case 0:
 				DPRINTK(PROBE, INFO, "%s turned off\n",
-				        opt.name);
+					opt.name);
 				if (hw->mac.type >= e1000_i350)
 					adapter->dmac = IGB_DMAC_DISABLE;
 				adapter->rx_itr_setting = itr;
@@ -359,7 +366,7 @@ void igb_check_options(struct igb_adapter *adapter)
 				break;
 			case 3:
 				DPRINTK(PROBE, INFO,
-				        "%s set to dynamic conservative mode\n",
+					"%s set to dynamic conservative mode\n",
 					opt.name);
 				adapter->rx_itr_setting = itr;
 				break;
@@ -373,8 +380,8 @@ void igb_check_options(struct igb_adapter *adapter)
 				if (itr == 3) {
 					adapter->rx_itr_setting = itr;
 				} else {
-					adapter->rx_itr_setting = 1000000000 /
-					                          (itr * 256);
+					adapter->rx_itr_setting = 1000000000
+								/ (itr * 256);
 					adapter->rx_itr_setting &= ~3;
 				}
 				break;
@@ -412,7 +419,8 @@ void igb_check_options(struct igb_adapter *adapter)
 		struct igb_option opt = {
 			.type = range_option,
 			.name = "Low Latency Interrupt TCP Port",
-			.err  = "using default of " __MODULE_STRING(DEFAULT_LLIPORT),
+			.err  = "using default of "
+				__MODULE_STRING(DEFAULT_LLIPORT),
 			.def  = DEFAULT_LLIPORT,
 			.arg  = { .r = { .min = MIN_LLIPORT,
 					 .max = MAX_LLIPORT } }
@@ -439,7 +447,8 @@ void igb_check_options(struct igb_adapter *adapter)
 		struct igb_option opt = {
 			.type = range_option,
 			.name = "Low Latency Interrupt on Packet Size",
-			.err  = "using default of " __MODULE_STRING(DEFAULT_LLISIZE),
+			.err  = "using default of "
+				__MODULE_STRING(DEFAULT_LLISIZE),
 			.def  = DEFAULT_LLISIZE,
 			.arg  = { .r = { .min = MIN_LLISIZE,
 					 .max = MAX_LLISIZE } }
@@ -486,7 +495,8 @@ void igb_check_options(struct igb_adapter *adapter)
 		struct igb_option opt = {
 			.type = range_option,
 			.name = "max_vfs - SR-IOV VF devices",
-			.err  = "using default of " __MODULE_STRING(DEFAULT_SRIOV),
+			.err  = "using default of "
+				__MODULE_STRING(DEFAULT_SRIOV),
 			.def  = DEFAULT_SRIOV,
 			.arg  = { .r = { .min = MIN_SRIOV,
 					 .max = MAX_SRIOV } }
@@ -496,7 +506,8 @@ void igb_check_options(struct igb_adapter *adapter)
 		if (num_max_vfs > bd) {
 #endif
 			adapter->vfs_allocated_count = max_vfs[bd];
-			igb_validate_option(&adapter->vfs_allocated_count, &opt, adapter);
+			igb_validate_option(&adapter->vfs_allocated_count,
+					    &opt, adapter);
 
 #ifdef module_param_array
 		} else {
@@ -511,7 +522,9 @@ void igb_check_options(struct igb_adapter *adapter)
 			case e1000_i211:
 			case e1000_i354:
 				adapter->vfs_allocated_count = 0;
-				DPRINTK(PROBE, INFO, "SR-IOV option max_vfs not supported.\n");
+				DPRINTK(PROBE, INFO,
+					"SR-IOV option max_vfs not supported.\n");
+				/* Fall through */
 			default:
 				break;
 			}
@@ -521,10 +534,11 @@ void igb_check_options(struct igb_adapter *adapter)
 		struct igb_option opt = {
 			.type = range_option,
 			.name = "VMDQ - VMDq multiqueue queue count",
-			.err  = "using default of " __MODULE_STRING(DEFAULT_VMDQ),
+			.err  = "using default of "__MODULE_STRING(DEFAULT_VMDQ),
 			.def  = DEFAULT_VMDQ,
 			.arg  = { .r = { .min = MIN_VMDQ,
-					 .max = (MAX_VMDQ - adapter->vfs_allocated_count) } }
+					 .max = (MAX_VMDQ
+					   - adapter->vfs_allocated_count)} }
 		};
 		if ((hw->mac.type != e1000_i210) ||
 		    (hw->mac.type != e1000_i211)) {
@@ -532,23 +546,28 @@ void igb_check_options(struct igb_adapter *adapter)
 		if (num_VMDQ > bd) {
 #endif
 			adapter->vmdq_pools = (VMDQ[bd] == 1 ? 0 : VMDQ[bd]);
-			if (adapter->vfs_allocated_count && !adapter->vmdq_pools) {
-				DPRINTK(PROBE, INFO, "Enabling SR-IOV requires VMDq be set to at least 1\n");
+			if (adapter->vfs_allocated_count &&
+			    !adapter->vmdq_pools) {
+				DPRINTK(PROBE, INFO,
+					"Enabling SR-IOV requires VMDq be set to at least 1\n");
 				adapter->vmdq_pools = 1;
 			}
-			igb_validate_option(&adapter->vmdq_pools, &opt, adapter);
+			igb_validate_option(&adapter->vmdq_pools, &opt,
+					    adapter);
 
 #ifdef module_param_array
 		} else {
 			if (!adapter->vfs_allocated_count)
-				adapter->vmdq_pools = (opt.def == 1 ? 0 : opt.def);
+				adapter->vmdq_pools = (opt.def == 1 ? 0
+						       : opt.def);
 			else
 				adapter->vmdq_pools = 1;
 		}
 #endif
 #ifdef CONFIG_IGB_VMDQ_NETDEV
 		if (hw->mac.type == e1000_82575 && adapter->vmdq_pools) {
-			DPRINTK(PROBE, INFO, "VMDq not supported on this part.\n");
+			DPRINTK(PROBE, INFO,
+				"VMDq not supported on this part.\n");
 			adapter->vmdq_pools = 0;
 		}
 #endif
@@ -562,7 +581,7 @@ void igb_check_options(struct igb_adapter *adapter)
 		struct igb_option opt = {
 			.type = range_option,
 			.name = "RSS - RSS multiqueue receive count",
-			.err  = "using default of " __MODULE_STRING(DEFAULT_RSS),
+			.err  = "using default of "__MODULE_STRING(DEFAULT_RSS),
 			.def  = DEFAULT_RSS,
 			.arg  = { .r = { .min = MIN_RSS,
 					 .max = MAX_RSS } }
@@ -607,7 +626,8 @@ void igb_check_options(struct igb_adapter *adapter)
 		}
 
 		if (adapter->int_mode != IGB_INT_MODE_MSIX) {
-			DPRINTK(PROBE, INFO, "RSS is not supported when in MSI/Legacy Interrupt mode, %s\n",
+			DPRINTK(PROBE, INFO,
+				"RSS is not supported when in MSI/Legacy Interrupt mode, %s\n",
 				opt.err);
 			opt.arg.r.max = 1;
 		}
@@ -620,11 +640,13 @@ void igb_check_options(struct igb_adapter *adapter)
 			case 1:
 				break;
 			default:
-				igb_validate_option(&adapter->rss_queues, &opt, adapter);
+				igb_validate_option(&adapter->rss_queues, &opt,
+						    adapter);
 				if (adapter->rss_queues)
 					break;
 			case 0:
-				adapter->rss_queues = min_t(u32, opt.arg.r.max, num_online_cpus());
+				adapter->rss_queues = min_t(u32, opt.arg.r.max,
+							    num_online_cpus());
 				break;
 			}
 #ifdef module_param_array
@@ -636,7 +658,8 @@ void igb_check_options(struct igb_adapter *adapter)
 	{ /* QueuePairs - Enable Tx/Rx queue pairs for interrupt handling */
 		struct igb_option opt = {
 			.type = enable_option,
-			.name = "QueuePairs - Tx/Rx queue pairs for interrupt handling",
+			.name =
+			  "QueuePairs - Tx/Rx queue pairs for interrupt handling",
 			.err  = "defaulting to Enabled",
 			.def  = OPTION_ENABLED
 		};
@@ -669,7 +692,8 @@ void igb_check_options(struct igb_adapter *adapter)
 					qp = OPTION_ENABLED;
 
 				if (qp == OPTION_ENABLED)
-					DPRINTK(PROBE, INFO, "Number of queues exceeds available interrupts, %s\n",
+					DPRINTK(PROBE, INFO,
+						"Number of queues exceeds available interrupts, %s\n",
 						opt.err);
 			}
 			igb_validate_option(&qp, &opt, adapter);
@@ -714,7 +738,7 @@ void igb_check_options(struct igb_adapter *adapter)
 	{ /* DMAC -  Enable DMA Coalescing for capable adapters */
 
 		if (hw->mac.type >= e1000_i350) {
-			struct igb_opt_list list [] = {
+			struct igb_opt_list list[] = {
 				{ IGB_DMAC_DISABLE, "DMAC Disable"},
 				{ IGB_DMAC_MIN, "DMAC 250 usec"},
 				{ IGB_DMAC_500, "DMAC 500 usec"},
@@ -732,10 +756,11 @@ void igb_check_options(struct igb_adapter *adapter)
 			struct igb_option opt = {
 				.type = list_option,
 				.name = "DMA Coalescing",
-				.err  = "using default of "__MODULE_STRING(IGB_DMAC_DISABLE),
+				.err  = "using default of "
+					__MODULE_STRING(IGB_DMAC_DISABLE),
 				.def  = IGB_DMAC_DISABLE,
 				.arg = { .l = { .nr = 13,
-					 	.p = list
+						.p = list
 					}
 				}
 			};
@@ -789,8 +814,8 @@ void igb_check_options(struct igb_adapter *adapter)
 				default:
 					adapter->dmac = opt.def;
 					DPRINTK(PROBE, INFO,
-					"Invalid DMAC setting, "
-					"resetting DMAC to %d\n", opt.def);
+					"Invalid DMAC setting, resetting DMAC to %d\n",
+						opt.def);
 				}
 #ifdef module_param_array
 			} else
