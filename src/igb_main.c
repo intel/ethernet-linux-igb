@@ -62,7 +62,7 @@
 
 #define MAJ 5
 #define MIN 2
-#define BUILD 9.2
+#define BUILD 9.3
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "."\
 	__stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
@@ -2543,7 +2543,7 @@ static int igb_probe(struct pci_dev *pdev,
 	u8 pba_str[E1000_PBANUM_LENGTH];
 	s32 ret_val;
 	static int global_quad_port_a; /* global quad port a indication */
-	int i, err, pci_using_dac;
+	int err, pci_using_dac;
 	static int cards_found;
 
 	err = pci_enable_device_mem(pdev);
@@ -2929,10 +2929,7 @@ static int igb_probe(struct pci_dev *pdev,
 		  (hw->bus.width == e1000_bus_width_pcie_x2) ? "Width x2" :
 		  (hw->bus.width == e1000_bus_width_pcie_x1) ? "Width x1" :
 		  (hw->mac.type == e1000_i354) ? "integrated" : "unknown"));
-	dev_info(pci_dev_to_dev(pdev), "%s: MAC: ", netdev->name);
-	for (i = 0; i < 6; i++)
-		netdev_info(netdev, "%2.2x%c", netdev->dev_addr[i], i ==
-			    5 ? '\n' : ':');
+	netdev_info(netdev, "MAC: %pM\n", netdev->dev_addr);
 
 	ret_val = e1000_read_pba_string(hw, pba_str, E1000_PBANUM_LENGTH);
 	if (ret_val)
