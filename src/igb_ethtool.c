@@ -2755,7 +2755,11 @@ static u32 igb_get_rxfh_indir_size(struct net_device *netdev)
 	return IGB_RETA_SIZE;
 }
 
+#ifdef ETHTOOL_GRSSH
+static int igb_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key)
+#else
 static int igb_get_rxfh_indir(struct net_device *netdev, u32 *indir)
+#endif /* ETHTOOL_GRSSH */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	int i;
@@ -2818,7 +2822,12 @@ void igb_write_rss_indir_tbl(struct igb_adapter *adapter)
 }
 
 #ifdef HAVE_ETHTOOL_GRXFHINDIR_SIZE
+#ifdef ETHTOOL_SRSSH
+static int igb_set_rxfh(struct net_device *netdev, const u32 *indir,
+			      const u8 *key)
+#else
 static int igb_set_rxfh_indir(struct net_device *netdev, const u32 *indir)
+#endif /* ETHTOOL_SRSSH */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
@@ -3101,10 +3110,18 @@ static const struct ethtool_ops igb_ethtool_ops = {
 #ifdef HAVE_ETHTOOL_GRXFHINDIR_SIZE
 	.get_rxfh_indir_size	= igb_get_rxfh_indir_size,
 #endif /* HAVE_ETHTOOL_GRSFHINDIR_SIZE */
+#ifdef ETHTOOL_GRSSH
+	.get_rxfh		= igb_get_rxfh,
+#else
 	.get_rxfh_indir		= igb_get_rxfh_indir,
+#endif /* ETHTOOL_GRSSH */
 #endif /* ETHTOOL_GRXFHINDIR */
 #ifdef ETHTOOL_SRXFHINDIR
+#ifdef ETHTOOL_SRSSH
+	.set_rxfh		= igb_set_rxfh,
+#else
 	.set_rxfh_indir		= igb_set_rxfh_indir,
+#endif /* ETHTOOL_SRSSH */
 #endif /* ETHTOOL_SRXFHINDIR */
 #ifdef ETHTOOL_GCHANNELS
 	.get_channels           = igb_get_channels,
@@ -3144,7 +3161,11 @@ void igb_set_ethtool_ops(struct net_device *netdev)
 void igb_set_ethtool_ops(struct net_device *netdev)
 {
 	/* have to "undeclare" const on this struct to remove warnings */
+#ifndef ETHTOOL_OPS_COMPAT
+	netdev->ethtool_ops = (struct ethtool_ops *)&igb_ethtool_ops;
+#else
 	SET_ETHTOOL_OPS(netdev, (struct ethtool_ops *)&igb_ethtool_ops);
+#endif /* SET_ETHTOOL_OPS */
 }
 #endif /* HAVE_RHEL6_ETHTOOL_OPS_EXT_STRUCT */
 #endif	/* SIOCETHTOOL */

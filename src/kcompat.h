@@ -140,6 +140,10 @@ struct msix_entry {
 #define PCI_CAP_ID_EXP 0x10
 #endif
 
+#ifndef uninitialized_var
+#define uninitialized_var(x) x = x
+#endif
+
 #ifndef PCIE_LINK_STATE_L0S
 #define PCIE_LINK_STATE_L0S 1
 #endif
@@ -1776,6 +1780,10 @@ typedef unsigned gfp_t;
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15) )
+#ifndef kfree_rcu
+/* this is placed here due to a lack of rcu_barrier in previous kernels */
+#define kfree_rcu(_ptr, _offset) kfree(_ptr)
+#endif /* kfree_rcu */
 #ifndef vmalloc_node
 #define vmalloc_node(a,b) vmalloc(a)
 #endif /* vmalloc_node*/
@@ -3092,13 +3100,15 @@ static inline bool _kc_pm_runtime_suspended(struct device *dev)
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35) )
-
 ssize_t _kc_simple_write_to_buffer(void *to, size_t available, loff_t *ppos,
 				   const void __user *from, size_t count);
 #define simple_write_to_buffer _kc_simple_write_to_buffer
 
 #ifndef numa_node_id
 #define numa_node_id() 0
+#endif
+#ifndef numa_mem_id
+#define numa_mem_id numa_node_id
 #endif
 #ifdef HAVE_TX_MQ
 #include <net/sch_generic.h>
@@ -3417,7 +3427,7 @@ struct _kc_ethtool_rx_flow_spec {
 #define USE_LEGACY_PM_SUPPORT
 #ifndef kfree_rcu
 #define kfree_rcu(_ptr, _rcu_head) kfree(_ptr)
-#endif
+#endif /* kfree_rcu */
 #ifndef kstrtol_from_user
 #define kstrtol_from_user(s, c, b, r) _kc_kstrtol_from_user(s, c, b, r)
 static inline int _kc_kstrtol_from_user(const char __user *s, size_t count, 
@@ -3954,7 +3964,7 @@ extern u16 __kc_netdev_pick_tx(struct net_device *dev, struct sk_buff *skb);
 #endif /* HAVE_NETDEV_SELECT_QUEUE */
 #else
 #define HAVE_BRIDGE_FILTER
-#define USE_DEFAULT_FDB_DEL_DUMP
+#define HAVE_FDB_DEL_NLATTR
 #endif /* < 3.9.0 */
 
 /*****************************************************************************/
@@ -3991,8 +4001,35 @@ static inline struct sk_buff *__kc__vlan_hwaccel_put_tag(struct sk_buff *skb,
 	__kc__vlan_hwaccel_put_tag(skb, vlan_tci)
 #endif
 
+#ifdef HAVE_FDB_OPS
+#ifdef USE_CONST_DEV_UC_CHAR
+extern int __kc_ndo_dflt_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
+				 struct net_device *dev,
+				 const unsigned char *addr, u16 flags);
+#ifdef HAVE_FDB_DEL_NLATTR
+extern int __kc_ndo_dflt_fdb_del(struct ndmsg *ndm, struct nlattr *tb[],
+				 struct net_device *dev,
+				 const unsigned char *addr);
+#else
+extern int __kc_ndo_dflt_fdb_del(struct ndmsg *ndm, struct net_device *dev,
+				 const unsigned char *addr);
+#endif
+#else
+extern int __kc_ndo_dflt_fdb_add(struct ndmsg *ndm, struct net_device *dev,
+				 unsigned char *addr, u16 flags);
+extern int __kc_ndo_dflt_fdb_del(struct ndmsg *ndm, struct net_device *dev,
+				 unsigned char *addr);
+#endif
+#define ndo_dflt_fdb_add __kc_ndo_dflt_fdb_add
+#define ndo_dflt_fdb_del __kc_ndo_dflt_fdb_del
+#endif /* HAVE_FDB_OPS */
+
+#ifndef PCI_DEVID
+#define PCI_DEVID(bus, devfn)  ((((u16)bus) << 8) | devfn)
+#endif
 #else /* >= 3.10.0 */
 #define HAVE_ENCAP_TSO_OFFLOAD
+#define USE_DEFAULT_FDB_DEL_DUMP
 #endif /* >= 3.10.0 */
 
 /*****************************************************************************/
@@ -4082,5 +4119,91 @@ static inline void __kc_ether_addr_copy(u8 *dst, const u8 *src)
 #define u64_stats_fetch_begin_irq u64_stats_fetch_begin_bh
 #define u64_stats_fetch_retry_irq u64_stats_fetch_retry_bh
 #endif /* 3.15.0 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0) )
+#ifndef __dev_uc_sync
+#ifdef HAVE_SET_RX_MODE
+#ifdef NETDEV_HW_ADDR_T_UNICAST
+int __kc_hw_addr_sync_dev(struct netdev_hw_addr_list *list,
+		struct net_device *dev,
+		int (*sync)(struct net_device *, const unsigned char *),
+		int (*unsync)(struct net_device *, const unsigned char *));
+void __kc_hw_addr_unsync_dev(struct netdev_hw_addr_list *list,
+		struct net_device *dev,
+		int (*unsync)(struct net_device *, const unsigned char *));
+#endif
+#ifndef NETDEV_HW_ADDR_T_MULTICAST
+int __kc_dev_addr_sync_dev(struct dev_addr_list **list, int *count,
+		struct net_device *dev,
+		int (*sync)(struct net_device *, const unsigned char *),
+		int (*unsync)(struct net_device *, const unsigned char *));
+void __kc_dev_addr_unsync_dev(struct dev_addr_list **list, int *count,
+		struct net_device *dev,
+		int (*unsync)(struct net_device *, const unsigned char *));
+#endif
+#endif /* HAVE_SET_RX_MODE */
+
+static inline int __kc_dev_uc_sync(struct net_device *dev,
+		int (*sync)(struct net_device *, const unsigned char *),
+		int (*unsync)(struct net_device *, const unsigned char *))
+{
+#ifdef NETDEV_HW_ADDR_T_UNICAST
+	return __kc_hw_addr_sync_dev(&dev->uc, dev, sync, unsync);
+#elif defined(HAVE_SET_RX_MODE)
+	return __kc_dev_addr_sync_dev(&dev->uc_list, &dev->uc_count,
+				      dev, sync, unsync);
+#else
+	return 0;
+#endif
+}
+#define __dev_uc_sync __kc_dev_uc_sync
+
+static inline void __kc_dev_uc_unsync(struct net_device *dev,
+		int (*unsync)(struct net_device *, const unsigned char *))
+{
+#ifdef HAVE_SET_RX_MODE
+#ifdef NETDEV_HW_ADDR_T_UNICAST
+	__kc_hw_addr_unsync_dev(&dev->uc, dev, unsync);
+#else /* NETDEV_HW_ADDR_T_MULTICAST */
+	__kc_dev_addr_unsync_dev(&dev->uc_list, &dev->uc_count, dev, unsync);
+#endif /* NETDEV_HW_ADDR_T_UNICAST */
+#endif /* HAVE_SET_RX_MODE */
+}
+#define __dev_uc_unsync __kc_dev_uc_unsync
+
+static inline int __kc_dev_mc_sync(struct net_device *dev,
+		int (*sync)(struct net_device *, const unsigned char *),
+		int (*unsync)(struct net_device *, const unsigned char *))
+{
+#ifdef NETDEV_HW_ADDR_T_MULTICAST
+	return __kc_hw_addr_sync_dev(&dev->mc, dev, sync, unsync);
+#elif defined(HAVE_SET_RX_MODE)
+	return __kc_dev_addr_sync_dev(&dev->mc_list, &dev->mc_count,
+				      dev, sync, unsync);
+#else
+	return 0;
+#endif
+	
+}
+#define __dev_mc_sync __kc_dev_mc_sync
+
+static inline void __kc_dev_mc_unsync(struct net_device *dev,
+		int (*unsync)(struct net_device *, const unsigned char *))
+{
+#ifdef HAVE_SET_RX_MODE
+#ifdef NETDEV_HW_ADDR_T_MULTICAST
+	__kc_hw_addr_unsync_dev(&dev->mc, dev, unsync);
+#else /* NETDEV_HW_ADDR_T_MULTICAST */
+	__kc_dev_addr_unsync_dev(&dev->mc_list, &dev->mc_count, dev, unsync);
+#endif /* NETDEV_HW_ADDR_T_MULTICAST */
+#endif /* HAVE_SET_RX_MODE */
+}
+#define __dev_mc_unsync __kc_dev_mc_unsync
+#endif /* __dev_uc_sync */
+#else
+#define HAVE_NDO_SET_VF_MIN_MAX_TX_RATE
+#define HAVE_DCBNL_OPS_SETAPP_RETURN_INT
+#endif /* 3.16.0 */
 
 #endif /* _KCOMPAT_H_ */
