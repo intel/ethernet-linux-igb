@@ -62,7 +62,7 @@
 
 #define MAJ 5
 #define MIN 2
-#define BUILD 9.4
+#define BUILD 15
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "."\
 	__stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
@@ -2039,10 +2039,10 @@ void igb_reset(struct igb_adapter *adapter)
 		case e1000_i350:
 		case e1000_i210:
 		case e1000_i211:
-			e1000_set_eee_i350(hw);
+			e1000_set_eee_i350(hw, true, true);
 			break;
 		case e1000_i354:
-			e1000_set_eee_i354(hw);
+			e1000_set_eee_i354(hw, true, true);
 			break;
 		default:
 			break;
@@ -2798,6 +2798,12 @@ static int igb_probe(struct pci_dev *pdev,
 	/* get firmware version for ethtool -i */
 	igb_set_fw_version(adapter);
 
+	/* configure RXPBSIZE and TXPBSIZE */
+	if (hw->mac.type == e1000_i210) {
+		E1000_WRITE_REG(hw, E1000_RXPBS, I210_RXPBSIZE_DEFAULT);
+		E1000_WRITE_REG(hw, E1000_TXPBS, I210_TXPBSIZE_DEFAULT);
+	}
+
 	/* Check if Media Autosense is enabled */
 	if (hw->mac.type == e1000_82580)
 		igb_init_mas(adapter);
@@ -2981,7 +2987,7 @@ static int igb_probe(struct pci_dev *pdev,
 		case e1000_i210:
 		case e1000_i211:
 			/* Enable EEE for internal copper PHY devices */
-			err = e1000_set_eee_i350(hw);
+			err = e1000_set_eee_i350(hw, true, true);
 			if ((!err) &&
 			    (adapter->flags & IGB_FLAG_EEE))
 				adapter->eee_advert =
@@ -2990,7 +2996,7 @@ static int igb_probe(struct pci_dev *pdev,
 		case e1000_i354:
 			if ((E1000_READ_REG(hw, E1000_CTRL_EXT)) &
 			    (E1000_CTRL_EXT_LINK_MODE_SGMII)) {
-				err = e1000_set_eee_i354(hw);
+				err = e1000_set_eee_i354(hw, true, true);
 				if ((!err) &&
 				    (adapter->flags & IGB_FLAG_EEE))
 					adapter->eee_advert =
@@ -5519,12 +5525,20 @@ netdev_tx_t igb_xmit_frame_ring(struct sk_buff *skb,
 	first->gso_segs = 1;
 
 #ifdef HAVE_PTP_1588_CLOCK
+#ifdef SKB_SHARED_TX_IS_UNION
+	if (unlikely(skb_tx(skb)->hardware)) {
+#else
 	if (unlikely(skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP)) {
+#endif
 		struct igb_adapter *adapter = netdev_priv(tx_ring->netdev);
 
 		if (!test_and_set_bit_lock(__IGB_PTP_TX_IN_PROGRESS,
 					   &adapter->state)) {
+#ifdef SKB_SHARED_TX_IS_UNION
+			skb_tx(skb)->in_progress = 1;
+#else
 			skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+#endif
 			tx_flags |= IGB_TX_FLAGS_TSTAMP;
 
 			adapter->ptp_tx_skb = skb_get(skb);
@@ -7621,6 +7635,9 @@ static void igb_lro_flush(struct igb_q_vector *q_vector,
 		}
 #ifdef NETIF_F_GSO
 
+#ifdef NAPI_GRO_CB
+		NAPI_GRO_CB(skb)->data_offset = 0;
+#endif
 		skb_shinfo(skb)->gso_size = IGB_CB(skb)->mss;
 		skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
 #endif
@@ -8112,116 +8129,6 @@ static bool igb_clean_rx_irq(struct igb_q_vector *q_vector, int budget)
 }
 #else /* CONFIG_IGB_DISABLE_PACKET_SPLIT */
 /**
- * igb_get_headlen - determine size of header for LRO/GRO
- * @data: pointer to the start of the headers
- * @max_len: total length of section to find headers in
- *
- * This function is meant to determine the length of headers that will
- * be recognized by hardware for LRO, and GRO offloads.  The main
- * motivation of doing this is to only perform one pull for IPv4 TCP
- * packets so that we can do basic things like calculating the gso_size
- * based on the average data per packet.
- **/
-static unsigned int igb_get_headlen(unsigned char *data,
-				    unsigned int max_len)
-{
-	union {
-		unsigned char *network;
-		/* l2 headers */
-		struct ethhdr *eth;
-		struct vlan_hdr *vlan;
-		/* l3 headers */
-		struct iphdr *ipv4;
-		struct ipv6hdr *ipv6;
-	} hdr;
-	__be16 protocol;
-	u8 nexthdr = 0;	/* default to not TCP */
-	u8 hlen;
-
-	/* this should never happen, but better safe than sorry */
-	if (max_len < ETH_HLEN)
-		return max_len;
-
-	/* initialize network frame pointer */
-	hdr.network = data;
-
-	/* set first protocol and move network header forward */
-	protocol = hdr.eth->h_proto;
-	hdr.network += ETH_HLEN;
-
-	/* handle any vlan tag if present */
-	if (protocol == htons(ETH_P_8021Q)) {
-		if ((hdr.network - data) > (max_len - VLAN_HLEN))
-			return max_len;
-
-		protocol = hdr.vlan->h_vlan_encapsulated_proto;
-		hdr.network += VLAN_HLEN;
-	}
-
-	/* handle L3 protocols */
-	if (protocol == htons(ETH_P_IP)) {
-		if ((hdr.network - data) > (max_len - sizeof(struct iphdr)))
-			return max_len;
-
-		/* access ihl as a u8 to avoid unaligned access on ia64 */
-		hlen = (hdr.network[0] & 0x0F) << 2;
-
-		/* verify hlen meets minimum size requirements */
-		if (hlen < sizeof(struct iphdr))
-			return hdr.network - data;
-
-		/* record next protocol if header is present */
-		if (!(hdr.ipv4->frag_off & htons(IP_OFFSET)))
-			nexthdr = hdr.ipv4->protocol;
-#ifdef NETIF_F_TSO6
-	} else if (protocol == htons(ETH_P_IPV6)) {
-		if ((hdr.network - data) > (max_len - sizeof(struct ipv6hdr)))
-			return max_len;
-
-		/* record next protocol */
-		nexthdr = hdr.ipv6->nexthdr;
-		hlen = sizeof(struct ipv6hdr);
-#endif /* NETIF_F_TSO6 */
-	} else {
-		return hdr.network - data;
-	}
-
-	/* relocate pointer to start of L4 header */
-	hdr.network += hlen;
-
-	/* finally sort out TCP */
-	if (nexthdr == IPPROTO_TCP) {
-		if ((hdr.network - data) > (max_len - sizeof(struct tcphdr)))
-			return max_len;
-
-		/* access doff as a u8 to avoid unaligned access on ia64 */
-		hlen = (hdr.network[12] & 0xF0) >> 2;
-
-		/* verify hlen meets minimum size requirements */
-		if (hlen < sizeof(struct tcphdr))
-			return hdr.network - data;
-
-		hdr.network += hlen;
-	} else if (nexthdr == IPPROTO_UDP) {
-		if ((hdr.network - data) > (max_len - sizeof(struct udphdr)))
-			return max_len;
-
-		hdr.network += sizeof(struct udphdr);
-	}
-
-	/*
-	 * If everything has gone correctly hdr.network should be the
-	 * data section of the packet and will be the end of the header.
-	 * If not then it probably represents the end of the last recognized
-	 * header.
-	 */
-	if ((hdr.network - data) < max_len)
-		return hdr.network - data;
-	else
-		return max_len;
-}
-
-/**
  * igb_pull_tail - igb specific version of skb_pull_tail
  * @rx_ring: rx descriptor ring packet is being transacted on
  * @rx_desc: pointer to the EOP Rx descriptor
@@ -8269,7 +8176,7 @@ static void igb_pull_tail(struct igb_ring *rx_ring,
 	 * we need the header to contain the greater of either ETH_HLEN or
 	 * 60 bytes if the skb->len is less than 60 for skb_pad.
 	 */
-	pull_len = igb_get_headlen(va, IGB_RX_HDR_LEN);
+	pull_len = eth_get_headlen(va, IGB_RX_HDR_LEN);
 
 	/* align pull length to size of long to optimize memcpy performance */
 	skb_copy_to_linear_data(skb, va, ALIGN(pull_len, sizeof(long)));
@@ -8624,8 +8531,12 @@ static int igb_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 		return igb_mii_ioctl(netdev, ifr, cmd);
 #endif
 #ifdef HAVE_PTP_1588_CLOCK
+#ifdef SIOCGHWTSTAMP
+	case SIOCGHWTSTAMP:
+		return igb_ptp_get_ts_config(netdev, ifr);
+#endif
 	case SIOCSHWTSTAMP:
-		return igb_ptp_hwtstamp_ioctl(netdev, ifr, cmd);
+		return igb_ptp_set_ts_config(netdev, ifr);
 #endif /* HAVE_PTP_1588_CLOCK */
 #ifdef ETHTOOL_OPS_COMPAT
 	case SIOCETHTOOL:

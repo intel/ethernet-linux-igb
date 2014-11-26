@@ -1433,7 +1433,8 @@ static int igb_setup_loopback_test(struct igb_adapter *adapter)
 		    (hw->device_id == E1000_DEV_ID_DH89XXCC_SERDES) ||
 		    (hw->device_id == E1000_DEV_ID_DH89XXCC_BACKPLANE) ||
 		    (hw->device_id == E1000_DEV_ID_DH89XXCC_SFP) ||
-		    (hw->device_id == E1000_DEV_ID_I354_SGMII)) {
+		    (hw->device_id == E1000_DEV_ID_I354_SGMII) ||
+		    (hw->device_id == E1000_DEV_ID_I354_BACKPLANE_2_5GBPS)) {
 
 			/* Enable DH89xxCC MPHY for near end loopback */
 			reg = E1000_READ_REG(hw, E1000_MPHY_ADDR_CTL);
@@ -2501,6 +2502,7 @@ static int igb_set_eee(struct net_device *netdev,
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
 	struct ethtool_eee eee_curr;
+	bool adv1g_eee = true, adv100m_eee = true;
 	s32 ret_val;
 
 	if ((hw->mac.type < e1000_i350) ||
@@ -2525,12 +2527,14 @@ static int igb_set_eee(struct net_device *netdev,
 			return -EINVAL;
 		}
 
-		if (edata->advertised &
-		    ~(ADVERTISE_100_FULL | ADVERTISE_1000_FULL)) {
+		if (!edata->advertised || (edata->advertised &
+				 ~(ADVERTISE_100_FULL | ADVERTISE_1000_FULL))) {
 			dev_err(pci_dev_to_dev(adapter->pdev),
-				"EEE Advertisement supports 100Base-Tx Full Duplex(0x008) 1000Base-T Full Duplex(0x20) or both(0x028)\n");
+				"EEE Advertisement supports 100Base-Tx Full Duplex(0x08) 1000Base-T Full Duplex(0x20) or both(0x28)\n");
 			return -EINVAL;
 		}
+		adv100m_eee = !!(edata->advertised & ADVERTISE_100_FULL);
+		adv1g_eee = !!(edata->advertised & ADVERTISE_1000_FULL);
 
 	} else if (!edata->eee_enabled) {
 		dev_err(pci_dev_to_dev(adapter->pdev),
@@ -2548,6 +2552,17 @@ static int igb_set_eee(struct net_device *netdev,
 			igb_reinit_locked(adapter);
 		else
 			igb_reset(adapter);
+	}
+
+	if (hw->mac.type == e1000_i354)
+		ret_val = e1000_set_eee_i354(hw, adv1g_eee, adv100m_eee);
+	else
+		ret_val = e1000_set_eee_i350(hw, adv1g_eee, adv100m_eee);
+
+	if (ret_val) {
+		dev_err(pci_dev_to_dev(adapter->pdev),
+			"Problem setting EEE advertisement options\n");
+		return -EINVAL;
 	}
 
 	return 0;
@@ -2755,11 +2770,11 @@ static u32 igb_get_rxfh_indir_size(struct net_device *netdev)
 	return IGB_RETA_SIZE;
 }
 
-#ifdef ETHTOOL_GRSSH
+#if (defined(ETHTOOL_GRSSH) && !defined(HAVE_ETHTOOL_GSRSSH))
 static int igb_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key)
 #else
 static int igb_get_rxfh_indir(struct net_device *netdev, u32 *indir)
-#endif /* ETHTOOL_GRSSH */
+#endif /* HAVE_ETHTOOL_GSRSSH */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	int i;
@@ -2822,12 +2837,12 @@ void igb_write_rss_indir_tbl(struct igb_adapter *adapter)
 }
 
 #ifdef HAVE_ETHTOOL_GRXFHINDIR_SIZE
-#ifdef ETHTOOL_SRSSH
+#if (defined(ETHTOOL_GRSSH) && !defined(HAVE_ETHTOOL_GSRSSH))
 static int igb_set_rxfh(struct net_device *netdev, const u32 *indir,
 			      const u8 *key)
 #else
 static int igb_set_rxfh_indir(struct net_device *netdev, const u32 *indir)
-#endif /* ETHTOOL_SRSSH */
+#endif /* HAVE_ETHTOOL_GSRSSH */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
@@ -3110,18 +3125,18 @@ static const struct ethtool_ops igb_ethtool_ops = {
 #ifdef HAVE_ETHTOOL_GRXFHINDIR_SIZE
 	.get_rxfh_indir_size	= igb_get_rxfh_indir_size,
 #endif /* HAVE_ETHTOOL_GRSFHINDIR_SIZE */
-#ifdef ETHTOOL_GRSSH
+#if (defined(ETHTOOL_GRSSH) && !defined(HAVE_ETHTOOL_GSRSSH))
 	.get_rxfh		= igb_get_rxfh,
 #else
 	.get_rxfh_indir		= igb_get_rxfh_indir,
-#endif /* ETHTOOL_GRSSH */
+#endif /* HAVE_ETHTOOL_GSRSSH */
 #endif /* ETHTOOL_GRXFHINDIR */
 #ifdef ETHTOOL_SRXFHINDIR
-#ifdef ETHTOOL_SRSSH
+#if (defined(ETHTOOL_GRSSH) && !defined(HAVE_ETHTOOL_GSRSSH))
 	.set_rxfh		= igb_set_rxfh,
 #else
 	.set_rxfh_indir		= igb_set_rxfh_indir,
-#endif /* ETHTOOL_SRSSH */
+#endif /* HAVE_ETHTOOL_GSRSSH */
 #endif /* ETHTOOL_SRXFHINDIR */
 #ifdef ETHTOOL_GCHANNELS
 	.get_channels           = igb_get_channels,
