@@ -753,12 +753,8 @@ int _kc_pci_save_state(struct pci_dev *pdev)
 
 void _kc_pci_restore_state(struct pci_dev *pdev)
 {
-#if defined(DRIVER_IXGBE) || defined(DRIVER_I40E) || defined(DRIVER_IXGBEVF)
-	struct adapter_struct *adapter = pci_get_drvdata(pdev);
-#else
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct adapter_struct *adapter = netdev_priv(netdev);
-#endif
 	int size = PCI_CONFIG_SPACE_LEN, i;
 	u16 pcie_cap_offset;
 	u16 pcie_link_status;
@@ -1176,8 +1172,6 @@ int _kc_pci_num_vf(struct pci_dev __maybe_unused *dev)
 #endif /* < 2.6.34 */
 
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35) )
-#if defined(DRIVER_IXGBE) || defined(DRIVER_IGB) || defined(DRIVER_I40E) || \
-	defined(DRIVER_IXGBEVF) || defined(DRIVER_FM10K)
 #ifdef HAVE_TX_MQ
 #if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,0)))
 #ifndef CONFIG_NETDEVICES_MULTIQUEUE
@@ -1227,7 +1221,6 @@ ssize_t _kc_simple_write_to_buffer(void *to, size_t available, loff_t *ppos,
         return count;
 }
 
-#endif /* defined(DRIVER_IXGBE) || defined(DRIVER_IGB) || defined(DRIVER_I40E) */
 #endif /* < 2.6.35 */
 
 /*****************************************************************************/
@@ -1254,8 +1247,6 @@ int _kc_ethtool_op_set_flags(struct net_device *dev, u32 data, u32 supported)
 /******************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39) )
 #if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(6,0)))
-
-
 
 #endif /* !(RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(6,0)) */
 #endif /* < 2.6.39 */
@@ -1575,6 +1566,21 @@ int __kc_dma_set_mask_and_coherent(struct device *dev, u64 mask)
 		 */
 		err = dma_set_coherent_mask(dev, mask);
 	return err;
+}
+
+void __kc_netdev_rss_key_fill(void *buffer, size_t len)
+{
+	/* Set of random keys generated using kernel random number generator */
+	static const u8 seed[NETDEV_RSS_KEY_LEN] = {0xE6, 0xFA, 0x35, 0x62,
+				0x95, 0x12, 0x3E, 0xA3, 0xFB, 0x46, 0xC1, 0x5F,
+				0xB1, 0x43, 0x82, 0x5B, 0x6A, 0x49, 0x50, 0x95,
+				0xCD, 0xAB, 0xD8, 0x11, 0x8F, 0xC5, 0xBD, 0xBC,
+				0x6A, 0x4A, 0xB2, 0xD4, 0x1F, 0xFE, 0xBC, 0x41,
+				0xBF, 0xAC, 0xB2, 0x9A, 0x8F, 0x70, 0xE9, 0x2A,
+				0xD7, 0xB2, 0x80, 0xB6, 0x5B, 0xAA, 0x9D, 0x20};
+
+	BUG_ON(len > NETDEV_RSS_KEY_LEN);
+	memcpy(buffer, seed, len);
 }
 #endif /* 3.13.0 */
 
@@ -1916,3 +1922,16 @@ again:
 
 #endif /* < 3.18.0 */
 
+/******************************************************************************/
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0) )
+#ifdef HAVE_NET_GET_RANDOM_ONCE
+static u8 __kc_netdev_rss_key[NETDEV_RSS_KEY_LEN];
+
+void __kc_netdev_rss_key_fill(void *buffer, size_t len)
+{
+	BUG_ON(len > sizeof(__kc_netdev_rss_key));
+	net_get_random_once(__kc_netdev_rss_key, sizeof(__kc_netdev_rss_key));
+	memcpy(buffer, __kc_netdev_rss_key, len);
+}
+#endif
+#endif

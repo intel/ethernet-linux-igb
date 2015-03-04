@@ -311,7 +311,6 @@ s32 e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 	if (ret_val)
 		return ret_val;
 
-
 	/* Alternate MAC address is handled by the option ROM for 82580
 	 * and newer. SW support not required.
 	 */
@@ -869,7 +868,6 @@ static s32 e1000_set_default_fc_generic(struct e1000_hw *hw)
 					   NVM_INIT_CONTROL2_REG,
 					   1, &nvm_data);
 	}
-
 
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");

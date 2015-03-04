@@ -222,7 +222,6 @@ s32 e1000_get_phy_id(struct e1000_hw *hw)
 	phy->id |= (u32)(phy_id & PHY_REVISION_MASK);
 	phy->revision = (u32)(phy_id & ~PHY_REVISION_MASK);
 
-
 	return E1000_SUCCESS;
 }
 

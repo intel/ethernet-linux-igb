@@ -441,7 +441,6 @@ struct e1000_hw_stats {
 	u64 b2ogprc;
 };
 
-
 struct e1000_phy_stats {
 	u32 idle_errors;
 	u32 receive_errors;

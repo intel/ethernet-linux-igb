@@ -461,7 +461,6 @@
 /* Ext Flexible Host Filter Table */
 #define E1000_FHFT_EXT(_n)	(0x09A00 + ((_n) * 0x100))
 
-
 #define E1000_KMRNCTRLSTA	0x00034 /* MAC-PHY interface - RW */
 #define E1000_MANC2H		0x05860 /* Management Control To Host - RW */
 /* Management Decision Filters */
@@ -636,7 +635,5 @@
 #define E1000_B2OGPRC	0x04158 /* BMC2OS packets received by host */
 #define E1000_O2BGPTC	0x08FE4 /* OS2BMC packets received by BMC */
 #define E1000_O2BSPC	0x0415C /* OS2BMC packets transmitted by host */
-
-
 
 #endif

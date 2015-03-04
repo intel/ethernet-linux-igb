@@ -747,10 +747,6 @@ s32 e1000_read_pba_length_generic(struct e1000_hw *hw, u32 *pba_num_size)
 	return E1000_SUCCESS;
 }
 
-
-
-
-
 /**
  *  e1000_read_mac_addr_generic - Read device MAC address
  *  @hw: pointer to the HW structure
@@ -974,5 +970,4 @@ etrack_id:
 				     eeprom_verl;
 	}
 }
-
 

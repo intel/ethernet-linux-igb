@@ -62,7 +62,7 @@
 
 #define MAJ 5
 #define MIN 2
-#define BUILD 15
+#define BUILD 17
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "."\
 	__stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
@@ -71,7 +71,7 @@ char igb_driver_version[] = DRV_VERSION;
 static const char igb_driver_string[] =
 				"Intel(R) Gigabit Ethernet Network Driver";
 static const char igb_copyright[] =
-				"Copyright (c) 2007-2014 Intel Corporation.";
+				"Copyright (c) 2007-2015 Intel Corporation.";
 
 static const struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I354_BACKPLANE_1GBPS) },
@@ -396,8 +396,7 @@ static void igb_cache_ring_register(struct igb_adapter *adapter)
 	int i = 0, j = 0;
 	u32 rbase_offset = adapter->vfs_allocated_count;
 
-	switch (adapter->hw.mac.type) {
-	case e1000_82576:
+	if (adapter->hw.mac.type == e1000_82576) {
 		/* The queues are allocated for virtualization such that VF 0
 		 * is allocated queues 0 and 8, VF 1 queues 1 and 9, etc.
 		 * In order to avoid collision we start at the first free queue
@@ -408,21 +407,11 @@ static void igb_cache_ring_register(struct igb_adapter *adapter)
 				adapter->rx_ring[i]->reg_idx = rbase_offset +
 								Q_IDX_82576(i);
 		}
-	break;
-	case e1000_82575:
-	case e1000_82580:
-	case e1000_i350:
-	case e1000_i354:
-	case e1000_i210:
-	case e1000_i211:
-		/* Fall through */
-	default:
-		for (; i < adapter->num_rx_queues; i++)
-			adapter->rx_ring[i]->reg_idx = rbase_offset + i;
-		for (; j < adapter->num_tx_queues; j++)
-			adapter->tx_ring[j]->reg_idx = rbase_offset + j;
-		break;
 	}
+	for (; i < adapter->num_rx_queues; i++)
+		adapter->rx_ring[i]->reg_idx = rbase_offset + i;
+	for (; j < adapter->num_tx_queues; j++)
+		adapter->tx_ring[j]->reg_idx = rbase_offset + j;
 }
 
 u32 e1000_read_reg(struct e1000_hw *hw, u32 reg)
@@ -2057,7 +2046,6 @@ void igb_reset(struct igb_adapter *adapter)
 	/* Enable h/w to recognize an 802.1Q VLAN Ethernet packet */
 	E1000_WRITE_REG(hw, E1000_VET, ETHERNET_IEEE_VLAN_TYPE);
 
-
 #ifdef HAVE_PTP_1588_CLOCK
 	/* Re-enable PTP, where applicable. */
 	igb_ptp_reset(adapter);
@@ -2111,13 +2099,16 @@ static int igb_set_features(struct net_device *netdev,
 static int igb_ndo_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 			   struct net_device *dev,
 			   const unsigned char *addr,
+#ifdef HAVE_NDO_FDB_ADD_VID
+			   u16 vid,
+#endif
 			   u16 flags)
-#else
+#else /* USE_CONST_DEV_UC_CHAR */
 static int igb_ndo_fdb_add(struct ndmsg *ndm,
 			   struct net_device *dev,
 			   unsigned char *addr,
 			   u16 flags)
-#endif
+#endif /* USE_CONST_DEV_UC_CHAR */
 {
 	struct igb_adapter *adapter = netdev_priv(dev);
 	struct e1000_hw *hw = &adapter->hw;
@@ -2203,8 +2194,14 @@ static int igb_ndo_fdb_dump(struct sk_buff *skb,
 #endif /* USE_DEFAULT_FDB_DEL_DUMP */
 
 #ifdef HAVE_BRIDGE_ATTRIBS
+#ifdef HAVE_NDO_BRIDGE_SET_DEL_LINK_FLAGS
+static int igb_ndo_bridge_setlink(struct net_device *dev,
+				  struct nlmsghdr *nlh,
+				  u16 flags)
+#else
 static int igb_ndo_bridge_setlink(struct net_device *dev,
 				  struct nlmsghdr *nlh)
+#endif /* HAVE_NDO_BRIDGE_SET_DEL_LINK_FLAGS */
 {
 	struct igb_adapter *adapter = netdev_priv(dev);
 	struct e1000_hw *hw = &adapter->hw;
@@ -2267,7 +2264,11 @@ static int igb_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 	else
 		mode = BRIDGE_MODE_VEPA;
 
+#ifdef HAVE_NDO_FDB_ADD_VID
+	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0);
+#else
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode);
+#endif /* HAVE_NDO_FDB_ADD_VID */
 }
 #endif /* HAVE_BRIDGE_ATTRIBS */
 #endif /* HAVE_FDB_OPS */
@@ -2951,7 +2952,6 @@ static int igb_probe(struct pci_dev *pdev,
 		strcpy(pba_str, "Unknown");
 	dev_info(pci_dev_to_dev(pdev), "%s: PBA No: %s\n", netdev->name,
 		 pba_str);
-
 
 	/* Initialize the thermal sensor on i350 devices. */
 	if (hw->mac.type == e1000_i350) {

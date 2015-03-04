@@ -53,6 +53,7 @@
 		103c 339e  Ethernet 1Gb 2-port 361T Adapter
 		103c 2003  Ethernet 1Gb 2-port 367i Adapter
 		103c 2226  Ethernet 1Gb 1-port 364i Adapter
+		103c 8157  Ethernet 1Gb 4-port 366T Adapter
 		108e 7b16  Quad Port GbE PCIe 2.0 ExpressModule, UTP
 		108e 7b18  Quad Port GbE PCIe 2.0 Low Profile Adapter, UTP
 		17aa 1074  Lenovo ThinkServer I350-T4 AnyFabric

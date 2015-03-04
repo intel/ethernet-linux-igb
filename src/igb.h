@@ -70,7 +70,11 @@ struct igb_adapter;
 		__func__ , ## args))
 
 #ifdef HAVE_PTP_1588_CLOCK
+#ifdef HAVE_INCLUDE_LINUX_TIMECOUNTER_H
+#include <linux/timecounter.h>
+#else
 #include <linux/clocksource.h>
+#endif /* HAVE_INCLUDE_TIMECOUNTER_H */
 #include <linux/net_tstamp.h>
 #include <linux/ptp_clock_kernel.h>
 #endif /* HAVE_PTP_1588_CLOCK */
@@ -121,7 +125,6 @@ struct igb_adapter;
 #define MAX_EMULATION_MAC_ADDRS           16
 #define OUI_LEN                            3
 #define IGB_MAX_VMDQ_QUEUES                8
-
 
 struct vf_data_storage {
 	unsigned char vf_mac_addresses[ETH_ALEN];
@@ -654,7 +657,6 @@ struct igb_adapter {
 #endif /* HAVE_I2C_SUPPORT */
 	unsigned long link_check_timeout;
 
-
 	int devrc;
 
 	int copper_tries;
@@ -842,7 +844,5 @@ int igb_procfs_topdir_init(void);
 void igb_procfs_topdir_exit(void);
 #endif /* IGB_PROCFS */
 #endif /* IGB_HWMON */
-
-
 
 #endif /* _IGB_H_ */

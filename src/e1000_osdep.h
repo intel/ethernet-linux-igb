@@ -65,7 +65,6 @@
 #define E1000_BIG_ENDIAN __BIG_ENDIAN
 #endif
 
-
 #ifdef DEBUG
 #define DEBUGOUT(S) pr_debug(S)
 #define DEBUGOUT1(S, A...) pr_debug(S, ## A)

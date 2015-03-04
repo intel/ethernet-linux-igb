@@ -101,8 +101,6 @@ s32 e1000_mng_write_dhcp_info(struct e1000_hw *hw, u8 *buffer, u16 length);
 s32 e1000_get_thermal_sensor_data(struct e1000_hw *hw);
 s32 e1000_init_thermal_sensor_thresh(struct e1000_hw *hw);
 
-
-
 /*
  * TBI_ACCEPT macro definition:
  *

@@ -112,7 +112,6 @@ static const u16 e1000_82580_rxpbs_table[] = {
 	(sizeof(e1000_82580_rxpbs_table) / \
 	 sizeof(e1000_82580_rxpbs_table[0]))
 
-
 /**
  *  e1000_sgmii_uses_mdio_82575 - Determine if I2C pins are for external MDIO
  *  @hw: pointer to the HW structure
@@ -1046,7 +1045,7 @@ static s32 e1000_acquire_swfw_sync_82575(struct e1000_hw *hw, u16 mask)
 	u32 swmask = mask;
 	u32 fwmask = mask << 16;
 	s32 ret_val = E1000_SUCCESS;
-	s32 i = 0, timeout = 200; /* FIXME: find real value to use here */
+	s32 i = 0, timeout = 200;
 
 	DEBUGFUNC("e1000_acquire_swfw_sync_82575");
 
@@ -3106,7 +3105,6 @@ void e1000_write_vfta_i350(struct e1000_hw *hw, u32 offset, u32 value)
 
 	E1000_WRITE_FLUSH(hw);
 }
-
 
 /**
  *  e1000_set_i2c_bb - Enable I2C bit-bang

@@ -265,7 +265,6 @@
 #define E1000_CTRL_PHY_RST	0x80000000 /* PHY Reset */
 #define E1000_CTRL_I2C_ENA	0x02000000 /* I2C enable */
 
-
 #define E1000_CONNSW_ENRGSRC		0x4
 #define E1000_CONNSW_PHYSD		0x400
 #define E1000_CONNSW_PHY_PDN		0x800
@@ -316,7 +315,6 @@
 #define SPEED_2500	2500
 #define HALF_DUPLEX	1
 #define FULL_DUPLEX	2
-
 
 #define ADVERTISE_10_HALF		0x0001
 #define ADVERTISE_10_FULL		0x0002
@@ -514,7 +512,6 @@
 
 #define E1000_ICR_THS		0x00800000 /* ICR.THS: Thermal Sensor Event*/
 #define E1000_ICR_MDDET		0x10000000 /* Malicious Driver Detect */
-
 
 /* Extended Interrupt Cause Read */
 #define E1000_EICR_RX_QUEUE0	0x00000001 /* Rx Queue 0 Interrupt */
@@ -1073,7 +1070,6 @@
 /* Offset of Link Mode bits for 82580 up */
 #define NVM_WORD24_82580_LNK_MODE_OFFSET	4
 
-
 /* Mask bits for fields in Word 0x0f of the NVM */
 #define NVM_WORD0F_PAUSE_MASK		0x3000
 #define NVM_WORD0F_PAUSE		0x1000
@@ -1379,7 +1375,6 @@
 #define E1000_TXPB0S_SIZE_I210_MASK	0x0000003F /* Tx packet buffer 0 size */
 #define I210_RXPBSIZE_DEFAULT		0x000000A2 /* RXPBSIZE default */
 #define I210_TXPBSIZE_DEFAULT		0x04000014 /* TXPBSIZE default */
-
 
 /* Proxy Filter Control */
 #define E1000_PROXYFC_D0		0x00000001 /* Enable offload in D0 */

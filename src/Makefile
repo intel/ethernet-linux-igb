@@ -342,7 +342,6 @@ else
   endif
 endif
 	install -D -m 644 $(MANFILE).gz $(INSTALL_MOD_PATH)$(MANDIR)/man$(MANSECTION)/$(MANFILE).gz
-	man -c -P'cat > /dev/null' $(MANFILE:.$(MANSECTION)=) || true
 
 uninstall:
 	if [ -e $(INSTDIR)/$(TARGET) ] ; then \
