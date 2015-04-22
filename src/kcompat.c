@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2014 Intel Corporation.
+  Copyright(c) 2007-2015 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -1808,9 +1808,6 @@ void __kc_skb_complete_tx_timestamp(struct sk_buff *skb,
 #endif
 
 /* include headers needed for get_headlen function */
-#if defined(CONFIG_FCOE) || defined(CONFIG_FCOE_MODULE)
-#include <scsi/fc/fc_fcoe.h>
-#endif
 #ifdef HAVE_SCTP
 #include <linux/sctp.h>
 #endif
@@ -1880,11 +1877,6 @@ again:
 		hdr.network += sizeof(struct ipv6hdr);
 		break;
 #endif /* NETIF_F_TSO6 */
-#if defined(CONFIG_FCOE) || defined(CONFIG_FCOE_MODULE)
-	case __constant_htons(ETH_P_FCOE):
-		hdr.network += FCOE_HEADER_LEN;
-		break;
-#endif
 	default:
 		return hdr.network - data;
 	}

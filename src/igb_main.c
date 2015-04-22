@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2014 Intel Corporation.
+  Copyright(c) 2007-2015 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -62,7 +62,7 @@
 
 #define MAJ 5
 #define MIN 2
-#define BUILD 17
+#define BUILD 18
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "."\
 	__stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
@@ -1783,6 +1783,7 @@ void igb_down(struct igb_adapter *adapter)
 	u32 tctl, rctl;
 	int i;
 
+
 	/* signal that we're down so the interrupt handler does not
 	 * reschedule our watchdog timer */
 	set_bit(__IGB_DOWN, &adapter->state);
@@ -1792,6 +1793,7 @@ void igb_down(struct igb_adapter *adapter)
 	E1000_WRITE_REG(hw, E1000_RCTL, rctl & ~E1000_RCTL_EN);
 	/* flush and sleep below */
 
+	netif_carrier_off(netdev);
 	netif_tx_stop_all_queues(netdev);
 
 	/* disable transmits in the hardware */
@@ -1813,8 +1815,6 @@ void igb_down(struct igb_adapter *adapter)
 	if (adapter->flags & IGB_FLAG_DETECT_BAD_DMA)
 		del_timer_sync(&adapter->dma_err_timer);
 	del_timer_sync(&adapter->phy_info_timer);
-
-	netif_carrier_off(netdev);
 
 	/* record the stats before reset*/
 	igb_update_stats(adapter);
@@ -1851,31 +1851,21 @@ void igb_reinit_locked(struct igb_adapter *adapter)
  *
  * @adapter: adapter struct
  **/
-static s32  igb_enable_mas(struct igb_adapter *adapter)
+void igb_enable_mas(struct igb_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	u32 connsw;
-	s32 ret_val = E1000_SUCCESS;
 
 	connsw = E1000_READ_REG(hw, E1000_CONNSW);
-	if (hw->phy.media_type == e1000_media_type_copper) {
-		/* configure for SerDes media detect */
-		if (!(connsw & E1000_CONNSW_SERDESD)) {
+
+	/* configure for SerDes media detect */
+	if ((hw->phy.media_type == e1000_media_type_copper) &&
+		(!(connsw & E1000_CONNSW_SERDESD))) {
 			connsw |= E1000_CONNSW_ENRGSRC;
 			connsw |= E1000_CONNSW_AUTOSENSE_EN;
 			E1000_WRITE_REG(hw, E1000_CONNSW, connsw);
 			E1000_WRITE_FLUSH(hw);
-		} else if (connsw & E1000_CONNSW_SERDESD) {
-			/* already SerDes, no need to enable anything */
-			return ret_val;
-		} else {
-			dev_info(pci_dev_to_dev(adapter->pdev),
-			"%s:MAS: Unable to configure feature, disabling..\n",
-			adapter->netdev->name);
-			adapter->flags &= ~IGB_FLAG_MAS_ENABLE;
-		}
 	}
-	return ret_val;
 }
 
 void igb_reset(struct igb_adapter *adapter)
@@ -1995,10 +1985,9 @@ void igb_reset(struct igb_adapter *adapter)
 		e1000_get_bus_info(hw);
 		adapter->flags &= ~IGB_FLAG_MEDIA_RESET;
 	}
-	if (adapter->flags & IGB_FLAG_MAS_ENABLE) {
-		if (igb_enable_mas(adapter))
-			dev_err(pci_dev_to_dev(pdev),
-				"Error enabling Media Auto Sense\n");
+	if ((mac->type == e1000_82575) &&
+			(adapter->flags & IGB_FLAG_MAS_ENABLE)) {
+		igb_enable_mas(adapter);
 	}
 	if (e1000_init_hw(hw))
 		dev_err(pci_dev_to_dev(pdev), "Hardware Error\n");

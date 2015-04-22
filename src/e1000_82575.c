@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2014 Intel Corporation.
+  Copyright(c) 2007-2015 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -2120,7 +2120,7 @@ static void e1000_clear_hw_cntrs_82575(struct e1000_hw *hw)
  *  e1000_rx_fifo_flush_82575 - Clean rx fifo after Rx enable
  *  @hw: pointer to the HW structure
  *
- *  After rx enable if managability is enabled then there is likely some
+ *  After Rx enable, if manageability is enabled then there is likely some
  *  bad data at the start of the fifo and possibly in the DMA fifo.  This
  *  function clears the fifos and flushes any packets that came in as rx was
  *  being enabled.
@@ -2130,7 +2130,13 @@ void e1000_rx_fifo_flush_82575(struct e1000_hw *hw)
 	u32 rctl, rlpml, rxdctl[4], rfctl, temp_rctl, rx_enabled;
 	int i, ms_wait;
 
-	DEBUGFUNC("e1000_rx_fifo_workaround_82575");
+	DEBUGFUNC("e1000_rx_fifo_flush_82575");
+
+	/* disable IPv6 options as per hardware errata */
+	rfctl = E1000_READ_REG(hw, E1000_RFCTL);
+	rfctl |= E1000_RFCTL_IPV6_EX_DIS;
+	E1000_WRITE_REG(hw, E1000_RFCTL, rfctl);
+
 	if (hw->mac.type != e1000_82575 ||
 	    !(E1000_READ_REG(hw, E1000_MANC) & E1000_MANC_RCV_TCO_EN))
 		return;
@@ -2158,7 +2164,6 @@ void e1000_rx_fifo_flush_82575(struct e1000_hw *hw)
 	 * incoming packets are rejected.  Set enable and wait 2ms so that
 	 * any packet that was coming in as RCTL.EN was set is flushed
 	 */
-	rfctl = E1000_READ_REG(hw, E1000_RFCTL);
 	E1000_WRITE_REG(hw, E1000_RFCTL, rfctl & ~E1000_RFCTL_LEF);
 
 	rlpml = E1000_READ_REG(hw, E1000_RLPML);
