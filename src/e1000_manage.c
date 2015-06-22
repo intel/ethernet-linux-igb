@@ -23,6 +23,7 @@
 *******************************************************************************/
 
 #include "e1000_api.h"
+
 /**
  *  e1000_calculate_checksum - Calculate checksum for buffer
  *  @buffer: pointer to EEPROM

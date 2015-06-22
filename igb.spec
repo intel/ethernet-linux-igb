@@ -1,6 +1,6 @@
 Name: igb
 Summary: Intel(R) Gigabit Ethernet Connection
-Version: 5.3.2.2
+Version: 5.3.2
 Release: 1
 Source: %{name}-%{version}.tar.gz
 Vendor: Intel Corporation
@@ -38,8 +38,6 @@ make -C src INSTALL_MOD_PATH=%{buildroot} MANDIR=%{_mandir} install
 cd %{buildroot}
 find lib -name "igb.*o" -exec mv {} {}.new \; \
          -fprintf %{_builddir}/%{name}-%{version}/file.list "/%p.new\n"
-mkdir -p $RPM_BUILD_ROOT/usr/share/pci.ids.d
-install -D -m 644 %{pciids} $RPM_BUILD_ROOT/usr/share/pci.ids.d/pci.ids.intel-igb-%{version}
 
 
 %clean
@@ -48,7 +46,6 @@ rm -rf %{buildroot}
 %files -f %{_builddir}/%{name}-%{version}/file.list
 %defattr(-,root,root)
 %{_mandir}/man7/igb.7.gz
-/usr/share/pci.ids.d/pci.ids.intel-igb-%{version}
 %doc COPYING
 %doc README
 %doc file.list
@@ -116,9 +113,6 @@ if [ -d %{_docdir}/%{name}-%{version} ]; then
 	LD="%{_docdir}/%{name}-%{version}";
 fi
 
-if [ -x /usr/bin/merge-pciids -a -x /usr/bin/perl ]; then
-    /usr/bin/merge-pciids
-else
 #Yes, this really needs bash
 bash -s %{pciids} \
 	%{pcitable} \
@@ -371,7 +365,6 @@ exec 6>&-
 exec 7>&-
 
 END
-fi
 
 mv -f $LD/pci.ids.new  %{pciids}
 if [ "%{pcitable}" != "/dev/null" ]; then

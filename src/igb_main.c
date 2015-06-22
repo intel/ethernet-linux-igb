@@ -62,7 +62,7 @@
 
 #define MAJ 5
 #define MIN 3
-#define BUILD 2.2
+#define BUILD 2
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "."\
 	__stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
@@ -2289,10 +2289,8 @@ static int igb_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 		mode = BRIDGE_MODE_VEB;
 	else
 		mode = BRIDGE_MODE_VEPA;
-#ifdef HAVE_NDO_DFLT_BRIDGE_GETLINK_VLAN_SUPPORT
-	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0, nlflags,
-				       filter_mask, NULL);
-#elif defined(HAVE_NDO_BRIDGE_GETLINK_NLFLAGS)
+
+#ifdef HAVE_NDO_BRIDGE_GETLINK_NLFLAGS
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0, nlflags);
 #elif defined(HAVE_NDO_FDB_ADD_VID)
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0);
