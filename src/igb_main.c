@@ -61,8 +61,8 @@
 #define VERSION_SUFFIX
 
 #define MAJ 5
-#define MIN 2
-#define BUILD 18
+#define MIN 3
+#define BUILD 2.2
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "."\
 	__stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
@@ -702,8 +702,60 @@ err_out:
 	return err;
 }
 
+/**
+ * igb_free_q_vector - Free memory allocated for specific interrupt vector
+ * @adapter: board private structure to initialize
+ * @v_idx: Index of vector to be freed
+ *
+ * This function frees the memory allocated to the q_vector.
+ **/
+static void igb_free_q_vector(struct igb_adapter *adapter, int v_idx)
+{
+	struct igb_q_vector *q_vector = adapter->q_vector[v_idx];
+
+	adapter->q_vector[v_idx] = NULL;
+
+	/* igb_get_stats64() might access the rings on this vector,
+	 * we must wait a grace period before freeing it.
+	 */
+	kfree_rcu(q_vector, rcu);
+
+#ifndef IGB_NO_LRO
+	__skb_queue_purge(&q_vector->lrolist.active);
+#endif
+}
+
+/**
+ *  igb_reset_q_vector - Reset config for interrupt vector
+ *  @adapter: board private structure to initialize
+ *  @v_idx: Index of vector to be reset
+ *
+ *  If NAPI is enabled it will delete any references to the
+ *  NAPI struct. This is preparation for igb_free_q_vector.
+ **/
+static void igb_reset_q_vector(struct igb_adapter *adapter, int v_idx)
+{
+	struct igb_q_vector *q_vector = adapter->q_vector[v_idx];
+
+	/* if we're coming from igb_set_interrupt_capability, the vectors are
+	 * not yet allocated */
+	if (!q_vector)
+		return;
+
+	if (q_vector->tx.ring)
+		adapter->tx_ring[q_vector->tx.ring->queue_index] = NULL;
+
+	if (q_vector->rx.ring)
+		adapter->rx_ring[q_vector->rx.ring->queue_index] = NULL;
+
+	netif_napi_del(&q_vector->napi);
+
+}
+
 static void igb_reset_interrupt_capability(struct igb_adapter *adapter)
 {
+	int v_idx = adapter->num_q_vectors;
+
 	if (adapter->msix_entries) {
 		pci_disable_msix(adapter->pdev);
 		kfree(adapter->msix_entries);
@@ -711,34 +763,9 @@ static void igb_reset_interrupt_capability(struct igb_adapter *adapter)
 	} else if (adapter->flags & IGB_FLAG_HAS_MSI) {
 		pci_disable_msi(adapter->pdev);
 	}
-}
 
-/**
- * igb_free_q_vector - Free memory allocated for specific interrupt vector
- * @adapter: board private structure to initialize
- * @v_idx: Index of vector to be freed
- *
- * This function frees the memory allocated to the q_vector.  In addition if
- * NAPI is enabled it will delete any references to the NAPI struct prior
- * to freeing the q_vector.
- **/
-static void igb_free_q_vector(struct igb_adapter *adapter, int v_idx)
-{
-	struct igb_q_vector *q_vector = adapter->q_vector[v_idx];
-
-	if (q_vector->tx.ring)
-		adapter->tx_ring[q_vector->tx.ring->queue_index] = NULL;
-
-	if (q_vector->rx.ring)
-		adapter->tx_ring[q_vector->rx.ring->queue_index] = NULL;
-
-	adapter->q_vector[v_idx] = NULL;
-	netif_napi_del(&q_vector->napi);
-#ifndef IGB_NO_LRO
-	__skb_queue_purge(&q_vector->lrolist.active);
-#endif
-
-	kfree_rcu(q_vector, rcu);
+	while (v_idx--)
+		igb_reset_q_vector(adapter, v_idx);
 }
 
 /**
@@ -757,8 +784,10 @@ static void igb_free_q_vectors(struct igb_adapter *adapter)
 	adapter->num_rx_queues = 0;
 	adapter->num_q_vectors = 0;
 
-	while (v_idx--)
+	while (v_idx--) {
+		igb_reset_q_vector(adapter, v_idx);
 		igb_free_q_vector(adapter, v_idx);
+	}
 }
 
 /**
@@ -999,7 +1028,7 @@ static void igb_set_interrupt_capability(struct igb_adapter *adapter, bool msix)
 		numvecs = max_t(int, adapter->num_tx_queues,
 				adapter->num_rx_queues);
 
-		/* if tx handler is seperate make it 1 for every queue */
+		/* if tx handler is separate make it 1 for every queue */
 		if (!(adapter->flags & IGB_FLAG_QUEUE_PAIRS))
 			numvecs = adapter->num_tx_queues +
 				adapter->num_rx_queues;
@@ -1083,7 +1112,11 @@ static int igb_alloc_q_vector(struct igb_adapter *adapter,
 	       (sizeof(struct igb_ring) * ring_count);
 
 	/* allocate q_vector and rings */
-	q_vector = kzalloc(size, GFP_KERNEL);
+	q_vector = adapter->q_vector[v_idx];
+	if (!q_vector)
+		q_vector = kzalloc(size, GFP_KERNEL);
+	else
+		memset(q_vector, 0, size);
 	if (!q_vector)
 		return -ENOMEM;
 
@@ -2234,13 +2267,17 @@ static int igb_ndo_bridge_setlink(struct net_device *dev,
 	return 0;
 }
 
-#ifdef HAVE_BRIDGE_FILTER
+#ifdef HAVE_NDO_BRIDGE_GETLINK_NLFLAGS
+static int igb_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
+				  struct net_device *dev, u32 filter_mask,
+				  int nlflags)
+#elif defined(HAVE_BRIDGE_FILTER)
 static int igb_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 				  struct net_device *dev, u32 filter_mask)
 #else
 static int igb_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 				  struct net_device *dev)
-#endif
+#endif /* HAVE_NDO_BRIDGE_GETLINK_NLFLAGS */
 {
 	struct igb_adapter *adapter = netdev_priv(dev);
 	u16 mode;
@@ -2252,8 +2289,12 @@ static int igb_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 		mode = BRIDGE_MODE_VEB;
 	else
 		mode = BRIDGE_MODE_VEPA;
-
-#ifdef HAVE_NDO_FDB_ADD_VID
+#ifdef HAVE_NDO_DFLT_BRIDGE_GETLINK_VLAN_SUPPORT
+	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0, nlflags,
+				       filter_mask, NULL);
+#elif defined(HAVE_NDO_BRIDGE_GETLINK_NLFLAGS)
+	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0, nlflags);
+#elif defined(HAVE_NDO_FDB_ADD_VID)
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0);
 #else
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode);
@@ -5538,9 +5579,9 @@ netdev_tx_t igb_xmit_frame_ring(struct sk_buff *skb,
 	}
 #endif /* HAVE_PTP_1588_CLOCK */
 	skb_tx_timestamp(skb);
-	if (vlan_tx_tag_present(skb)) {
+	if (skb_vlan_tag_present(skb)) {
 		tx_flags |= IGB_TX_FLAGS_VLAN;
-		tx_flags |= (vlan_tx_tag_get(skb) << IGB_TX_FLAGS_VLAN_SHIFT);
+		tx_flags |= (skb_vlan_tag_get(skb) << IGB_TX_FLAGS_VLAN_SHIFT);
 	}
 
 	/* record initial flags and protocol */
@@ -7311,24 +7352,27 @@ static bool igb_add_rx_frag(struct igb_ring *rx_ring,
 			    struct sk_buff *skb)
 {
 	struct page *page = rx_buffer->page;
+	unsigned char *va = page_address(page) + rx_buffer->page_offset;
 	unsigned int size = le16_to_cpu(rx_desc->wb.upper.length);
 #if (PAGE_SIZE < 8192)
 	unsigned int truesize = IGB_RX_BUFSZ;
 #else
-	unsigned int truesize = ALIGN(size, L1_CACHE_BYTES);
+	unsigned int truesize = SKB_DATA_ALIGN(size);
 #endif
+	unsigned int pull_len;
 
-	if ((size <= IGB_RX_HDR_LEN) && !skb_is_nonlinear(skb)) {
-		unsigned char *va = page_address(page) + rx_buffer->page_offset;
+	if (unlikely(skb_is_nonlinear(skb)))
+		goto add_tail_frag;
 
 #ifdef HAVE_PTP_1588_CLOCK
-		if (igb_test_staterr(rx_desc, E1000_RXDADV_STAT_TSIP)) {
-			igb_ptp_rx_pktstamp(rx_ring->q_vector, va, skb);
-			va += IGB_TS_HDR_LEN;
-			size -= IGB_TS_HDR_LEN;
-		}
+	if (unlikely(igb_test_staterr(rx_desc, E1000_RXDADV_STAT_TSIP))) {
+		igb_ptp_rx_pktstamp(rx_ring->q_vector, va, skb);
+		va += IGB_TS_HDR_LEN;
+		size -= IGB_TS_HDR_LEN;
+	}
 #endif /* HAVE_PTP_1588_CLOCK */
 
+	if (likely(size <= IGB_RX_HDR_LEN)) {
 		memcpy(__skb_put(skb, size), va, ALIGN(size, sizeof(long)));
 
 		/* we can reuse buffer as-is, just make sure it is local */
@@ -7340,8 +7384,21 @@ static bool igb_add_rx_frag(struct igb_ring *rx_ring,
 		return false;
 	}
 
+	/* we need the header to contain the greater of either ETH_HLEN or
+	 * 60 bytes if the skb->len is less than 60 for skb_pad.
+	 */
+	pull_len = eth_get_headlen(va, IGB_RX_HDR_LEN);
+
+	/* align pull length to size of long to optimize memcpy performance */
+	memcpy(__skb_put(skb, pull_len), va, ALIGN(pull_len, sizeof(long)));
+
+	/* update all of the pointers */
+	va += pull_len;
+	size -= pull_len;
+
+add_tail_frag:
 	skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, page,
-			rx_buffer->page_offset, size, truesize);
+			(unsigned long)va & ~PAGE_MASK, size, truesize);
 
 	return igb_can_reuse_rx_page(rx_buffer, page, truesize);
 }
@@ -8117,65 +8174,6 @@ static bool igb_clean_rx_irq(struct igb_q_vector *q_vector, int budget)
 	return (total_packets < budget);
 }
 #else /* CONFIG_IGB_DISABLE_PACKET_SPLIT */
-/**
- * igb_pull_tail - igb specific version of skb_pull_tail
- * @rx_ring: rx descriptor ring packet is being transacted on
- * @rx_desc: pointer to the EOP Rx descriptor
- * @skb: pointer to current skb being adjusted
- *
- * This function is an igb specific version of __pskb_pull_tail.  The
- * main difference between this version and the original function is that
- * this function can make several assumptions about the state of things
- * that allow for significant optimizations versus the standard function.
- * As a result we can do things like drop a frag and maintain an accurate
- * truesize for the skb.
- */
-static void igb_pull_tail(struct igb_ring *rx_ring,
-			  union e1000_adv_rx_desc *rx_desc,
-			  struct sk_buff *skb)
-{
-	struct skb_frag_struct *frag = &skb_shinfo(skb)->frags[0];
-	unsigned char *va;
-	unsigned int pull_len;
-
-	/*
-	 * it is valid to use page_address instead of kmap since we are
-	 * working with pages allocated out of the lomem pool per
-	 * alloc_page(GFP_ATOMIC)
-	 */
-	va = skb_frag_address(frag);
-
-#ifdef HAVE_PTP_1588_CLOCK
-	if (igb_test_staterr(rx_desc, E1000_RXDADV_STAT_TSIP)) {
-		/* retrieve timestamp from buffer */
-		igb_ptp_rx_pktstamp(rx_ring->q_vector, va, skb);
-
-		/* update pointers to remove timestamp header */
-		skb_frag_size_sub(frag, IGB_TS_HDR_LEN);
-		frag->page_offset += IGB_TS_HDR_LEN;
-		skb->data_len -= IGB_TS_HDR_LEN;
-		skb->len -= IGB_TS_HDR_LEN;
-
-		/* move va to start of packet data */
-		va += IGB_TS_HDR_LEN;
-	}
-#endif /* HAVE_PTP_1588_CLOCK */
-
-	/*
-	 * we need the header to contain the greater of either ETH_HLEN or
-	 * 60 bytes if the skb->len is less than 60 for skb_pad.
-	 */
-	pull_len = eth_get_headlen(va, IGB_RX_HDR_LEN);
-
-	/* align pull length to size of long to optimize memcpy performance */
-	skb_copy_to_linear_data(skb, va, ALIGN(pull_len, sizeof(long)));
-
-	/* update all of the pointers */
-	skb_frag_size_sub(frag, pull_len);
-	frag->page_offset += pull_len;
-	skb->data_len -= pull_len;
-	skb->tail += pull_len;
-}
 
 /**
  * igb_cleanup_headers - Correct corrupted or empty headers
@@ -8204,10 +8202,6 @@ static bool igb_cleanup_headers(struct igb_ring *rx_ring,
 			return true;
 		}
 	}
-
-	/* place header in linear portion of buffer */
-	if (skb_is_nonlinear(skb))
-		igb_pull_tail(rx_ring, rx_desc, skb);
 
 	/* if skb_pad returns an error the skb was freed */
 	if (unlikely(skb->len < 60)) {
@@ -9776,4 +9770,27 @@ s32 igb_write_i2c_byte(struct e1000_hw *hw, u8 byte_offset,
 		return E1000_SUCCESS;
 }
 #endif /*  HAVE_I2C_SUPPORT */
+
+int igb_reinit_queues(struct igb_adapter *adapter)
+{
+	struct net_device *netdev = adapter->netdev;
+	struct pci_dev *pdev = adapter->pdev;
+	int err = 0;
+
+	if (netif_running(netdev))
+		igb_close(netdev);
+
+	igb_reset_interrupt_capability(adapter);
+
+	if (igb_init_interrupt_scheme(adapter, true)) {
+		dev_err(&pdev->dev, "Unable to allocate memory for queues\n");
+		return -ENOMEM;
+	}
+
+	if (netif_running(netdev))
+		err = igb_open(netdev);
+
+	return err;
+}
+
 /* igb_main.c */

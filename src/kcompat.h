@@ -2012,6 +2012,23 @@ static inline int _kc_skb_padto(struct sk_buff *skb, unsigned int len)
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19) )
 
+/* other values will be created as #defines later */
+enum pci_bus_speed {
+	PCI_SPEED_UNKNOWN = 0xff,
+};
+
+enum pcie_link_width {
+	PCIE_LNK_WIDTH_RESRV    = 0x00,
+	PCIE_LNK_X1             = 0x01,
+	PCIE_LNK_X2             = 0x02,
+	PCIE_LNK_X4             = 0x04,
+	PCIE_LNK_X8             = 0x08,
+	PCIE_LNK_X12            = 0x0C,
+	PCIE_LNK_X16            = 0x10,
+	PCIE_LNK_X32            = 0x20,
+	PCIE_LNK_WIDTH_UNKNOWN  = 0xFF,
+};
+
 #if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(5,0)))
 #define i_private u.generic_ip
 #endif /* >= RHEL 5.0 */
@@ -2085,6 +2102,7 @@ extern void *_kc_kmemdup(const void *src, size_t len, unsigned gfp);
 #else /* 2.6.19 */
 #include <linux/aer.h>
 #include <linux/string.h>
+#include <linux/pci_hotplug.h>
 #endif /* < 2.6.19 */
 
 /*****************************************************************************/
@@ -2446,6 +2464,7 @@ static inline int _kc_skb_is_gso_v6(const struct sk_buff *skb)
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE > KERNEL_VERSION(2,6,24) )
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,2,0) )
+#define INCLUDE_PM_QOS_PARAMS_H
 #include <linux/pm_qos_params.h>
 #else /* >= 3.2.0 */
 #include <linux/pm_qos.h>
@@ -3165,6 +3184,10 @@ static inline bool _kc_pm_runtime_suspended(struct device __always_unused *dev)
 #endif
 #endif /* 2.6.0 => 2.6.34 */
 
+#define PCIE_SPEED_2_5GT 0x14
+#define PCIE_SPEED_5_0GT 0x15
+#define PCIE_SPEED_8_0GT 0x16
+
 #else /* < 2.6.34 */
 #define HAVE_SYSTEM_SLEEP_PM_OPS
 #ifndef HAVE_SET_RX_MODE
@@ -3179,6 +3202,10 @@ ssize_t _kc_simple_write_to_buffer(void *to, size_t available, loff_t *ppos,
 				   const void __user *from, size_t count);
 #define simple_write_to_buffer _kc_simple_write_to_buffer
 
+#ifndef PCI_EXP_LNKSTA_NLW_SHIFT
+#define PCI_EXP_LNKSTA_NLW_SHIFT 4
+#endif
+
 #ifndef numa_node_id
 #define numa_node_id() 0
 #endif
@@ -3188,9 +3215,6 @@ ssize_t _kc_simple_write_to_buffer(void *to, size_t available, loff_t *ppos,
 #ifdef HAVE_TX_MQ
 #include <net/sch_generic.h>
 #ifndef CONFIG_NETDEVICES_MULTIQUEUE
-#if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,4)))
-#define kstrtoul(a, b, c)  ((*(c)) = simple_strtoul((a), &(a), (b)))
-#endif /* !(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,4)) */
 #if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,0)))
 void _kc_netif_set_real_num_tx_queues(struct net_device *, unsigned int);
 #define netif_set_real_num_tx_queues  _kc_netif_set_real_num_tx_queues
@@ -3277,6 +3301,15 @@ do {								\
 
 #if (RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,1))
 #define HAVE_8021P_SUPPORT
+#endif
+
+/* RHEL6.4 and SLES11sp2 backported skb_tx_timestamp */
+#if (!(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,4)) && \
+     !(SLE_VERSION_CODE >= SLE_VERSION(11,2,0)))
+static inline void skb_tx_timestamp(struct sk_buff __always_unused *skb)
+{
+	return;
+}
 #endif
 
 #else /* < 2.6.36 */
@@ -3502,7 +3535,7 @@ struct _kc_ethtool_rx_flow_spec {
 #endif /* kfree_rcu */
 #ifndef kstrtol_from_user
 #define kstrtol_from_user(s, c, b, r) _kc_kstrtol_from_user(s, c, b, r)
-static inline int _kc_kstrtol_from_user(const char __user *s, size_t count, 
+static inline int _kc_kstrtol_from_user(const char __user *s, size_t count,
 					unsigned int base, long *res)
 {
 	/* sign, base 2 representation, newline, terminator */
@@ -3640,6 +3673,7 @@ static inline void __kc_skb_frag_unref(skb_frag_t *frag)
 #define HAVE_SKB_L4_RXHASH
 #endif
 #define HAVE_IOMMU_PRESENT
+#define HAVE_PM_QOS_REQUEST_LIST_NEW
 #endif /* < 3.2.0 */
 
 #if (RHEL_RELEASE_CODE && RHEL_RELEASE_CODE == RHEL_RELEASE_VERSION(6,2))
@@ -3716,7 +3750,6 @@ extern void _kc_skb_add_rx_frag(struct sk_buff *, int, struct page *,
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0) )
-#define skb_tx_timestamp(skb) do {} while (0)
 
 #ifndef ether_addr_equal
 static inline bool __kc_ether_addr_equal(const u8 *addr1, const u8 *addr2)
@@ -3752,6 +3785,10 @@ static inline bool __kc_ether_addr_equal(const u8 *addr1, const u8 *addr2)
 #endif
 #ifndef MDIO_EEE_10GKR
 #define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap */
+#endif
+
+#ifndef __GFP_MEMALLOC
+#define __GFP_MEMALLOC 0
 #endif
 
 #ifndef eth_random_addr
@@ -3997,6 +4034,10 @@ static inline bool __kc_is_link_local_ether_addr(const u8 *addr)
 #define HAVE_ENCAP_CSUM_OFFLOAD
 #endif
 
+#ifndef HAVE_GRE_ENCAP_OFFLOAD
+#define HAVE_GRE_ENCAP_OFFLOAD
+#endif
+
 #ifndef HAVE_SRIOV_CONFIGURE
 #define HAVE_SRIOV_CONFIGURE
 #endif
@@ -4119,10 +4160,17 @@ extern int __kc_ndo_dflt_fdb_del(struct ndmsg *ndm, struct net_device *dev,
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0) )
 #else /* >= 3.11.0 */
 #define HAVE_NDO_SET_VF_LINK_STATE
+#define HAVE_SKB_INNER_PROTOCOL
 #endif /* >= 3.11.0 */
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,12,0) )
+extern int __kc_pcie_get_minimum_link(struct pci_dev *dev,
+				      enum pci_bus_speed *speed,
+				      enum pcie_link_width *width);
+#ifndef pcie_get_minimum_link
+#define pcie_get_minimum_link(_p, _s, _w) __kc_pcie_get_minimum_link(_p, _s, _w)
+#endif
 #else /* >= 3.12.0 */
 #if ( SLE_VERSION_CODE && SLE_VERSION_CODE >= SLE_VERSION(12,0,0))
 #define HAVE_NDO_SELECT_QUEUE_ACCEL_FALLBACK
@@ -4315,7 +4363,7 @@ static inline int __kc_dev_mc_sync(struct net_device __maybe_unused *dev,
 #else
 	return 0;
 #endif
-	
+
 }
 #define __dev_mc_sync __kc_dev_mc_sync
 
@@ -4379,6 +4427,7 @@ extern unsigned int __kc_eth_get_headlen(unsigned char *data, unsigned int max_l
 #else /*  3.18.0 */
 #define HAVE_SKBUFF_CSUM_LEVEL
 #define HAVE_SKB_XMIT_MORE
+#define HAVE_SKB_INNER_PROTOCOL_TYPE
 #endif /* 3.18.0 */
 
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,18,4) )
@@ -4389,8 +4438,15 @@ extern unsigned int __kc_eth_get_headlen(unsigned char *data, unsigned int max_l
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0) )
 /* netdev_phys_port_id renamed to netdev_phys_item_id */
 #define netdev_phys_item_id netdev_phys_port_id
+
+#ifndef NETDEV_RSS_KEY_LEN
 #define NETDEV_RSS_KEY_LEN (13 * 4)
+#endif
+#if ( !(RHEL_RELEASE_CODE && \
+	(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,7) && \
+	(RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(7,0)))) )
 #define netdev_rss_key_fill(buffer, len) __kc_netdev_rss_key_fill(buffer, len)
+#endif /* RHEL_RELEASE_CODE */
 extern void __kc_netdev_rss_key_fill(void *buffer, size_t len);
 #define SPEED_20000 20000
 #define SPEED_40000 40000
@@ -4398,8 +4454,18 @@ extern void __kc_netdev_rss_key_fill(void *buffer, size_t len);
 #define dma_rmb() rmb()
 #endif
 #ifndef dev_alloc_pages
-#define dev_alloc_pages(order) alloc_pages(GFP_ATOMIC, (order));
+#define dev_alloc_pages(_order) alloc_pages_node(NUMA_NO_NODE, (GFP_ATOMIC | __GFP_COLD | __GFP_COMP | __GFP_MEMALLOC), (_order))
 #endif
+#ifndef dev_alloc_page
+#define dev_alloc_page() dev_alloc_pages(0)
+#endif
+#if ( !(RHEL_RELEASE_CODE && \
+	(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,7) && \
+	(RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(7,0)))) && \
+      !(SLE_VERSION_CODE && \
+	      (SLE_VERSION_CODE >= SLE_VERSION(11,4,0)) && \
+	      (SLE_VERSION_CODE < SLE_VERSION(12,0,0)) ) )
+
 /**
  *     skb_put_padto - increase size and pad an skbuff up to a minimal size
  *     @skb: buffer to pad
@@ -4426,6 +4492,7 @@ static inline int eth_skb_pad(struct sk_buff *skb)
 {
        return skb_put_padto(skb, ETH_ZLEN);
 }
+#endif /* RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(6,7)) */
 #ifndef napi_alloc_skb
 static inline struct sk_buff *__kc_napi_alloc_skb(struct napi_struct *napi, unsigned int length)
 {
@@ -4433,6 +4500,7 @@ static inline struct sk_buff *__kc_napi_alloc_skb(struct napi_struct *napi, unsi
 }
 #define napi_alloc_skb(napi,len) __kc_napi_alloc_skb(napi,len)
 #endif /* napi_alloc_skb */
+#define HAVE_CONFIG_PM_RUNTIME
 #else /* 3.19.0 */
 #define HAVE_NDO_FDB_ADD_VID
 /* ethtool get/set_rxfh function got a new argument */
@@ -4440,11 +4508,11 @@ static inline struct sk_buff *__kc_napi_alloc_skb(struct napi_struct *napi, unsi
 #endif /* 3.19.0 */
 
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,20,0) )
+/* vlan_tx_xx functions got renamed to skb_vlan */
+#define skb_vlan_tag_get vlan_tx_tag_get
+#define skb_vlan_tag_present vlan_tx_tag_present
 #else
 #define HAVE_INCLUDE_LINUX_TIMECOUNTER_H
-/* vlan_tx_xx functions got renamed to skb_vlan */
-#define vlan_tx_tag_get skb_vlan_tag_get
-#define vlan_tx_tag_present skb_vlan_tag_present
 #define HAVE_NDO_BRIDGE_SET_DEL_LINK_FLAGS
 #endif /* 3.20.0 */
 
@@ -4463,6 +4531,12 @@ static inline void __kc_timecounter_adjtime(struct timecounter *tc, s64 delta)
 #endif
 #else
 #define HAVE_PTP_CLOCK_INFO_GETTIME64
+#define HAVE_NDO_BRIDGE_GETLINK_NLFLAGS
 #endif /* 4,1,0 */
+
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(4,2,0) )
+#else
+#define HAVE_NDO_DFLT_BRIDGE_GETLINK_VLAN_SUPPORT
+#endif /* 4.2.0 */
 
 #endif /* _KCOMPAT_H_ */
