@@ -476,6 +476,7 @@ s32 e1000_set_eee_i350(struct e1000_hw *hw, bool adv1G, bool adv100M);
 s32 e1000_set_eee_i354(struct e1000_hw *hw, bool adv1G, bool adv100M);
 s32 e1000_get_eee_status_i354(struct e1000_hw *, bool *);
 s32 e1000_initialize_M88E1512_phy(struct e1000_hw *hw);
+s32 e1000_initialize_M88E1543_phy(struct e1000_hw *hw);
 #define E1000_I2C_THERMAL_SENSOR_ADDR	0xF8
 #define E1000_EMC_INTERNAL_DATA		0x00
 #define E1000_EMC_INTERNAL_THERM_LIMIT	0x20

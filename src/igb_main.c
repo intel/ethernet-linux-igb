@@ -62,7 +62,7 @@
 
 #define MAJ 5
 #define MIN 3
-#define BUILD 2
+#define BUILD 3.2
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "."\
 	__stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
@@ -960,6 +960,8 @@ static void igb_set_sriov_capability(struct igb_adapter *adapter)
 			if (pci_enable_sriov(pdev,
 					adapter->vfs_allocated_count))
 				goto err_out;
+			dev_warn(pci_dev_to_dev(pdev),
+				 "SR-IOV has been enabled: configure port VLANs to keep your VFs secure\n");
 		}
 		for (i = 0; i < adapter->vfs_allocated_count; i++)
 			igb_vf_configure(adapter, i);
@@ -1191,7 +1193,7 @@ static int igb_alloc_q_vector(struct igb_adapter *adapter,
 		/* update q_vector Rx values */
 		igb_add_ring(ring, &q_vector->rx);
 
-#ifndef HAVE_NDO_SET_FEATURES
+#if defined(HAVE_RHEL6_NET_DEVICE_OPS_EXT) || !defined(HAVE_NDO_SET_FEATURES)
 		/* enable rx checksum */
 		set_bit(IGB_RING_FLAG_RX_CSUM, &ring->flags);
 
@@ -2078,7 +2080,7 @@ void igb_reset(struct igb_adapter *adapter)
 	adapter->devrc++;
 }
 
-#ifdef HAVE_NDO_SET_FEATURES
+#if defined(HAVE_NDO_SET_FEATURES) && !defined(HAVE_RHEL6_NET_DEVICE_OPS_EXT)
 static netdev_features_t igb_fix_features(struct net_device *netdev,
 					  netdev_features_t features)
 {
@@ -2289,14 +2291,16 @@ static int igb_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 		mode = BRIDGE_MODE_VEB;
 	else
 		mode = BRIDGE_MODE_VEPA;
-
-#ifdef HAVE_NDO_BRIDGE_GETLINK_NLFLAGS
+#ifdef HAVE_NDO_DFLT_BRIDGE_GETLINK_VLAN_SUPPORT
+	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0, nlflags,
+				       filter_mask, NULL);
+#elif defined(HAVE_NDO_BRIDGE_GETLINK_NLFLAGS)
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0, nlflags);
-#elif defined(HAVE_NDO_FDB_ADD_VID)
+#elif defined(NDO_BRIDGE_GETLINK_HAS_FILTER_MASK_PARAM)
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0);
 #else
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode);
-#endif /* HAVE_NDO_FDB_ADD_VID */
+#endif /* NDO_BRIDGE_GETLINK_HAS_FILTER_MASK_PARAM */
 }
 #endif /* HAVE_BRIDGE_ATTRIBS */
 #endif /* HAVE_FDB_OPS */
@@ -2332,7 +2336,7 @@ static const struct net_device_ops igb_netdev_ops = {
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller	= igb_netpoll,
 #endif
-#ifdef HAVE_NDO_SET_FEATURES
+#if defined(HAVE_NDO_SET_FEATURES) && !defined(HAVE_RHEL6_NET_DEVICE_OPS_EXT)
 	.ndo_fix_features	= igb_fix_features,
 	.ndo_set_features	= igb_set_features,
 #endif
@@ -2749,7 +2753,7 @@ static int igb_probe(struct pci_dev *pdev,
 	if (hw->mac.type >= e1000_82576)
 		netdev->features |= NETIF_F_SCTP_CSUM;
 
-#ifdef HAVE_NDO_SET_FEATURES
+#if defined(HAVE_NDO_SET_FEATURES) && !defined(HAVE_RHEL6_NET_DEVICE_OPS_EXT)
 	/* copy netdev features into list of user selectable features */
 	netdev->hw_features |= netdev->features;
 #ifndef IGB_NO_LRO

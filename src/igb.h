@@ -422,7 +422,7 @@ struct igb_q_vector {
 };
 
 enum e1000_ring_flags_t {
-#ifndef HAVE_NDO_SET_FEATURES
+#if defined(HAVE_RHEL6_NET_DEVICE_OPS_EXT) || !defined(HAVE_NDO_SET_FEATURES)
 	IGB_RING_FLAG_RX_CSUM,
 #endif
 	IGB_RING_FLAG_RX_SCTP_CSUM,
