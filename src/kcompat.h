@@ -3232,22 +3232,29 @@ ssize_t _kc_simple_write_to_buffer(void *to, size_t available, loff_t *ppos,
 #ifndef numa_mem_id
 #define numa_mem_id numa_node_id
 #endif
+#if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,0)))
 #ifdef HAVE_TX_MQ
 #include <net/sch_generic.h>
 #ifndef CONFIG_NETDEVICES_MULTIQUEUE
-#if (!(RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,0)))
-void _kc_netif_set_real_num_tx_queues(struct net_device *, unsigned int);
-#define netif_set_real_num_tx_queues  _kc_netif_set_real_num_tx_queues
-#endif /* !(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,0)) */
+int _kc_netif_set_real_num_tx_queues(struct net_device *, unsigned int);
 #else /* CONFIG_NETDEVICES_MULTI_QUEUE */
-#define netif_set_real_num_tx_queues(_netdev, _count) \
-	do { \
-		(_netdev)->egress_subqueue_count = _count; \
-	} while (0)
+static inline int _kc_netif_set_real_num_tx_queues(struct net_device *dev,
+						   unsigned int txq)
+{
+	dev->egress_subqueue_count = txq;
+	return 0;
+}
 #endif /* CONFIG_NETDEVICES_MULTI_QUEUE */
 #else /* HAVE_TX_MQ */
-#define netif_set_real_num_tx_queues(_netdev, _count) do {} while(0)
+static inline int _kc_netif_set_real_num_tx_queues(struct net_device __always_unused *dev,
+						   unsigned int __always_unused txq)
+{
+	return 0;
+}
 #endif /* HAVE_TX_MQ */
+#define netif_set_real_num_tx_queues(dev, txq) \
+	_kc_netif_set_real_num_tx_queues(dev, txq)
+#endif /* !(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,0)) */
 #ifndef ETH_FLAG_RXHASH
 #define ETH_FLAG_RXHASH (1<<28)
 #endif /* ETH_FLAG_RXHASH */
@@ -3341,6 +3348,16 @@ static inline void skb_tx_timestamp(struct sk_buff __always_unused *skb)
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37) )
+#ifndef netif_set_real_num_tx_queues
+static inline int _kc_netif_set_real_num_tx_queues(struct net_device *dev,
+						   unsigned int txq)
+{
+	netif_set_real_num_tx_queues(dev, txq);
+	return 0;
+}
+#define netif_set_real_num_tx_queues(dev, txq) \
+	_kc_netif_set_real_num_tx_queues(dev, txq)
+#endif
 #ifndef netif_set_real_num_rx_queues
 static inline int __kc_netif_set_real_num_rx_queues(struct net_device __always_unused *dev,
 						    unsigned int __always_unused rxq)
@@ -4212,6 +4229,7 @@ extern int __kc_dma_set_mask_and_coherent(struct device *dev, u64 mask);
 
 #if (SLE_VERSION_CODE && SLE_VERSION_CODE >= SLE_VERSION(12,1,0))
 #undef HAVE_STRUCT_PAGE_PFMEMALLOC
+#define HAVE_DCBNL_OPS_SETAPP_RETURN_INT
 #endif
 
 #else /* >= 3.13.0 */
@@ -4258,11 +4276,7 @@ static inline void __kc_skb_set_hash(struct sk_buff __maybe_unused *skb,
 }
 #endif /* !skb_set_hash */
 
-#else
-
-#ifndef HAVE_ENCAP_TSO_OFFLOAD
-#define HAVE_ENCAP_TSO_OFFLOAD
-#endif /* HAVE_ENCAP_TSO_OFFLOAD */
+#else	/* RHEL_RELEASE_CODE >= 7.0 || SLE_VERSION_CODE >= 12.0 */
 
 #ifndef HAVE_VXLAN_RX_OFFLOAD
 #define HAVE_VXLAN_RX_OFFLOAD
@@ -4271,7 +4285,7 @@ static inline void __kc_skb_set_hash(struct sk_buff __maybe_unused *skb,
 #ifndef HAVE_VXLAN_CHECKS
 #define HAVE_VXLAN_CHECKS
 #endif /* HAVE_VXLAN_CHECKS */
-#endif /* !(RHEL_RELEASE_CODE&&RHEL_RELEASE_CODE>=RHEL_RELEASE_VERSION(7,0)) */
+#endif /* !(RHEL_RELEASE_CODE >= 7.0 && SLE_VERSION_CODE >= 12.0) */
 
 #ifndef pci_enable_msix_range
 extern int __kc_pci_enable_msix_range(struct pci_dev *dev,
@@ -4473,6 +4487,12 @@ extern unsigned int __kc_eth_get_headlen(unsigned char *data, unsigned int max_l
 /* netdev_phys_port_id renamed to netdev_phys_item_id */
 #define netdev_phys_item_id netdev_phys_port_id
 
+static inline void _kc_napi_complete_done(struct napi_struct *napi,
+					  int __always_unused work_done) {
+	napi_complete(napi);
+}
+#define napi_complete_done _kc_napi_complete_done
+
 #ifndef NETDEV_RSS_KEY_LEN
 #define NETDEV_RSS_KEY_LEN (13 * 4)
 #endif
@@ -4534,12 +4554,16 @@ static inline struct sk_buff *__kc_napi_alloc_skb(struct napi_struct *napi, unsi
 #endif /* napi_alloc_skb */
 #define HAVE_CONFIG_PM_RUNTIME
 #if RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,1))
-#define NDO_BRIDGE_GETLINK_HAS_FILTER_MASK_PARAM
+#define NDO_DFLT_BRIDGE_GETLINK_HAS_BRFLAGS
 #define HAVE_RXFH_HASHFUNC
 #endif /* RHEL_RELEASE_CODE */
+#ifndef napi_schedule_irqoff
+#define napi_schedule_irqoff	napi_schedule
+#endif
 #else /* 3.19.0 */
 #define HAVE_NDO_FDB_ADD_VID
 #define HAVE_RXFH_HASHFUNC
+#define NDO_DFLT_BRIDGE_GETLINK_HAS_BRFLAGS
 #endif /* 3.19.0 */
 
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,20,0) )
@@ -4574,23 +4598,27 @@ static inline void __kc_timecounter_adjtime(struct timecounter *tc, s64 delta)
 #else
 #define HAVE_PTP_CLOCK_INFO_GETTIME64
 #define HAVE_NDO_BRIDGE_GETLINK_NLFLAGS
+#define HAVE_PASSTHRU_FEATURES_CHECK
 #endif /* 4,1,0 */
 
-#if ( LINUX_VERSION_CODE < KERNEL_VERSION(4,2,0) )
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,9))
 #if (!(SLE_VERSION_CODE && SLE_VERSION_CODE >= SLE_VERSION(12,1,0)))
-static inline bool page_is_pfmemalloc(struct page *page)
+static inline bool page_is_pfmemalloc(struct page __maybe_unused *page)
 {
 #ifdef HAVE_STRUCT_PAGE_PFMEMALLOC
 	return page->pfmemalloc;
 #else
-	return page->index == -1UL;
+	return false;
 #endif
 }
 #endif /* !SLES12sp1 */
+#else
+#undef HAVE_STRUCT_PAGE_PFMEMALLOC
+#endif /* 4.1.9 */
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,2,0))
 #else
 #define HAVE_NDO_DFLT_BRIDGE_GETLINK_VLAN_SUPPORT
-#undef HAVE_STRUCT_PAGE_PFMEMALLOC
 #endif /* 4.2.0 */
 
 #endif /* _KCOMPAT_H_ */

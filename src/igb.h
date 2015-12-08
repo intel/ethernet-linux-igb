@@ -548,6 +548,8 @@ struct igb_adapter {
 	u16 link_duplex;
 	u8 port_num;
 
+	u8 __iomem *io_addr; /* for iounmap */
+
 	/* Interrupt Throttle Rate */
 	u32 rx_itr_setting;
 	u32 tx_itr_setting;

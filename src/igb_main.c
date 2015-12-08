@@ -62,7 +62,7 @@
 
 #define MAJ 5
 #define MIN 3
-#define BUILD 3.2
+#define BUILD 3.5
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "."\
 	__stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
@@ -414,9 +414,41 @@ static void igb_cache_ring_register(struct igb_adapter *adapter)
 		adapter->tx_ring[j]->reg_idx = rbase_offset + j;
 }
 
-u32 e1000_read_reg(struct e1000_hw *hw, u32 reg)
+static void e1000_remove_adapter(struct e1000_hw *hw)
 {
 	struct igb_adapter *igb = container_of(hw, struct igb_adapter, hw);
+	struct net_device *netdev;
+
+	if (!hw->hw_addr)
+		return;
+	hw->hw_addr = NULL;
+	netdev = igb->netdev;
+	netif_device_detach(netdev);
+	netdev_err(netdev, "PCIe link lost, device now detached\n");
+}
+
+static void e1000_check_remove(struct e1000_hw *hw, u32 reg)
+{
+	u32 value;
+
+	/* The following check not only optimizes a bit by not
+	 * performing a read on the status register when the
+	 * register just read was a status register read that
+	 * returned e1000_FAILED_READ_REG. It also blocks any
+	 * potential recursion.
+	 */
+	if (reg == E1000_STATUS) {
+		e1000_remove_adapter(hw);
+		return;
+	}
+	value = E1000_READ_REG(hw, E1000_STATUS);
+	if (~value)
+		e1000_remove_adapter(hw);
+}
+
+
+u32 e1000_read_reg(struct e1000_hw *hw, u32 reg)
+{
 	u8 __iomem *hw_addr = ACCESS_ONCE(hw->hw_addr);
 	u32 value = 0;
 
@@ -426,12 +458,8 @@ u32 e1000_read_reg(struct e1000_hw *hw, u32 reg)
 	value = readl(&hw_addr[reg]);
 
 	/* reads should not return all F's */
-	if (!(~value) && (!reg || !(~readl(hw_addr)))) {
-		struct net_device *netdev = igb->netdev;
-		hw->hw_addr = NULL;
-		netif_device_detach(netdev);
-		netdev_err(netdev, "PCIe link lost, device now detached\n");
-	}
+	if (unlikely(!(~value)))
+		e1000_check_remove(hw, reg);
 
 	return value;
 }
@@ -652,7 +680,6 @@ static void igb_configure_msix(struct igb_adapter *adapter)
 static int igb_request_msix(struct igb_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
-	struct e1000_hw *hw = &adapter->hw;
 	int i, err = 0, vector = 0, free_vector = 0;
 
 	err = request_irq(adapter->msix_entries[vector].vector,
@@ -665,7 +692,7 @@ static int igb_request_msix(struct igb_adapter *adapter)
 
 		vector++;
 
-		q_vector->itr_register = hw->hw_addr + E1000_EITR(vector);
+		q_vector->itr_register = adapter->io_addr + E1000_EITR(vector);
 
 		if (q_vector->rx.ring && q_vector->tx.ring)
 			sprintf(q_vector->name, "%s-TxRx-%u", netdev->name,
@@ -1139,7 +1166,7 @@ static int igb_alloc_q_vector(struct igb_adapter *adapter,
 	q_vector->tx.work_limit = adapter->tx_work_limit;
 
 	/* initialize ITR configuration */
-	q_vector->itr_register = adapter->hw.hw_addr + E1000_EITR(0);
+	q_vector->itr_register = adapter->io_addr + E1000_EITR(0);
 	q_vector->itr_val = IGB_START_ITR;
 
 	/* initialize pointer to rings */
@@ -2296,11 +2323,11 @@ static int igb_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 				       filter_mask, NULL);
 #elif defined(HAVE_NDO_BRIDGE_GETLINK_NLFLAGS)
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0, nlflags);
-#elif defined(NDO_BRIDGE_GETLINK_HAS_FILTER_MASK_PARAM)
+#elif defined(NDO_DFLT_BRIDGE_GETLINK_HAS_BRFLAGS)
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode, 0, 0);
 #else
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode);
-#endif /* NDO_BRIDGE_GETLINK_HAS_FILTER_MASK_PARAM */
+#endif /* NDO_DFLT_BRIDGE_GETLINK_HAS_BRFLAGS */
 }
 #endif /* HAVE_BRIDGE_ATTRIBS */
 #endif /* HAVE_FDB_OPS */
@@ -2663,10 +2690,12 @@ static int igb_probe(struct pci_dev *pdev,
 		goto err_ioremap;
 #endif
 	err = -EIO;
-	hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
+	adapter->io_addr = ioremap(pci_resource_start(pdev, 0),
 			      pci_resource_len(pdev, 0));
-	if (!hw->hw_addr)
+	if (!adapter->io_addr)
 		goto err_ioremap;
+	/* hw->hw_addr can be zeroed, so use adapter->io_addr for unmap */
+	hw->hw_addr = adapter->io_addr;
 
 #ifdef HAVE_NET_DEVICE_OPS
 	netdev->netdev_ops = &igb_netdev_ops;
@@ -2919,6 +2948,27 @@ static int igb_probe(struct pci_dev *pdev,
 		adapter->wol = 0;
 	}
 
+	/* Some vendors want the ability to Use the EEPROM setting as
+	 * enable/disable only, and not for capability
+	 */
+	if ((((hw->mac.type == e1000_i350) ||
+	      (hw->mac.type == e1000_i354))) &&
+			((pdev->subsystem_vendor == PCI_VENDOR_ID_DELL))) {
+		adapter->flags |= IGB_FLAG_WOL_SUPPORTED;
+		adapter->wol = 0;
+	}
+	if (hw->mac.type == e1000_i350) {
+		if (((pdev->subsystem_device == 0x5001) ||
+		     (pdev->subsystem_device == 0x5002)) && 
+				(hw->bus.func == 0)) {
+			adapter->flags |= IGB_FLAG_WOL_SUPPORTED;
+			adapter->wol = 0;
+		}
+		if (pdev->subsystem_device == 0x1F52) {
+			adapter->flags |= IGB_FLAG_WOL_SUPPORTED;
+		}
+	}
+
 	device_set_wakeup_enable(pci_dev_to_dev(adapter->pdev),
 				 adapter->flags & IGB_FLAG_WOL_SUPPORTED);
 
@@ -3076,7 +3126,7 @@ err_eeprom:
 err_sw_init:
 	igb_clear_interrupt_scheme(adapter);
 	igb_reset_sriov_capability(adapter);
-	iounmap(hw->hw_addr);
+	iounmap(adapter->io_addr);
 err_ioremap:
 	free_netdev(netdev);
 err_alloc_etherdev:
@@ -3155,7 +3205,7 @@ static void igb_remove(struct pci_dev *pdev)
 	igb_clear_interrupt_scheme(adapter);
 	igb_reset_sriov_capability(adapter);
 
-	iounmap(hw->hw_addr);
+	iounmap(adapter->io_addr);
 	if (hw->flash_address)
 		iounmap(hw->flash_address);
 	pci_release_selected_regions(pdev,
@@ -3546,7 +3596,7 @@ void igb_configure_tx_ring(struct igb_adapter *adapter,
 			tdba & 0x00000000ffffffffULL);
 	E1000_WRITE_REG(hw, E1000_TDBAH(reg_idx), tdba >> 32);
 
-	ring->tail = hw->hw_addr + E1000_TDT(reg_idx);
+	ring->tail = adapter->io_addr + E1000_TDT(reg_idx);
 	E1000_WRITE_REG(hw, E1000_TDH(reg_idx), 0);
 	writel(0, ring->tail);
 
@@ -3972,7 +4022,7 @@ void igb_configure_rx_ring(struct igb_adapter *adapter,
 			ring->count * sizeof(union e1000_adv_rx_desc));
 
 	/* initialize head and tail */
-	ring->tail = hw->hw_addr + E1000_RDT(reg_idx);
+	ring->tail = adapter->io_addr + E1000_RDT(reg_idx);
 	E1000_WRITE_REG(hw, E1000_RDH(reg_idx), 0);
 	writel(0, ring->tail);
 
