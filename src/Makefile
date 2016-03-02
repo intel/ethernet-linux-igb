@@ -233,7 +233,7 @@ endif # kernel version >= 3.0
 endif # !NO_PTP_SUPPORT
 
 # set the install path
-INSTDIR := /lib/modules/$(KVER)/kernel/drivers/net/$(DRIVER_NAME)
+INSTDIR ?= /lib/modules/${KVER}/updates/drivers/net/ethernet/intel
 
 # look for SMP in config.h
 SMP := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(CONFIG_FILE) | \
@@ -356,9 +356,6 @@ $(MANFILE).gz: ../$(MANFILE)
 	gzip -c $< > $@
 
 install: default $(MANFILE).gz
-	# remove all old versions of the driver
-	find $(INSTALL_MOD_PATH)/lib/modules/$(KVER) -name $(TARGET) -exec rm -f {} \; || true
-	find $(INSTALL_MOD_PATH)/lib/modules/$(KVER) -name $(TARGET).gz -exec rm -f {} \; || true
 	install -D -m 644 $(TARGET) $(INSTALL_MOD_PATH)$(INSTDIR)/$(TARGET)
 ifeq (,$(INSTALL_MOD_PATH))
 	/sbin/depmod -a || true

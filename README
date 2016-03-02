@@ -4,7 +4,7 @@ igb Linux* Base Driver for Intel(R) Ethernet Network Connection
 
 ================================================================================
 
-September 24, 2015
+February 1, 2016
 
 ================================================================================
 
@@ -41,15 +41,13 @@ frames to be dropped.
 Overview
 --------
 
-This document describes the igb Linux base driver.
+This driver supports kernel versions 2.6.30 or newer.
 
-The Linux* base driver supports the following kernel versions:
- 2.6.30 or newer. 
+It supports Itanium(R)2 based systems.
 
-It includes support for Itanium(R)2 based systems.
-
-The igb driver supports 2.5 Gbps operating speed on 2500BASE-KX only for
-I354-based network connections.
+Driver information can be obtained using ethtool, lspci, and ifconfig.
+Instructions on updating ethtool can be found in the section Additional
+Configurations later in this document.
 
 This driver is only supported as a loadable module at this time. Intel is
 not supplying patches against the kernel source to allow for static linking of
@@ -66,18 +64,17 @@ The following features are now available in supported kernels:
 
 Adapter teaming is implemented using the native Linux Channel bonding
 module. This is included in supported Linux kernels.
+
 Channel Bonding documentation can be found in the Linux kernel source:
 /documentation/networking/bonding.txt
-
-The igb driver supports IEEE 1588 time stamping for kernels 2.6.30 and newer.
 
 The driver information previously displayed in the /proc file system is not
 supported in this release.
 
-Driver information can be obtained using ethtool, lspci, and ifconfig.
-Instructions on updating ethtool can be found in the section Additional 
-Configurations later in this document.
+The igb driver supports IEEE 1588 time stamping for kernels 2.6.30 and newer.
 
+The igb driver supports 2.5 Gbps operating speed on 2500BASE-KX only for
+I354-based network connections.
 
 
 ================================================================================
@@ -319,17 +316,18 @@ and above, use sysfs to enable VFs. For example:
 #echo 0 > /sys/class/net/$dev/device/sriov_numvfs	//disable VFs
 
 The parameters for the driver are referenced by position. Thus, if you have a
-dual port adapter, or more than one adapter in your system, and want N virtual functions per port, you must specify a
-number for each port with each parameter separated by a comma. For example:
+dual port adapter, or more than one adapter in your system, and want N virtual
+functions per port, you must specify a number for each port with each parameter
+separated by a comma. For example:
   modprobe igb max_vfs=4,1
 NOTE: Caution must be used in loading the driver with these parameters.
 Depending on your system configuration, number of slots, etc., it is impossible
 to predict in all cases where the positions would be on the command line.
 This parameter adds support for SR-IOV. It causes the driver to spawn up to
 max_vfs worth of virtual functions.
-NOTE: When either SR-IOV mode or VMDq mode is enabled, hardware VLAN filtering
-and VLAN tag stripping/insertion will remain enabled. Please remove the old
-VLAN filter before the new VLAN filter is added. For example,
+NOTE: When either SR-IOV mode or VMDq mode is enabled, hardware VLAN
+filtering and VLAN tag stripping/insertion will remain enabled. Please remove
+the old VLAN filter before the new VLAN filter is added. For example,
 ip link set eth0 vf 0 vlan 100	// set vlan 100 for VF 0
 ip link set eth0 vf 0 vlan 0	// Delete vlan 100
 ip link set eth0 vf 0 vlan 200	// set a new vlan 200 for VF 0
@@ -916,8 +914,7 @@ St - Fifth Floor, Boston, MA 02110-1301 USA.
 The full GNU General Public License is included in this distribution in the
 file called "COPYING".
 
-Intel(R) Gigabit Ethernet driver
-Copyright(c) 1999 - 2015 Intel Corporation.
+Copyright(c) 1999 - 2016 Intel Corporation.
 ================================================================================
 
 

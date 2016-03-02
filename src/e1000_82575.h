@@ -470,6 +470,7 @@ void e1000_vmdq_set_replication_pf(struct e1000_hw *hw, bool enable);
 s32 e1000_init_nvm_params_82575(struct e1000_hw *hw);
 s32  e1000_init_hw_82575(struct e1000_hw *hw);
 
+void e1000_write_vfta_i350(struct e1000_hw *hw, u32 offset, u32 value);
 u16 e1000_rxpbs_adjust_82580(u32 data);
 s32 e1000_read_emi_reg(struct e1000_hw *hw, u16 addr, u16 *data);
 s32 e1000_set_eee_i350(struct e1000_hw *hw, bool adv1G, bool adv100M);
