@@ -4,7 +4,7 @@ igb Linux* Base Driver for Intel(R) Ethernet Network Connection
 
 ================================================================================
 
-February 1, 2016
+May 2, 2016
 
 ================================================================================
 
@@ -306,25 +306,32 @@ and VLAN tag stripping/insertion will remain enabled.
 
 max_vfs
 -------
+This parameter adds support for SR-IOV. It causes the driver to spawn up to
+max_vfs worth of virtual functions.
 Valid Range: 0-7
 If the value is greater than 0 it will also force the VMDq parameter to be 1
 or more.
-
-NOTE: This parameter is only used on kernel 3.7.x and below. On kernel 3.8.x
-and above, use sysfs to enable VFs. For example:
-#echo $num_vf_enabled > /sys/class/net/$dev/device/sriov_numvfs	//enable VFs
-#echo 0 > /sys/class/net/$dev/device/sriov_numvfs	//disable VFs
 
 The parameters for the driver are referenced by position. Thus, if you have a
 dual port adapter, or more than one adapter in your system, and want N virtual
 functions per port, you must specify a number for each port with each parameter
 separated by a comma. For example:
-  modprobe igb max_vfs=4,1
+
+  modprobe igb max_vfs=4
+
+This will spawn 4 VFs on the first port.
+
+  modprobe igb max_vfs=2,4
+
+This will spawn 2 VFs on the first port and 4 VFs on the second port.
+
 NOTE: Caution must be used in loading the driver with these parameters.
 Depending on your system configuration, number of slots, etc., it is impossible
 to predict in all cases where the positions would be on the command line.
-This parameter adds support for SR-IOV. It causes the driver to spawn up to
-max_vfs worth of virtual functions.
+
+NOTE: Neither the device nor the driver control how VFs are mapped into config
+space. Bus layout will vary by operating system. On operating systems that
+support it, you can check sysfs to find the mapping. 
 NOTE: When either SR-IOV mode or VMDq mode is enabled, hardware VLAN
 filtering and VLAN tag stripping/insertion will remain enabled. Please remove
 the old VLAN filter before the new VLAN filter is added. For example,
@@ -703,10 +710,9 @@ In some cases ports 3 and 4 don't pass traffic and report 'Detected Tx Unit
 Hang' followed by 'NETDEV WATCHDOG: ethX: transmit timed out' errors. Ports 1
 and 2 do not show any errors and will pass traffic.
 
-This issue may be resolved by updating to the latest kernel and BIOS. The user
-is encouraged to run an OS that fully supports MSI interrupts. You can check
-your system BIOS by downloading the Linux Firmware Developer Kit at
-http://www.linuxfirmwarekit.org/.
+This issue may be resolved by updating to the latest kernel and BIOS. You should
+use an OS that fully supports Message Signaled Interrupts (MSI) and make sure
+that MSI is enabled in your system's BIOS.
 
 
 Compiling the Driver
@@ -847,7 +853,7 @@ Otherwise, the driver can be loaded once and will be safe, but unloading it
 will lead to the issue.
 
 Enabling SR-IOV in a 32-bit Microsoft* Windows* Server 2008 Guest OS Using
-Intel® 82576-based GbE or Intel® 82599-based 10GbE Controller Under KVM
+Intel? 82576-based GbE or Intel? 82599-based 10GbE Controller Under KVM
 KVM Hypervisor/VMM supports direct assignment of a PCIe device to a VM. This
 includes traditional PCIe devices, as well as SR-IOV-capable devices using
 Intel 82576-based and 82599-based controllers.

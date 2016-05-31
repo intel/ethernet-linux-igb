@@ -62,7 +62,7 @@
 
 #define MAJ 5
 #define MIN 3
-#define BUILD 4.4
+#define BUILD 5.3
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "."\
 	__stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 
@@ -123,8 +123,6 @@ static void igb_setup_mrqc(struct igb_adapter *);
 static int igb_probe(struct pci_dev *, const struct pci_device_id *);
 static void igb_remove(struct pci_dev *pdev);
 static int igb_sw_init(struct igb_adapter *);
-static int igb_open(struct net_device *);
-static int igb_close(struct net_device *);
 static void igb_configure(struct igb_adapter *);
 static void igb_configure_tx(struct igb_adapter *);
 static void igb_configure_rx(struct igb_adapter *);
@@ -414,28 +412,9 @@ static void igb_cache_ring_register(struct igb_adapter *adapter)
 		adapter->tx_ring[j]->reg_idx = rbase_offset + j;
 }
 
-static void e1000_remove_adapter(struct e1000_hw *hw)
-{
-	struct igb_adapter *igb = container_of(hw, struct igb_adapter, hw);
-	struct net_device *netdev;
-
-	if (!hw->hw_addr)
-		return;
-	hw->hw_addr = NULL;
-	netdev = igb->netdev;
-	netif_device_detach(netdev);
-	netdev_err(netdev, "PCIe link lost, device now detached\n");
-}
-
-static void e1000_check_remove(struct e1000_hw *hw, u32 reg)
-{
-	/* E1000_VET is always 0x8100 and can't be all F's */
-	if ((reg == E1000_VET) || (!(~E1000_READ_REG(hw, E1000_VET))))
-		e1000_remove_adapter(hw);
-}
-
 u32 e1000_read_reg(struct e1000_hw *hw, u32 reg)
 {
+	struct igb_adapter *igb = container_of(hw, struct igb_adapter, hw);
 	u8 __iomem *hw_addr = ACCESS_ONCE(hw->hw_addr);
 	u32 value = 0;
 
@@ -445,8 +424,13 @@ u32 e1000_read_reg(struct e1000_hw *hw, u32 reg)
 	value = readl(&hw_addr[reg]);
 
 	/* reads should not return all F's */
-	if (unlikely(!(~value)))
-		e1000_check_remove(hw, reg);
+	if (!(~value) && (!reg || !(~readl(hw_addr)))) {
+		struct net_device *netdev = igb->netdev;
+
+		hw->hw_addr = NULL;
+		netif_device_detach(netdev);
+		netdev_err(netdev, "PCIe link lost, device now detached\n");
+	}
 
 	return value;
 }
@@ -871,7 +855,7 @@ static void igb_disable_mdd(struct igb_adapter *adapter)
 	struct e1000_hw *hw = &adapter->hw;
 	u32 reg;
 
-	if ((hw->mac.type != e1000_i350) ||
+	if ((hw->mac.type != e1000_i350) &&
 	    (hw->mac.type != e1000_i354))
 		return;
 
@@ -2103,9 +2087,14 @@ void igb_reset(struct igb_adapter *adapter)
 	adapter->devrc++;
 }
 
-#if defined(HAVE_NDO_SET_FEATURES) && !defined(HAVE_RHEL6_NET_DEVICE_OPS_EXT)
+#ifdef HAVE_NDO_SET_FEATURES
+#ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+static u32 igb_fix_features(struct net_device *netdev,
+			    u32 features)
+#else
 static netdev_features_t igb_fix_features(struct net_device *netdev,
 					  netdev_features_t features)
+#endif /* HAVE_RHEL6_NET_DEVICE_OPS_EXT */
 {
 	/*
 	 * Since there is no support for separate tx vlan accel
@@ -2117,29 +2106,49 @@ static netdev_features_t igb_fix_features(struct net_device *netdev,
 #else
 	if (!(features & NETIF_F_HW_VLAN_RX))
 		features &= ~NETIF_F_HW_VLAN_TX;
-#endif
+#endif /* NETIF_F_HW_VLAN_CTAG_RX */
 
+#ifndef IGB_NO_LRO
 	/* If Rx checksum is disabled, then LRO should also be disabled */
 	if (!(features & NETIF_F_RXCSUM))
 		features &= ~NETIF_F_LRO;
 
+#endif
 	return features;
 }
 
 static int igb_set_features(struct net_device *netdev,
+#ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+			    u32 features)
+#else
 			    netdev_features_t features)
+#endif /* HAVE_RHEL6_NET_DEVICE_OPS_EXT */
 {
-	u32 changed = netdev->features ^ features;
+	netdev_features_t changed = netdev->features ^ features;
+#ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+	struct igb_adapter *adapter = netdev_priv(netdev);
+#endif
 
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
 	if (changed & NETIF_F_HW_VLAN_CTAG_RX)
 #else
 	if (changed & NETIF_F_HW_VLAN_RX)
-#endif
+#endif /* NETIF_F_HW_VLAN_CTAG_RX */
+		netdev->features = features;
+#ifdef HAVE_VLAN_RX_REGISTER
+		igb_vlan_mode(netdev, adapter->vlgrp);
+#else
 		igb_vlan_mode(netdev, features);
+#endif
+
+	if (!(changed & (NETIF_F_RXALL | NETIF_F_NTUPLE)))
+		return 0;
+
+	netdev->features = features;
 
 	return 0;
 }
+#endif /* HAVE_NDO_SET_FEATURES */
 
 #ifdef HAVE_FDB_OPS
 #ifdef USE_CONST_DEV_UC_CHAR
@@ -2148,7 +2157,7 @@ static int igb_ndo_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 			   const unsigned char *addr,
 #ifdef HAVE_NDO_FDB_ADD_VID
 			   u16 vid,
-#endif
+#endif /* HAVE_NDO_FDB_ADD_VID */
 			   u16 flags)
 #else /* USE_CONST_DEV_UC_CHAR */
 static int igb_ndo_fdb_add(struct ndmsg *ndm,
@@ -2203,7 +2212,7 @@ static int igb_ndo_fdb_del(struct ndmsg *ndm,
 static int igb_ndo_fdb_del(struct ndmsg *ndm,
 			   struct net_device *dev,
 			   unsigned char *addr)
-#endif
+#endif /* USE_CONST_DEV_UC_CHAR */
 {
 	struct igb_adapter *adapter = netdev_priv(dev);
 	int err = -EOPNOTSUPP;
@@ -2239,7 +2248,6 @@ static int igb_ndo_fdb_dump(struct sk_buff *skb,
 	return idx;
 }
 #endif /* USE_DEFAULT_FDB_DEL_DUMP */
-
 #ifdef HAVE_BRIDGE_ATTRIBS
 #ifdef HAVE_NDO_BRIDGE_SET_DEL_LINK_FLAGS
 static int igb_ndo_bridge_setlink(struct net_device *dev,
@@ -2327,8 +2335,6 @@ static int igb_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 }
 #endif /* HAVE_BRIDGE_ATTRIBS */
 #endif /* HAVE_FDB_OPS */
-
-#endif /* HAVE_NDO_SET_FEATURES */
 #ifdef HAVE_NET_DEVICE_OPS
 static const struct net_device_ops igb_netdev_ops = {
 	.ndo_open		= igb_open,
@@ -2359,10 +2365,6 @@ static const struct net_device_ops igb_netdev_ops = {
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller	= igb_netpoll,
 #endif
-#if defined(HAVE_NDO_SET_FEATURES) && !defined(HAVE_RHEL6_NET_DEVICE_OPS_EXT)
-	.ndo_fix_features	= igb_fix_features,
-	.ndo_set_features	= igb_set_features,
-#endif
 #ifdef HAVE_VLAN_RX_REGISTER
 	.ndo_vlan_rx_register	= igb_vlan_mode,
 #endif
@@ -2377,6 +2379,17 @@ static const struct net_device_ops igb_netdev_ops = {
 	.ndo_bridge_getlink	= igb_ndo_bridge_getlink,
 #endif /* HAVE_BRIDGE_ATTRIBS */
 #endif
+#ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+};
+
+/* RHEL6 keeps these operations in a separate structure */
+static const struct net_device_ops_ext igb_netdev_ops_ext = {
+	.size = sizeof(struct net_device_ops_ext),
+#endif /* HAVE_RHEL6_NET_DEVICE_OPS_EXT */
+#ifdef HAVE_NDO_SET_FEATURES
+	.ndo_fix_features	= igb_fix_features,
+	.ndo_set_features	= igb_set_features,
+#endif /* HAVE_NDO_SET_FEATURES */
 };
 
 #ifdef CONFIG_IGB_VMDQ_NETDEV
@@ -2421,7 +2434,7 @@ void igb_assign_vmdq_netdev_ops(struct net_device *vnetdev)
 	dev->vlan_rx_add_vid = &igb_vmdq_vlan_rx_add_vid;
 	dev->vlan_rx_kill_vid = &igb_vmdq_vlan_rx_kill_vid;
 #endif
-#endif
+#endif /* HAVE_NET_DEVICE_OPS */
 	igb_vmdq_set_ethtool_ops(vnetdev);
 	vnetdev->watchdog_timeo = 5 * HZ;
 
@@ -2454,7 +2467,7 @@ int igb_init_vmdq_netdevs(struct igb_adapter *adapter)
 		vnetdev->features = adapter->netdev->features;
 #ifdef HAVE_NETDEV_VLAN_FEATURES
 		vnetdev->vlan_features = adapter->netdev->vlan_features;
-#endif
+#endif /* HAVE_NETDEV_VLAN_FEATURES */
 		adapter->vmdq_netdev[pool-1] = vnetdev;
 		err = register_netdev(vnetdev);
 		if (err)
@@ -2612,6 +2625,13 @@ static int igb_probe(struct pci_dev *pdev,
 	static int global_quad_port_a; /* global quad port a indication */
 	int err, pci_using_dac;
 	static int cards_found;
+#ifdef HAVE_NDO_SET_FEATURES
+#ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+	u32 hw_features;
+#else
+	netdev_features_t hw_features;
+#endif
+#endif
 
 	err = pci_enable_device_mem(pdev);
 	if (err)
@@ -2697,6 +2717,9 @@ static int igb_probe(struct pci_dev *pdev,
 
 #ifdef HAVE_NET_DEVICE_OPS
 	netdev->netdev_ops = &igb_netdev_ops;
+#ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+	set_netdev_ops_ext(netdev, &igb_netdev_ops_ext);
+#endif /* HAVE_RHEL6_NET_DEVICE_OPS_EXT */
 #else /* HAVE_NET_DEVICE_OPS */
 	netdev->open = &igb_open;
 	netdev->stop = &igb_close;
@@ -2780,27 +2803,42 @@ static int igb_probe(struct pci_dev *pdev,
 	if (hw->mac.type >= e1000_82576)
 		netdev->features |= NETIF_F_SCTP_CSUM;
 
-#if defined(HAVE_NDO_SET_FEATURES) && !defined(HAVE_RHEL6_NET_DEVICE_OPS_EXT)
+#ifdef HAVE_NDO_SET_FEATURES
 	/* copy netdev features into list of user selectable features */
-	netdev->hw_features |= netdev->features;
-#ifndef IGB_NO_LRO
+#ifndef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+	hw_features = netdev->hw_features;
 
 	/* give us the option of enabling LRO later */
-	netdev->hw_features |= NETIF_F_LRO;
-#endif
+	hw_features |= NETIF_F_LRO;
+
+#else
+	hw_features = get_netdev_hw_features(netdev);
+
+#endif /* HAVE_RHEL6_NET_DEVICE_OPS_EXT */
+	hw_features |= netdev->features;
+
 #else
 #ifdef NETIF_F_GRO
 
 	/* this is only needed on kernels prior to 2.6.39 */
 	netdev->features |= NETIF_F_GRO;
-#endif
-#endif
+#endif /* NETIF_F_GRO */
+#endif /* HAVE_NDO_SET_FEATURES */
 
 	/* set this bit last since it cannot be part of hw_features */
 #ifdef NETIF_F_HW_VLAN_CTAG_FILTER
 	netdev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
-#else
+#endif /* NETIF_F_HW_FLAN_CTAG_FILTER */
+#ifdef NETIF_F_HW_VLAN_TX
 	netdev->features |= NETIF_F_HW_VLAN_FILTER;
+#endif /* NETIF_F_HW_VLAN_TX */
+
+#ifdef HAVE_NDO_SET_FEATURES
+#ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+	set_netdev_hw_features(netdev, hw_features);
+#else
+	netdev->hw_features = hw_features;
+#endif
 #endif
 
 #ifdef HAVE_NETDEV_VLAN_FEATURES
@@ -2810,7 +2848,7 @@ static int igb_probe(struct pci_dev *pdev,
 				 NETIF_F_IPV6_CSUM |
 				 NETIF_F_SG;
 
-#endif
+#endif /* HAVE_NETDEV_VLAN_FEATURES */
 	if (pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
 
@@ -3419,7 +3457,7 @@ err_setup_tx:
 	return err;
 }
 
-static int igb_open(struct net_device *netdev)
+int igb_open(struct net_device *netdev)
 {
 	return __igb_open(netdev, false);
 }
@@ -3466,7 +3504,7 @@ static int __igb_close(struct net_device *netdev, bool suspending)
 	return 0;
 }
 
-static int igb_close(struct net_device *netdev)
+int igb_close(struct net_device *netdev)
 {
 	return __igb_close(netdev, false);
 }
@@ -8659,15 +8697,15 @@ s32 e1000_write_pcie_cap_reg(struct e1000_hw *hw, u32 reg, u16 *value)
 static void igb_vlan_mode(struct net_device *netdev, struct vlan_group *vlgrp)
 #else
 void igb_vlan_mode(struct net_device *netdev, u32 features)
-#endif
+#endif /* HAVE_VLAN_RX_REGISTER */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
 	u32 ctrl, rctl;
+	bool enable;
 	int i;
 #ifdef HAVE_VLAN_RX_REGISTER
-	bool enable = !!vlgrp;
-
+	enable = !!vlgrp;
 	igb_irq_disable(adapter);
 
 	adapter->vlgrp = vlgrp;
@@ -8676,11 +8714,11 @@ void igb_vlan_mode(struct net_device *netdev, u32 features)
 		igb_irq_enable(adapter);
 #else
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
-	bool enable = !!(features & NETIF_F_HW_VLAN_CTAG_RX);
+	enable = !!(features & NETIF_F_HW_VLAN_CTAG_RX);
 #else
-	bool enable = !!(features & NETIF_F_HW_VLAN_RX);
-#endif
-#endif
+	enable = !!(features & NETIF_F_HW_VLAN_RX);
+#endif /* NETIF_F_HW_VLAN_CTAG_RX */
+#endif /* HAVE_VLAN_RX_REGISTER */
 
 	if (enable) {
 		/* enable VLAN tag insert/strip */
@@ -8726,14 +8764,14 @@ void igb_vlan_mode(struct net_device *netdev, u32 features)
 		enable = !!(vnetdev->features & NETIF_F_HW_VLAN_CTAG_RX);
 #else
 		enable = !!(vnetdev->features & NETIF_F_HW_VLAN_RX);
-#endif
-#endif
+#endif /* NETIF_F_HW_VLAN_CTAG_RX */
+#endif /* HAVE_VLAN_RX_REGISTER */
 		igb_set_vf_vlan_strip(adapter,
 				      adapter->vfs_allocated_count + i,
 				      enable);
 	}
 
-#endif
+#endif /* CONFIG_IGB_VMDQ_NETDEV */
 	igb_rlpml_set(adapter);
 }
 
@@ -8743,10 +8781,10 @@ static int igb_vlan_rx_add_vid(struct net_device *netdev,
 			       __always_unused __be16 proto, u16 vid)
 #else
 static int igb_vlan_rx_add_vid(struct net_device *netdev, u16 vid)
-#endif
+#endif /* NETIF_F_HW_VLAN_CTAG_RX */
 #else
 static void igb_vlan_rx_add_vid(struct net_device *netdev, u16 vid)
-#endif
+#endif /* HAVE_INT_NDO_VLAN_RX_ADD_VID */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	int pf_id = adapter->vfs_allocated_count;
@@ -8772,14 +8810,14 @@ static void igb_vlan_rx_add_vid(struct net_device *netdev, u16 vid)
 			vlan_group_set_device(vlgrp, vid, v_netdev);
 		}
 	}
-#endif
+#endif /* HAVE_NETDEV_VLAN_FEATURES */
 #ifndef HAVE_VLAN_RX_REGISTER
 
 	set_bit(vid, adapter->active_vlans);
-#endif
+#endif /* HAVE_VLAN_RX_REGISTER */
 #ifdef HAVE_INT_NDO_VLAN_RX_ADD_VID
 	return 0;
-#endif
+#endif /* HAVE_INT_NDO_VLAN_RX_ADD_VID */
 }
 
 #ifdef HAVE_INT_NDO_VLAN_RX_ADD_VID
@@ -8788,10 +8826,10 @@ static int igb_vlan_rx_kill_vid(struct net_device *netdev,
 				__always_unused __be16 proto, u16 vid)
 #else
 static int igb_vlan_rx_kill_vid(struct net_device *netdev, u16 vid)
-#endif
+#endif /* NETIF_F_HW_VLAN_CTAG_RX */
 #else
 static void igb_vlan_rx_kill_vid(struct net_device *netdev, u16 vid)
-#endif
+#endif /* HAVE_INT_NDO_VLAN_RX_ADD_VID */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	int pf_id = adapter->vfs_allocated_count;
@@ -8815,10 +8853,10 @@ static void igb_vlan_rx_kill_vid(struct net_device *netdev, u16 vid)
 #ifndef HAVE_VLAN_RX_REGISTER
 
 	clear_bit(vid, adapter->active_vlans);
-#endif
+#endif /* HAVE_VLAN_RX_REGISTER */
 #ifdef HAVE_INT_NDO_VLAN_RX_ADD_VID
 	return 0;
-#endif
+#endif /* HAVE_INT_NDO_VLAN_RX_ADD_VID */
 }
 
 static void igb_restore_vlan(struct igb_adapter *adapter)
@@ -8837,7 +8875,7 @@ static void igb_restore_vlan(struct igb_adapter *adapter)
 					    htons(ETH_P_8021Q), vid);
 #else
 			igb_vlan_rx_add_vid(adapter->netdev, vid);
-#endif
+#endif /* NETIF_F_HW_VLAN_CTAG_RX */
 		}
 	}
 #else
@@ -8851,8 +8889,8 @@ static void igb_restore_vlan(struct igb_adapter *adapter)
 				    htons(ETH_P_8021Q), vid);
 #else
 		igb_vlan_rx_add_vid(adapter->netdev, vid);
-#endif
-#endif
+#endif /* NETIF_F_HW_VLAN_CTAG_RX */
+#endif /* HAVE_VLAN_RX_REGISTER */
 }
 
 int igb_set_spd_dplx(struct igb_adapter *adapter, u16 spddplx)
