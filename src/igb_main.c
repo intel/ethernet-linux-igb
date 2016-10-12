@@ -62,7 +62,7 @@
 
 #define MAJ 5
 #define MIN 3
-#define BUILD 5.3
+#define BUILD 5.4
 #define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "."\
 	__stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 

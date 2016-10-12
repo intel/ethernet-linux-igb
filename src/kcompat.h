@@ -350,6 +350,34 @@ struct _kc_vlan_hdr {
 #define VLAN_PRIO_SHIFT 13
 #endif
 
+#ifndef PCI_EXP_LNKSTA_CLS_2_5GB
+#define PCI_EXP_LNKSTA_CLS_2_5GB 0x0001
+#endif
+
+#ifndef PCI_EXP_LNKSTA_CLS_5_0GB
+#define PCI_EXP_LNKSTA_CLS_5_0GB 0x0002
+#endif
+
+#ifndef PCI_EXP_LNKSTA_CLS_8_0GB
+#define PCI_EXP_LNKSTA_CLS_8_0GB 0x0003
+#endif
+
+#ifndef PCI_EXP_LNKSTA_NLW_X1
+#define PCI_EXP_LNKSTA_NLW_X1 0x0010
+#endif
+
+#ifndef PCI_EXP_LNKSTA_NLW_X2
+#define PCI_EXP_LNKSTA_NLW_X2 0x0020
+#endif
+
+#ifndef PCI_EXP_LNKSTA_NLW_X4
+#define PCI_EXP_LNKSTA_NLW_X4 0x0040
+#endif
+
+#ifndef PCI_EXP_LNKSTA_NLW_X8
+#define PCI_EXP_LNKSTA_NLW_X8 0x0080
+#endif
+
 #ifndef __GFP_COLD
 #define __GFP_COLD 0
 #endif
@@ -762,7 +790,8 @@ struct _kc_ethtool_pauseparam {
  * ABI value. Otherwise, it becomes impossible to correlate ABI to version for
  * ordering checks.
  */
-#define UBUNTU_VERSION_CODE (((LINUX_VERSION_CODE & ~0xFF) << 8) + (UTS_UBUNTU_RELEASE_ABI))
+#define UBUNTU_VERSION_CODE (((~0xFF & LINUX_VERSION_CODE) << 8) + \
+			     UTS_UBUNTU_RELEASE_ABI)
 
 #if UTS_UBUNTU_RELEASE_ABI > 255
 #error UTS_UBUNTU_RELEASE_ABI is too large...
@@ -3314,6 +3343,11 @@ extern int _kc_ethtool_op_set_flags(struct net_device *, u32, u32);
 extern u32 _kc_ethtool_op_get_flags(struct net_device *);
 #define ethtool_op_get_flags _kc_ethtool_op_get_flags
 
+enum {
+	WQ_UNBOUND = 0,
+	WQ_RESCUER = 0,
+};
+
 #ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
 #ifdef NET_IP_ALIGN
 #undef NET_IP_ALIGN
@@ -3421,6 +3455,8 @@ static inline int __kc_netif_set_real_num_rx_queues(struct net_device __always_u
 #ifndef ETH_FLAG_RXVLAN
 #define ETH_FLAG_RXVLAN (1 << 8)
 #endif /* ETH_FLAG_RXVLAN */
+
+#define WQ_MEM_RECLAIM WQ_RESCUER
 
 static inline void _kc_skb_checksum_none_assert(struct sk_buff *skb)
 {
@@ -3762,6 +3798,46 @@ static inline void __kc_skb_frag_unref(skb_frag_t *frag)
 #endif
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,3,0) )
+/* NOTE: the order of parameters to _kc_alloc_workqueue() is different than
+ * alloc_workqueue() to avoid compiler warning from -Wvarargs
+ */
+static inline struct workqueue_struct * __attribute__ ((format(printf, 3, 4)))
+_kc_alloc_workqueue(__maybe_unused int flags, __maybe_unused int max_active,
+		    const char *fmt, ...)
+{
+	struct workqueue_struct *wq;
+	va_list args, temp;
+	unsigned int len;
+	char *p;
+
+	va_start(args, fmt);
+	va_copy(temp, args);
+	len = vsnprintf(NULL, 0, fmt, temp);
+	va_end(temp);
+
+	p = kmalloc(len + 1, GFP_KERNEL);
+	if (!p) {
+		va_end(args);
+		return NULL;
+	}
+
+	vsnprintf(p, len + 1, fmt, args);
+	va_end(args);
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36) )
+	wq = create_workqueue(p);
+#else
+	wq = alloc_workqueue(p, flags, max_active);
+#endif
+	kfree(p);
+
+	return wq;
+}
+#ifdef alloc_workqueue
+#undef alloc_workqueue
+#endif
+#define alloc_workqueue(fmt, flags, max_active, args...) \
+	_kc_alloc_workqueue(flags, max_active, fmt, ##args)
+
 #if !(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,5))
 typedef u32 netdev_features_t;
 #endif
@@ -4030,8 +4106,7 @@ static inline u8 pci_pcie_type(struct pci_dev *pdev)
 	u16 reg16;
 
 	pos = pci_find_capability(pdev, PCI_CAP_ID_EXP);
-	if (!pos)
-		BUG();
+	BUG_ON(!pos);
 	pci_read_config_word(pdev, pos + PCI_EXP_FLAGS, &reg16);
 	return (reg16 & PCI_EXP_FLAGS_TYPE) >> 4;
 }
@@ -4082,7 +4157,67 @@ int __kc_pcie_capability_clear_word(struct pci_dev *dev, int pos,
 #define napi_gro_flush(_napi, _flush_old) napi_gro_flush(_napi)
 #endif /* !RHEL6.8+ */
 
+#if (RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(6,6))
+#include <linux/hashtable.h>
+#else
+
+#define DEFINE_HASHTABLE(name, bits)						\
+	struct hlist_head name[1 << (bits)] =					\
+			{ [0 ... ((1 << (bits)) - 1)] = HLIST_HEAD_INIT }
+
+#define DEFINE_READ_MOSTLY_HASHTABLE(name, bits)				\
+	struct hlist_head name[1 << (bits)] __read_mostly =			\
+			{ [0 ... ((1 << (bits)) - 1)] = HLIST_HEAD_INIT }
+
+#define DECLARE_HASHTABLE(name, bits)                                   	\
+	struct hlist_head name[1 << (bits)]
+
+#define HASH_SIZE(name) (ARRAY_SIZE(name))
+#define HASH_BITS(name) ilog2(HASH_SIZE(name))
+
+/* Use hash_32 when possible to allow for fast 32bit hashing in 64bit kernels. */
+#define hash_min(val, bits)							\
+	(sizeof(val) <= 4 ? hash_32(val, bits) : hash_long(val, bits))
+
+static inline void __hash_init(struct hlist_head *ht, unsigned int sz)
+{
+	unsigned int i;
+
+	for (i = 0; i < sz; i++)
+		INIT_HLIST_HEAD(&ht[i]);
+}
+
+#define hash_init(hashtable) __hash_init(hashtable, HASH_SIZE(hashtable))
+
+#define hash_add(hashtable, node, key)						\
+	hlist_add_head(node, &hashtable[hash_min(key, HASH_BITS(hashtable))])
+
+static inline bool hash_hashed(struct hlist_node *node)
+{
+	return !hlist_unhashed(node);
+}
+
+static inline bool __hash_empty(struct hlist_head *ht, unsigned int sz)
+{
+	unsigned int i;
+
+	for (i = 0; i < sz; i++)
+		if (!hlist_empty(&ht[i]))
+			return false;
+
+	return true;
+}
+
+#define hash_empty(hashtable) __hash_empty(hashtable, HASH_SIZE(hashtable))
+
+static inline void hash_del(struct hlist_node *node)
+{
+	hlist_del_init(node);
+}
+#endif /* RHEL >= 6.6 */
+
 #else /* >= 3.7.0 */
+#include <linux/hashtable.h>
 #define HAVE_CONST_STRUCT_PCI_ERROR_HANDLERS
 #define USE_CONST_DEV_UC_CHAR
 #endif /* >= 3.7.0 */
@@ -4221,7 +4356,9 @@ int __kc_ipv6_find_hdr(const struct sk_buff *skb, unsigned int *offset,
 
 #undef hlist_entry_safe
 #define hlist_entry_safe(ptr, type, member) \
-	(ptr) ? hlist_entry(ptr, type, member) : NULL
+	({ typeof(ptr) ____ptr = (ptr); \
+	   ____ptr ? hlist_entry(____ptr, type, member) : NULL; \
+	})
 
 #undef hlist_for_each_entry
 #define hlist_for_each_entry(pos, head, member)                             \
@@ -4234,6 +4371,27 @@ int __kc_ipv6_find_hdr(const struct sk_buff *skb, unsigned int *offset,
 	for (pos = hlist_entry_safe((head)->first, typeof(*pos), member);   \
 	     pos && ({ n = pos->member.next; 1; });			    \
 	     pos = hlist_entry_safe(n, typeof(*pos), member))
+
+#undef hash_for_each
+#define hash_for_each(name, bkt, obj, member)				\
+	for ((bkt) = 0, obj = NULL; obj == NULL && (bkt) < HASH_SIZE(name);\
+			(bkt)++)\
+		hlist_for_each_entry(obj, &name[bkt], member)
+
+#undef hash_for_each_safe
+#define hash_for_each_safe(name, bkt, tmp, obj, member)			\
+	for ((bkt) = 0, obj = NULL; obj == NULL && (bkt) < HASH_SIZE(name);\
+			(bkt)++)\
+		hlist_for_each_entry_safe(obj, tmp, &name[bkt], member)
+
+#undef hash_for_each_possible
+#define hash_for_each_possible(name, obj, member, key)			\
+	hlist_for_each_entry(obj, &name[hash_min(key, HASH_BITS(name))], member)
+
+#undef hash_for_each_possible_safe
+#define hash_for_each_possible_safe(name, obj, tmp, member, key)	\
+	hlist_for_each_entry_safe(obj, tmp,\
+		&name[hash_min(key, HASH_BITS(name))], member)
 
 #ifdef CONFIG_XPS
 extern int __kc_netif_set_xps_queue(struct net_device *, struct cpumask *, u16);
@@ -4343,7 +4501,9 @@ extern int __kc_pcie_get_minimum_link(struct pci_dev *dev,
 #if ( SLE_VERSION_CODE && SLE_VERSION_CODE >= SLE_VERSION(12,0,0))
 #define HAVE_NDO_SELECT_QUEUE_ACCEL_FALLBACK
 #endif
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(4,8,0) )
 #define HAVE_VXLAN_RX_OFFLOAD
+#endif /* < 4.8.0 */
 #define HAVE_NDO_GET_PHYS_PORT_ID
 #endif /* >= 3.12.0 */
 
@@ -4375,10 +4535,15 @@ extern int __kc_dma_set_mask_and_coherent(struct device *dev, u64 mask);
 #define HAVE_NDO_SELECT_QUEUE_ACCEL
 #endif
 #define HAVE_NET_GET_RANDOM_ONCE
+#define HAVE_HWMON_DEVICE_REGISTER_WITH_GROUPS
 #endif
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0) )
+
+#ifndef U16_MAX
+#define U16_MAX ((u16)~0U)
+#endif
 
 #ifndef U32_MAX
 #define U32_MAX ((u32)~0U)
@@ -4728,6 +4893,12 @@ static inline struct sk_buff *__kc_napi_alloc_skb(struct napi_struct *napi, unsi
 #ifndef napi_schedule_irqoff
 #define napi_schedule_irqoff	napi_schedule
 #endif
+#ifndef READ_ONCE
+#define READ_ONCE(_x) ACCESS_ONCE(_x)
+#endif
+#if RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,2))
+#define HAVE_NDO_FDB_ADD_VID
+#endif
 #else /* 3.19.0 */
 #define HAVE_NDO_FDB_ADD_VID
 #define HAVE_RXFH_HASHFUNC
@@ -4744,6 +4915,9 @@ static inline struct sk_buff *__kc_napi_alloc_skb(struct napi_struct *napi, unsi
 #endif
 #if RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,1))
 #define HAVE_INCLUDE_LINUX_TIMECOUNTER_H
+#endif
+#if RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,2))
+#define HAVE_NDO_BRIDGE_SET_DEL_LINK_FLAGS
 #endif
 #else
 #define HAVE_INCLUDE_LINUX_TIMECOUNTER_H
@@ -4763,6 +4937,9 @@ static inline void __kc_timecounter_adjtime(struct timecounter *tc, s64 delta)
 }
 #define timecounter_adjtime __kc_timecounter_adjtime
 #endif
+#if RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,2))
+#define HAVE_NDO_BRIDGE_GETLINK_NLFLAGS
+#endif
 #else
 #define HAVE_PTP_CLOCK_INFO_GETTIME64
 #define HAVE_NDO_BRIDGE_GETLINK_NLFLAGS
@@ -4771,7 +4948,8 @@ static inline void __kc_timecounter_adjtime(struct timecounter *tc, s64 delta)
 #endif /* 4,1,0 */
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,9))
-#if (!(SLE_VERSION_CODE && SLE_VERSION_CODE >= SLE_VERSION(12,1,0)))
+#if (!(SLE_VERSION_CODE && SLE_VERSION_CODE >= SLE_VERSION(12,1,0))) && \
+	!(RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,2)))
 static inline bool page_is_pfmemalloc(struct page __maybe_unused *page)
 {
 #ifdef HAVE_STRUCT_PAGE_PFMEMALLOC
@@ -4791,8 +4969,43 @@ static inline bool page_is_pfmemalloc(struct page __maybe_unused *page)
 #endif /* 4.2.0 */
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,4,0))
+#ifndef CONFIG_64BIT
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+#include <asm-generic/io-64-nonatomic-lo-hi.h>	/* 32-bit readq/writeq */
+#else /* 3.3.0 => 4.3.x */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26))
+#include <asm-generic/int-ll64.h>
+#endif /* 2.6.26 => 3.3.0 */
+#ifndef readq
+static inline __u64 readq(const volatile void __iomem *addr)
+{
+	const volatile u32 __iomem *p = addr;
+	u32 low, high;
+
+	low = readl(p);
+	high = readl(p + 1);
+
+	return low + ((u64)high << 32);
+}
+#define readq readq
+#endif
+
+#ifndef writeq
+static inline void writeq(__u64 val, volatile void __iomem *addr)
+{
+	writel(val, addr);
+	writel(val >> 32, addr + 4);
+}
+#define writeq writeq
+#endif
+#endif /* < 3.3.0 */
+#endif /* !CONFIG_64BIT */
 #else
 #define HAVE_NDO_SET_VF_TRUST
+
+#ifndef CONFIG_64BIT
+#include <linux/io-64-nonatomic-lo-hi.h>	/* 32-bit readq/writeq */
+#endif /* !CONFIG_64BIT */
 #endif /* 4.4.0 */
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,5,0))
@@ -4804,12 +5017,16 @@ static inline bool page_is_pfmemalloc(struct page __maybe_unused *page)
 #define NETIF_F_SCTP_CRC NETIF_F_SCTP_CSUM
 #endif /* NETIF_F_SCTP_CRC */
 #else
+#if ( LINUX_VERSION_CODE < KERNEL_VERSION(4,8,0) )
 #define HAVE_GENEVE_RX_OFFLOAD
+#endif /* < 4.8.0 */
 #define HAVE_NETIF_NAPI_ADD_CALLS_NAPI_HASH_ADD
 #endif /* 4.5.0 */
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,6,0))
-#if !(UBUNTU_VERSION_CODE && UBUNTU_VERSION_CODE >= UBUNTU_VERSION(4,4,0,21))
+#if !(UBUNTU_VERSION_CODE && \
+		UBUNTU_VERSION_CODE >= UBUNTU_VERSION(4,4,0,21)) && \
+	!(RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,2)))
 static inline void napi_consume_skb(struct sk_buff *skb,
 				    int __always_unused budget)
 {
@@ -4822,11 +5039,33 @@ static inline void csum_replace_by_diff(__sum16 *sum, __wsum diff)
 	* sum = csum_fold(csum_add(diff, ~csum_unfold(*sum)));
 }
 
+#if !(RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,2)))
 static inline void page_ref_inc(struct page *page)
 {
 	atomic_inc(&page->_count);
 }
 
+#endif
+
 #endif /* 4.6.0 */
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,7,0))
+#else
+#define HAVE_NETIF_TRANS_UPDATE
+#endif /* 4.7.0 */
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,8,0))
+enum udp_parsable_tunnel_type {
+	UDP_TUNNEL_TYPE_VXLAN,
+	UDP_TUNNEL_TYPE_GENEVE,
+};
+struct udp_tunnel_info {
+	unsigned short type;
+	sa_family_t sa_family;
+	__be16 port;
+};
+#else
+#define HAVE_UDP_ENC_RX_OFFLOAD
+#endif /* 4.8.0 */
 
 #endif /* _KCOMPAT_H_ */
