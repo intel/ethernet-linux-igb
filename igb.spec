@@ -1,6 +1,6 @@
 Name: igb
-Summary: Intel(R) Gigabit Ethernet Connection
-Version: 5.3.5.4
+Summary: Intel(R) Gigabit Ethernet Linux Driver
+Version: 5.3.5.10
 Release: 1
 Source: %{name}-%{version}.tar.gz
 Vendor: Intel Corporation
@@ -10,7 +10,7 @@ Group: System Environment/Kernel
 Provides: %{name}
 URL: http://support.intel.com
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
-# do not generate debugging packages by default - older versions of rpmbuild
+# do not generate debugging packages by default - newer versions of rpmbuild
 # may instead need:
 #%define debug_package %{nil}
 %debug_package %{nil}
@@ -23,7 +23,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-root
 Requires: kernel, fileutils, findutils, gawk, bash
 
 %description
-This package contains the Linux driver for the Intel(R) Gigabit Family of Server Adapters.
+This package contains the Intel(R) Gigabit Ethernet Linux Driver.
 
 %prep
 %setup
@@ -33,22 +33,20 @@ make -C src clean
 make -C src
 
 %install
-make -C src INSTALL_MOD_PATH=%{buildroot} MANDIR=%{_mandir} install
+make -C src INSTALL_MOD_PATH=%{buildroot} MANDIR=%{_mandir} rpm
 # Append .new to driver name to avoid conflict with kernel RPM
 cd %{buildroot}
 find lib -name "igb.*o" -exec mv {} {}.new \; \
          -fprintf %{_builddir}/%{name}-%{version}/file.list "/%p.new\n"
-mkdir -p $RPM_BUILD_ROOT/usr/share/pci.ids.d
-install -D -m 644 %{pciids} $RPM_BUILD_ROOT/usr/share/pci.ids.d/pci.ids.intel-igb-%{version}
+find lib/modules -name modules.* -exec rm -f {} \;
 
 
 %clean
 rm -rf %{buildroot}
 
-%files -f %{_builddir}/%{name}-%{version}/file.list
+%files -f file.list
 %defattr(-,root,root)
 %{_mandir}/man7/igb.7.gz
-/usr/share/pci.ids.d/pci.ids.intel-igb-%{version}
 %doc COPYING
 %doc README
 %doc file.list
@@ -66,12 +64,12 @@ if [ -d /usr/local/share/%{name} ]; then
 	rm -rf /usr/local/share/%{name}
 fi
 
-# Save old drivers (aka .o and .o.gz)
+# Save old drivers (aka .ko and .ko.gz)
 echo "original pci.ids saved in /usr/local/share/%{name}";
 if [ "%{pcitable}" != "/dev/null" ]; then
 	echo "original pcitable saved in /usr/local/share/%{name}";
 fi
-for k in $(sed 's/\/lib\/modules\/\([0-9a-zA-Z_\.\-]*\).*/\1/' $FL) ; 
+for k in $(sed 's#/lib/modules/\([0-9a-zA-Z.+_-]*\).*$#\1#' $FL) ;
 do
 	d_drivers=/lib/modules/$k
 	d_usr=/usr/local/share/%{name}/$k
@@ -88,11 +86,11 @@ done
 
 # Add driver link
 for f in $(sed 's/\.new$//' $FL) ; do
-	ln -f $f.new $f 
+	ln -f $f.new $f
 done
 
 # Check if kernel version rpm was built on IS the same as running kernel
-BK_LIST=$(sed 's/\/lib\/modules\/\([0-9a-zA-Z_\.\-]*\).*/\1/' $FL)
+BK_LIST=$(sed 's#/lib/modules/\([0-9a-zA-Z.+_-]*\).*$#\1#' $FL) ;
 MATCH=no
 for i in $BK_LIST
 do
@@ -116,9 +114,6 @@ if [ -d %{_docdir}/%{name}-%{version} ]; then
 	LD="%{_docdir}/%{name}-%{version}";
 fi
 
-if [ -x /usr/bin/merge-pciids -a -x /usr/bin/perl ]; then
-    /usr/bin/merge-pciids
-else
 #Yes, this really needs bash
 bash -s %{pciids} \
 	%{pcitable} \
@@ -371,7 +366,6 @@ exec 6>&-
 exec 7>&-
 
 END
-fi
 
 mv -f $LD/pci.ids.new  %{pciids}
 if [ "%{pcitable}" != "/dev/null" ]; then
@@ -379,6 +373,37 @@ mv -f $LD/pcitable.new %{pcitable}
 fi
 
 uname -r | grep BOOT || /sbin/depmod -a > /dev/null 2>&1 || true
+
+echo "Updating initrd..."
+# Decide which initrd update utility to use.
+# Default is dracut but we'll try mkinitrd if that's not found.
+which dracut >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+	echo "Using dracut to update initrd..."
+	initrd_cmd="dracut --force"
+else
+	which mkinitrd >/dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		echo "Using mkinitrd to update initrd..."
+		initrd_cmd="mkinitrd"
+	else
+		echo "Unable to find initrd update utility."
+		echo "You must update your initrd for changes to take place."
+		exit -1
+	fi
+fi
+
+# Do the initrd update and report success or failure.
+if [ "$initrd_cmd" != "" ]; then
+	eval "$initrd_cmd"
+	if [ $? -ne 0 ]; then
+		echo "Failed to update initrd."
+		echo "You must update your initrd for changes to take place."
+		exit -1
+	else
+		echo "Successfully updated initrd."
+	fi
+fi
 
 %preun
 # If doing RPM un-install

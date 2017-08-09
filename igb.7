@@ -5,7 +5,7 @@
 .\" * Other names and brands may be claimed as the property of others.
 .\"
 .
-.TH igb 1 "December 10, 2015"
+.TH igb 1 "February 23, 2017"
 .SH NAME
 igb \-This file describes the Linux* Base Driver
 for the Gigabit Family of Adapters.
@@ -29,6 +29,8 @@ use with Linux.
 .LP
 This driver supports 2.5 Gbps operating speed on 2500BASE-KX only for 
 I354-based network connections.
+
+
 .SH OPTIONS
 The following optional parameters are used by entering them on the
 command line with the modprobe command.
@@ -71,9 +73,16 @@ increased CPU utilization, though it may help throughput in some circumstances.
   increase latency as packets are not processed as quickly.
 
  .IP
+
 NOTE:
 - Un-supported Adapters: InterruptThrottleRate is NOT supported by
   82542, 82543, or 82544-based adapters.
+
+
+
+
+
+
 .LP
 .B LLIPort
 .IP
@@ -207,11 +216,10 @@ A link between two EEE-compliant devices will result in periodic bursts of
 data followed by periods where the link is in an idle state. This Low Power
 Idle (LPI) state is supported in both 1 Gbps and 100 Mbps link speeds.
 
-NOTE: EEE support requires auto-negotiation.
 .LP
 .B DMAC
 .IP
-.B Valid Range: 0, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000,
+.B Valid Range: 0, 1, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000,
 9000, 10000
 .IP
 This parameter enables or disables DMA Coalescing feature. Values are in
@@ -234,7 +242,7 @@ platform power.
 .B Valid Range: 0-1
 .IP
 0 = Disabled
-.IP>
+.IP
 1 = Enabled
 .IP
 This parameter is only relevant for I350 devices operating in SR-IOV mode.
@@ -249,6 +257,9 @@ Use the ifconfig command to increase the MTU size. For example, enter the
 following where <x> is the interface number:
 
    ifconfig eth<x> mtu 9000 up
+Alternatively, you can use the ip command as follows:
+   ip link set mtu 9000 dev eth<x>
+   ip link set up dev eth<x>
 
 .LP
 NOTES:
@@ -256,6 +267,7 @@ NOTES:
   with the maximum Jumbo Frames size of 9234 bytes.
 - Using Jumbo frames at 10 or 100 Mbps is not supported and may result in
   poor performance or loss of link.
+
 See the section "Jumbo Frames" in the Readme.
 .SH ethtool
 .LP
@@ -307,4 +319,5 @@ For general information, go to the Intel support website at:
 If an issue is identified with the released source code on a supported
 kernel with a supported adapter, email the specific information related to the
 issue to e1000-devel@lists.sf.net.
+
 .LP

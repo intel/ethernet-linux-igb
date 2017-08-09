@@ -1,7 +1,7 @@
 /*******************************************************************************
 
-  Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2015 Intel Corporation.
+  Intel(R) Gigabit Ethernet Linux Driver
+  Copyright(c) 2007 - 2017 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -60,18 +60,13 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define MAJ 5
-#define MIN 3
-#define BUILD 5.4
-#define DRV_VERSION __stringify(MAJ) "." __stringify(MIN) "."\
-	__stringify(BUILD) VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.3.5.10" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
-static const char igb_driver_string[] =
-				"Intel(R) Gigabit Ethernet Network Driver";
-static const char igb_copyright[] =
-				"Copyright (c) 2007-2015 Intel Corporation.";
+static const char igb_driver_string[] = DRV_SUMMARY;
+static const char igb_copyright[] = "Copyright(c) 2007 - 2017 Intel Corporation.";
 
 static const struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I354_BACKPLANE_1GBPS) },
@@ -182,8 +177,12 @@ static void igb_restore_vf_multicasts(struct igb_adapter *adapter);
 static void igb_process_mdd_event(struct igb_adapter *);
 #ifdef IFLA_VF_MAX
 static int igb_ndo_set_vf_mac(struct net_device *netdev, int vf, u8 *mac);
-static int igb_ndo_set_vf_vlan(struct net_device *netdev,
-			       int vf, u16 vlan, u8 qos);
+#ifdef IFLA_VF_VLAN_INFO_MAX
+int igb_ndo_set_vf_vlan(struct net_device *netdev, int vf, u16 vlan, u8 qos,
+			__be16 vlan_proto);
+#else
+int igb_ndo_set_vf_vlan(struct net_device *netdev, int vf, u16 vlan, u8 qos);
+#endif /* IFLA_VF_VLAN_INFO_MAX */
 #ifdef HAVE_VF_SPOOFCHK_CONFIGURE
 static int igb_ndo_set_vf_spoofchk(struct net_device *netdev, int vf,
 				bool setting);
@@ -283,7 +282,7 @@ static struct pci_driver igb_driver = {
 /* u32 e1000_read_reg(struct e1000_hw *hw, u32 reg); */
 
 MODULE_AUTHOR("Intel Corporation, <e1000-devel@lists.sourceforge.net>");
-MODULE_DESCRIPTION("Intel(R) Gigabit Ethernet Network Driver");
+MODULE_DESCRIPTION(DRV_SUMMARY);
 MODULE_LICENSE("GPL");
 MODULE_VERSION(DRV_VERSION);
 
@@ -2345,13 +2344,25 @@ static const struct net_device_ops igb_netdev_ops = {
 	.ndo_set_mac_address	= igb_set_mac,
 	.ndo_change_mtu		= igb_change_mtu,
 	.ndo_do_ioctl		= igb_ioctl,
+#ifdef HAVE_RHEL7_NET_DEVICE_OPS_EXT
+	/* RHEL7 requires this to be defined to enable extended ops. RHEL7 uses
+	 * the function get_ndo_ext to retrieve offsets for extended fields
+	 * from with the net_device_ops struct and ndo_size is checked to
+	 * determine whether or not the offset is valid.
+	 */
+	.ndo_size               = sizeof(const struct net_device_ops),
+#endif
 	.ndo_tx_timeout		= igb_tx_timeout,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_vlan_rx_add_vid	= igb_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	= igb_vlan_rx_kill_vid,
 #ifdef IFLA_VF_MAX
 	.ndo_set_vf_mac		= igb_ndo_set_vf_mac,
+#ifdef HAVE_RHEL7_NETDEV_OPS_EXT_NDO_SET_VF_VLAN
+	.extended.ndo_set_vf_vlan = igb_ndo_set_vf_vlan,
+#else
 	.ndo_set_vf_vlan	= igb_ndo_set_vf_vlan,
+#endif
 #ifdef HAVE_NDO_SET_VF_MIN_MAX_TX_RATE
 	.ndo_set_vf_rate	= igb_ndo_set_vf_bw,
 #else
@@ -2507,7 +2518,7 @@ static void igb_set_fw_version(struct igb_adapter *adapter)
 		if (!(e1000_get_flash_presence_i210(hw))) {
 			snprintf(adapter->fw_version,
 			    sizeof(adapter->fw_version),
-			    "%2d.%2d-%d",
+			    "%2u.%2u-%u",
 			    fw.invm_major, fw.invm_minor, fw.invm_img_type);
 			break;
 		}
@@ -2517,7 +2528,7 @@ static void igb_set_fw_version(struct igb_adapter *adapter)
 		if (fw.or_valid) {
 			snprintf(adapter->fw_version,
 			    sizeof(adapter->fw_version),
-			    "%d.%d, 0x%08x, %d.%d.%d",
+			    "%u.%u, 0x%08x, %u.%u.%u",
 			    fw.eep_major, fw.eep_minor, fw.etrack_id,
 			    fw.or_major, fw.or_build, fw.or_patch);
 		/* no option rom */
@@ -2525,12 +2536,12 @@ static void igb_set_fw_version(struct igb_adapter *adapter)
 			if (fw.etrack_id != 0X0000) {
 				snprintf(adapter->fw_version,
 				    sizeof(adapter->fw_version),
-				    "%d.%d, 0x%08x",
+				    "%u.%u, 0x%08x",
 				    fw.eep_major, fw.eep_minor, fw.etrack_id);
 			} else {
 			snprintf(adapter->fw_version,
 			    sizeof(adapter->fw_version),
-			    "%d.%d.%d",
+			    "%u.%u.%u",
 			    fw.eep_major, fw.eep_minor, fw.eep_build);
 			}
 		}
@@ -3054,7 +3065,7 @@ static int igb_probe(struct pci_dev *pdev,
 	igb_ptp_init(adapter);
 #endif /* HAVE_PTP_1588_CLOCK */
 
-	dev_info(pci_dev_to_dev(pdev), "Intel(R) Gigabit Ethernet Network Connection\n");
+	dev_info(pci_dev_to_dev(pdev), "Intel(R) Gigabit Ethernet Linux Driver");
 	/* print bus type/speed/width info */
 	dev_info(pci_dev_to_dev(pdev), "%s: (PCIe:%s:%s) ",
 		 netdev->name,
@@ -6614,8 +6625,12 @@ static void igb_set_vmvir(struct igb_adapter *adapter, u32 vid, u32 vf)
 		E1000_WRITE_REG(hw, E1000_VMVIR(vf), 0);
 }
 
-static int igb_ndo_set_vf_vlan(struct net_device *netdev,
-			       int vf, u16 vlan, u8 qos)
+#ifdef IFLA_VF_VLAN_INFO_MAX
+int igb_ndo_set_vf_vlan(struct net_device *netdev, int vf, u16 vlan, u8 qos,
+			__be16 vlan_proto)
+#else
+int igb_ndo_set_vf_vlan(struct net_device *netdev, int vf, u16 vlan, u8 qos)
+#endif /* IFLA_VF_VLAN_INFO_MAX */
 {
 	int err = 0;
 	struct igb_adapter *adapter = netdev_priv(netdev);
@@ -6781,9 +6796,15 @@ static inline void igb_vf_reset(struct igb_adapter *adapter, u32 vf)
 	igb_clear_vf_vfta(adapter, vf);
 #ifdef IFLA_VF_MAX
 	if (adapter->vf_data[vf].pf_vlan)
+#ifdef IFLA_VF_VLAN_INFO_MAX
+		igb_ndo_set_vf_vlan(adapter->netdev, vf,
+				    adapter->vf_data[vf].pf_vlan,
+				    adapter->vf_data[vf].pf_qos, 0);
+#else
 		igb_ndo_set_vf_vlan(adapter->netdev, vf,
 				    adapter->vf_data[vf].pf_vlan,
 				    adapter->vf_data[vf].pf_qos);
+#endif
 	else
 		igb_clear_vf_vfta(adapter, vf);
 #endif

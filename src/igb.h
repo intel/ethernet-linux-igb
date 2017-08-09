@@ -1,7 +1,7 @@
 /*******************************************************************************
 
-  Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2015 Intel Corporation.
+  Intel(R) Gigabit Ethernet Linux Driver
+  Copyright(c) 2007 - 2017 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -610,7 +610,7 @@ struct igb_adapter {
 	u32 rss_queues;
 	u32 tss_queues;
 	u32 vmdq_pools;
-	char fw_version[32];
+	char fw_version[45];
 	u32 wvbr;
 	struct igb_mac_addr *mac_table;
 #ifdef CONFIG_IGB_VMDQ_NETDEV

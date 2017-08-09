@@ -1,7 +1,7 @@
 /*******************************************************************************
 
-  Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2015 Intel Corporation.
+  Intel(R) Gigabit Ethernet Linux Driver
+  Copyright(c) 2007 - 2017 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -446,7 +446,7 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	if (mac->type >= e1000_82580)
 		mac->ops.reset_hw = e1000_reset_hw_82580;
 	else
-	mac->ops.reset_hw = e1000_reset_hw_82575;
+		mac->ops.reset_hw = e1000_reset_hw_82575;
 	/* hw initialization */
 	if ((mac->type == e1000_i210) || (mac->type == e1000_i211))
 		mac->ops.init_hw = e1000_init_hw_i210;

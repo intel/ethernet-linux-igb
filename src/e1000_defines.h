@@ -1,7 +1,7 @@
 /*******************************************************************************
 
-  Intel(R) Gigabit Ethernet Linux driver
-  Copyright(c) 2007-2015 Intel Corporation.
+  Intel(R) Gigabit Ethernet Linux Driver
+  Copyright(c) 2007 - 2017 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -1402,6 +1402,7 @@
 /* Lan ID bit field offset in status register */
 #define E1000_STATUS_LAN_ID_OFFSET	2
 #define E1000_VFTA_ENTRIES		128
+
 #ifndef E1000_UNUSEDARG
 #define E1000_UNUSEDARG
 #endif /* E1000_UNUSEDARG */

@@ -4,7 +4,7 @@ igb Linux* Base Driver for Intel(R) Ethernet Network Connection
 
 ================================================================================
 
-May 2, 2016
+February 23, 2017
 
 ================================================================================
 
@@ -35,7 +35,6 @@ can throttle traffic between the host and the virtual switch, reducing
 performance. To resolve this issue, configure all SR-IOV enabled ports for
 VLAN tagging. This configuration allows unexpected, and potentially malicious,
 frames to be dropped.
-
 
 
 Overview
@@ -75,6 +74,8 @@ The igb driver supports IEEE 1588 time stamping for kernels 2.6.30 and newer.
 
 The igb driver supports 2.5 Gbps operating speed on 2500BASE-KX only for
 I354-based network connections.
+
+
 
 
 ================================================================================
@@ -149,6 +150,8 @@ To build igb driver with DCA
 ----------------------------
 
 If your kernel supports DCA, the driver will build by default with DCA enabled.
+
+
 NOTE:
    For certain distributions like (but not limited to) RedHat Enterprise
    Linux 7 and Ubuntu, once the driver is installed the initrd/initramfs
@@ -217,9 +220,17 @@ increased CPU utilization, though it may help throughput in some circumstances.
   increase latency as packets are not processed as quickly.
 
  
+
 NOTE:
 - Un-supported Adapters: InterruptThrottleRate is NOT supported by
   82542, 82543, or 82544-based adapters.
+
+
+
+
+
+
+
 
 
 LLI (Low Latency Interrupts)
@@ -277,9 +288,11 @@ queues (8 queues).
 The driver allows maximum supported queue value. For example,
 I350-based adapters allow RSS=8, where 8 queues is the maximum allowable
 queues.
+
 NOTE: For 82575-based adapters, the maximum number of queues is 4; for
 82576-based and newer adapters it is 8; for I210-based adapters it is 4
 queues; and for I211-based adapters it is 2 queues.
+
 This parameter is also affected by the VMDq parameter in that it will limit
 the queues more.
 	VMDQ
@@ -312,6 +325,7 @@ Valid Range: 0-7
 If the value is greater than 0 it will also force the VMDq parameter to be 1
 or more.
 
+
 The parameters for the driver are referenced by position. Thus, if you have a
 dual port adapter, or more than one adapter in your system, and want N virtual
 functions per port, you must specify a number for each port with each parameter
@@ -332,6 +346,7 @@ to predict in all cases where the positions would be on the command line.
 NOTE: Neither the device nor the driver control how VFs are mapped into config
 space. Bus layout will vary by operating system. On operating systems that
 support it, you can check sysfs to find the mapping. 
+
 NOTE: When either SR-IOV mode or VMDq mode is enabled, hardware VLAN
 filtering and VLAN tag stripping/insertion will remain enabled. Please remove
 the old VLAN filter before the new VLAN filter is added. For example,
@@ -401,12 +416,11 @@ A link between two EEE-compliant devices will result in periodic bursts of
 data followed by periods where the link is in an idle state. This Low Power
 Idle (LPI) state is supported in both 1 Gbps and 100 Mbps link speeds.
 
-NOTE: EEE support requires auto-negotiation.
 
 
 DMAC
 ----
-Valid Range: 0, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000,
+Valid Range: 0, 1, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000,
 9000, 10000
 This parameter enables or disables DMA Coalescing feature. Values are in
 microseconds and set the internal DMA Coalescing internal timer.
@@ -426,7 +440,6 @@ MDD (Malicious Driver Detection)
 --------------------------------
 Valid Range: 0-1
 0 = Disabled
->
 1 = Enabled
 This parameter is only relevant for I350 devices operating in SR-IOV mode.
 When this parameter is set, the driver detects malicious VF driver and
@@ -480,17 +493,23 @@ Use the ifconfig command to increase the MTU size. For example, enter the
 following where <x> is the interface number:
 
    ifconfig eth<x> mtu 9000 up
+Alternatively, you can use the ip command as follows:
+   ip link set mtu 9000 dev eth<x>
+   ip link set up dev eth<x>
 
 This setting is not saved across reboots. The setting change can be made
 permanent by adding 'MTU=9000' to the file:
 /etc/sysconfig/network-scripts/ifcfg-eth<x> for RHEL or to the file
 /etc/sysconfig/network/<config_file> for SLES.
 
+
+
 NOTES:
 - The maximum MTU setting for Jumbo Frames is 9216. This value coincides
   with the maximum Jumbo Frames size of 9234 bytes.
 - Using Jumbo frames at 10 or 100 Mbps is not supported and may result in
   poor performance or loss of link.
+
 
 
 ethtool
@@ -515,24 +534,27 @@ partner to identical settings to establish link and pass packets. This
 should only be needed when attempting to link with an older switch that
 does not support auto-negotiation or one that has been forced to a specific
 speed or duplex mode. Your link partner must match the setting you choose.
+1 Gbps speeds and higher cannot be forced. Use the autonegotiation
+advertising setting to manually set devices for 1 Gbps and higher.
 
-Speed and Duplex are configured through the ethtool* utility. ethtool is
-included with all versions of Red Hat after Red Hat 7.2. For other Linux
-distributions, download and install ethtool from the following website:
+
+Speed, duplex, and autonegotiation advertising are configured through
+the ethtool* utility. ethtool is included with all versions of Red Hat
+after Red Hat 7.2. For the latest version, download and install
+ethtool from the following website:
 
    http://ftp.kernel.org/pub/software/network/ethtool/
 
+
 Caution: Only experienced network administrators should force speed and
-duplex manually. The settings at the switch must always match the adapter
-settings. Adapter performance may suffer or your adapter may not
-operate if you configure the adapter differently from your switch.
+duplex or change autonegotiation advertising manually. The settings at
+the switch must always match the adapter settings. Adapter performance
+may suffer or your adapter may not operate if you configure the adapter
+differently from your switch.
 
 An Intel(R) Network Adapter using fiber-based connections, however, will not
 attempt to auto-negotiate with its link partner since those adapters operate
 only in full duplex and only at their native speed.
-
-NOTE: For the Intel(R) Ethernet Connection X552 10 GbE SFP+ you must specify
-the desired speed. 
 
 
 Enabling Wake on LAN* (WoL)
@@ -604,16 +626,20 @@ IEEE 1588 Precision Time Protocol (PTP) Hardware Clock (PHC)
 ------------------------------------------------------------
 
 Precision Time Protocol (PTP) is used to synchronize clocks in a computer
-network and is supported in the igb driver.
+network. PTP support varies among Intel devices that support this driver.
+Use "ethtool -T <netdev name>" to get a definitive list of PTP capabilities
+supported by the device.
 
 NOTE: PTP requires 3.0.0 or later kernel version that has PTP support enabled
 in the kernel and a user-space software daemon.
+
 
 IGB_PTP is a compile time flag. The user can enable it at compile time to add
 support for PTP from the driver. The flag is used by editing the make file
 as follows when it is being compiled:
 
 >make CFLAGS_EXTRA="-DIGB_PTP" install
+
 
 NOTE: The driver will fail to compile if your kernel does not support PTP.
 
@@ -633,6 +659,7 @@ the hardware and not transmitted.
 An interrupt is sent to the PF driver notifying it of the spoof attempt.
 When a spoofed packet is detected, the PF driver will send the following
 message to the system log (displayed by the "dmesg" command):
+
 Spoof event(s) detected on VF(n), where n = the VF that attempted to do the
 spoofing
 
@@ -824,8 +851,9 @@ kernel.
 Rx Page Allocation Errors
 -------------------------
 
-'Page allocation failure. order:0' errors may occur under stress with kernels
-2.6.25 and newer. This is caused by the way the Linux kernel reports this
+'Page allocation failure. order:0' errors may occur under stress.
+with kernels 2.6.25 and newer.
+This is caused by the way the Linux kernel reports this
 stressed condition.
 
 Under Redhat 5.4-GA, System May Crash when Closing Guest OS Window after
@@ -894,9 +922,11 @@ www.intel.com/support/
 
 or the Intel Wired Networking project hosted by Sourceforge at:
 http://sourceforge.net/projects/e1000
+
 If an issue is identified with the released source code on a supported
 kernel with a supported adapter, email the specific information related to the
 issue to e1000-devel@lists.sf.net.
+
 
 
 ================================================================================
@@ -920,16 +950,15 @@ St - Fifth Floor, Boston, MA 02110-1301 USA.
 The full GNU General Public License is included in this distribution in the
 file called "COPYING".
 
-Copyright(c) 1999 - 2016 Intel Corporation.
+Copyright(c) 1999 - 2017 Intel Corporation.
 ================================================================================
-
 
 
 Trademarks
 ----------
 
-Intel, Itanium, and Pentium are trademarks or registered trademarks of Intel
-Corporation or its subsidiaries in the United States and other countries.
+Intel and Itanium are trademarks or registered trademarks of Intel
+Corporation or its subsidiaries in the United States and/or other countries.
 
 * Other names and brands may be claimed as the property of others.
 
