@@ -60,7 +60,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.3.5.10" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.3.5.12" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
@@ -1047,9 +1047,11 @@ static void igb_set_interrupt_capability(struct igb_adapter *adapter, bool msix)
 			for (i = 0; i < numvecs; i++)
 				adapter->msix_entries[i].entry = i;
 
-			err = pci_enable_msix(pdev,
-					      adapter->msix_entries, numvecs);
-			if (err == 0)
+			err = pci_enable_msix_range(pdev,
+						    adapter->msix_entries,
+						    numvecs,
+						    numvecs);
+			if (err > 0)
 				break;
 		}
 		/* MSI-X failed, so fall through and try MSI */
@@ -2725,6 +2727,13 @@ static int igb_probe(struct pci_dev *pdev,
 		goto err_ioremap;
 	/* hw->hw_addr can be zeroed, so use adapter->io_addr for unmap */
 	hw->hw_addr = adapter->io_addr;
+
+#ifdef HAVE_NETDEVICE_MIN_MAX_MTU
+	/* MTU range: 68 - 9696 */
+	netdev->min_mtu = ETH_MIN_MTU;
+	netdev->max_mtu = MAX_RX_JUMBO_FRAME_SIZE -
+		(ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN);
+#endif
 
 #ifdef HAVE_NET_DEVICE_OPS
 	netdev->netdev_ops = &igb_netdev_ops;
@@ -5841,14 +5850,17 @@ static int igb_change_mtu(struct net_device *netdev, int new_mtu)
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
 	struct pci_dev *pdev = adapter->pdev;
+#ifndef HAVE_NETDEVICE_MIN_MAX_MTU
 	int max_frame = new_mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
 
 	if ((new_mtu < 68) || (max_frame > MAX_JUMBO_FRAME_SIZE)) {
 		dev_err(pci_dev_to_dev(pdev), "Invalid MTU setting\n");
 		return -EINVAL;
 	}
+#endif
 
 #define MAX_STD_JUMBO_FRAME_SIZE 9238
+#ifndef HAVE_NETDEVICE_MIN_MAX_MTU
 	if (max_frame > MAX_STD_JUMBO_FRAME_SIZE) {
 		dev_err(pci_dev_to_dev(pdev), "MTU > 9216 not supported.\n");
 		return -EINVAL;
@@ -5857,12 +5869,15 @@ static int igb_change_mtu(struct net_device *netdev, int new_mtu)
 	/* adjust max frame to be at least the size of a standard frame */
 	if (max_frame < (ETH_FRAME_LEN + ETH_FCS_LEN))
 		max_frame = ETH_FRAME_LEN + ETH_FCS_LEN;
+#endif
 
 	while (test_and_set_bit(__IGB_RESETTING, &adapter->state))
 		usleep_range(1000, 2000);
 
+#ifndef HAVE_NETDEVICE_MIN_MAX_MTU
 	/* igb_down has a dependency on max_frame_size */
 	adapter->max_frame_size = max_frame;
+#endif
 
 	if (netif_running(netdev))
 		igb_down(adapter);

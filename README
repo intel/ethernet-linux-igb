@@ -537,14 +537,12 @@ speed or duplex mode. Your link partner must match the setting you choose.
 1 Gbps speeds and higher cannot be forced. Use the autonegotiation
 advertising setting to manually set devices for 1 Gbps and higher.
 
-
 Speed, duplex, and autonegotiation advertising are configured through
 the ethtool* utility. ethtool is included with all versions of Red Hat
 after Red Hat 7.2. For the latest version, download and install
 ethtool from the following website:
 
    http://ftp.kernel.org/pub/software/network/ethtool/
-
 
 Caution: Only experienced network administrators should force speed and
 duplex or change autonegotiation advertising manually. The settings at

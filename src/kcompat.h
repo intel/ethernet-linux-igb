@@ -4752,6 +4752,7 @@ extern int __kc_pcie_get_minimum_link(struct pci_dev *dev,
 #endif
 #endif /* < 4.8.0 */
 #define HAVE_NDO_GET_PHYS_PORT_ID
+#define HAVE_NETIF_SET_XPS_QUEUE_CONST_MASK
 #endif /* >= 3.12.0 */
 
 /*****************************************************************************/
@@ -5073,6 +5074,11 @@ extern unsigned int __kc_eth_get_headlen(unsigned char *data, unsigned int max_l
 #if RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,1))
 #define HAVE_SKBUFF_CSUM_LEVEL
 #endif /* >= RH 7.1 */
+
+/* RHEL 7.3 backported xmit_more */
+#if (RHEL_RELEASE_CODE && RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,3))
+#define HAVE_SKB_XMIT_MORE
+#endif /* >= RH 7.3 */
 
 #undef GENMASK
 #define GENMASK(h, l) \
@@ -5489,7 +5495,6 @@ pci_release_mem_regions(struct pci_dev *pdev)
 #endif /* !SLE_VERSION(12,3,0) */
 #else
 #define HAVE_UDP_ENC_RX_OFFLOAD
-#define HAVE_XPS_QOS_SUPPORT
 #endif /* 4.8.0 */
 
 /*****************************************************************************/
@@ -5503,8 +5508,12 @@ pci_release_mem_regions(struct pci_dev *pdev)
 
 /*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0))
+#if (RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,4)))
+#define HAVE_DEV_WALK_API
+#endif
 #if (SLE_VERSION_CODE && (SLE_VERSION_CODE >= SLE_VERSION(12,3,0)))
 #define HAVE_STRUCT_DMA_ATTRS
+#define HAVE_NETDEVICE_MIN_MAX_MTU
 #endif
 
 #if !(SLE_VERSION_CODE && (SLE_VERSION_CODE >= SLE_VERSION(12,3,0)))
@@ -5550,10 +5559,12 @@ static inline void __page_frag_cache_drain(struct page *page,
 #ifndef ETH_MIN_MTU
 #define ETH_MIN_MTU 68
 #endif /* ETH_MIN_MTU */
-#else
+#else /* >= 4.10 */
 #define HAVE_NETDEVICE_MIN_MAX_MTU
 #define HAVE_SWIOTLB_SKIP_CPU_SYNC
 #define HAVE_NETDEV_TC_RESETS_XPS
+#define HAVE_XPS_QOS_SUPPORT
+#define HAVE_DEV_WALK_API
 #endif /* 4.10.0 */
 
 /*****************************************************************************/
@@ -5575,5 +5586,11 @@ static inline void __page_frag_cache_drain(struct page *page,
 #define HAVE_NDO_SETUP_TC_CHAIN_INDEX
 #define HAVE_PCI_ERROR_HANDLER_RESET_PREPARE
 #endif /* 4.13.0 */
+
+/*****************************************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0))
+#else /* > 4.14 */
+#define HAVE_NDO_SETUP_TC_REMOVE_TC_TO_NETDEV
+#endif /* 4.14.0 */
 
 #endif /* _KCOMPAT_H_ */
