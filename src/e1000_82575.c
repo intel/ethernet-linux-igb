@@ -448,7 +448,7 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	else
 		mac->ops.reset_hw = e1000_reset_hw_82575;
 	/* hw initialization */
-	if ((mac->type == e1000_i210) || (mac->type == e1000_i211))
+	if (mac->type == e1000_i210 || mac->type == e1000_i211)
 		mac->ops.init_hw = e1000_init_hw_i210;
 	else
 	mac->ops.init_hw = e1000_init_hw_82575;
@@ -507,11 +507,10 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	/* acquire SW_FW sync */
 	mac->ops.acquire_swfw_sync = e1000_acquire_swfw_sync_82575;
 	mac->ops.release_swfw_sync = e1000_release_swfw_sync_82575;
-	if (mac->type >= e1000_i210) {
+	if (mac->type == e1000_i210 || mac->type == e1000_i211) {
 		mac->ops.acquire_swfw_sync = e1000_acquire_swfw_sync_i210;
 		mac->ops.release_swfw_sync = e1000_release_swfw_sync_i210;
 	}
-
 	/* set lan id for port to determine which phy lock to use */
 	hw->mac.ops.set_lan_id(hw);
 

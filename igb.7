@@ -29,8 +29,6 @@ use with Linux.
 .LP
 This driver supports 2.5 Gbps operating speed on 2500BASE-KX only for 
 I354-based network connections.
-
-
 .SH OPTIONS
 The following optional parameters are used by entering them on the
 command line with the modprobe command.
@@ -73,16 +71,9 @@ increased CPU utilization, though it may help throughput in some circumstances.
   increase latency as packets are not processed as quickly.
 
  .IP
-
 NOTE:
 - Un-supported Adapters: InterruptThrottleRate is NOT supported by
   82542, 82543, or 82544-based adapters.
-
-
-
-
-
-
 .LP
 .B LLIPort
 .IP
@@ -166,13 +157,11 @@ In addition, the number of queues available for RSS is limited if this is set
 to 1 or greater.
 .LP
 .B max_vfs
-This parameter adds support for SR-IOV. It causes the driver to spawn up to
-max_vfs worth of virtual functions.
+This parameter adds support for SR-IOV. It causes the driver to spawn up to max_vfs worth of virtual functions.
 .IP
 .B Valid Range: 0-7
 .IP
-If the value is greater than 0 it will also force the VMDq parameter to be 1
-or more.
+If the value is greater than 0 it will also force the VMDq parameter to be 1 or more.
 .IP
 .IP
 .LP
@@ -250,11 +239,9 @@ When this parameter is set, the driver detects malicious VF driver and
 disables its Tx/Rx queues until a VF driver reset occurs.
 .SH Jumbo Frames
 .LP
-Jumbo Frames support is enabled by changing the Maximum Transmission Unit
-(MTU) to a value larger than the default value of 1500.
+Jumbo Frames support is enabled by changing the Maximum Transmission Unit (MTU) to a value larger than the default value of 1500.
 
-Use the ifconfig command to increase the MTU size. For example, enter the
-following where <x> is the interface number:
+Use the ifconfig command to increase the MTU size. For example, enter the following where <x> is the interface number:
 
    ifconfig eth<x> mtu 9000 up
 Alternatively, you can use the ip command as follows:
@@ -262,18 +249,13 @@ Alternatively, you can use the ip command as follows:
    ip link set up dev eth<x>
 
 .LP
-NOTES:
-- The maximum MTU setting for Jumbo Frames is 9216. This value coincides
-  with the maximum Jumbo Frames size of 9234 bytes.
-- Using Jumbo frames at 10 or 100 Mbps is not supported and may result in
-  poor performance or loss of link.
+NOTE: The maximum MTU setting for Jumbo Frames is 9216. This value coincides with the maximum Jumbo Frames size of 9234 bytes.
 
+NOTE: Using Jumbo frames at 10 or 100 Mbps is not supported and may result in poor performance or loss of link.
 See the section "Jumbo Frames" in the Readme.
 .SH ethtool
 .LP
-The driver utilizes the ethtool interface for driver configuration and
-diagnostics, as well as displaying statistical information. The latest
-ethtool version is required for this functionality. Download it at
+The driver utilizes the ethtool interface for driver configuration and diagnostics, as well as displaying statistical information. The latest ethtool version is required for this functionality. Download it at:
 http://ftp.kernel.org/pub/software/network/ethtool/
 
 
@@ -309,15 +291,11 @@ ethtool:
 NOTE: IPv6 and UDP are not supported by LRO.
 .SH SUPPORT
 .LP
-For additional information regarding building and installation,
-see the
+For additional information regarding building and installation, see the
 README
 included with the driver.
 For general information, go to the Intel support website at:
 .B www.intel.com/support/
 .LP
-If an issue is identified with the released source code on a supported
-kernel with a supported adapter, email the specific information related to the
-issue to e1000-devel@lists.sf.net.
-
+If an issue is identified with the released source code on a supported kernel with a supported adapter, email the specific information related to the issue to e1000-devel@lists.sf.net.
 .LP
