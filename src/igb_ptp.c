@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2017 Intel Corporation.
+  Copyright(c) 2007 - 2018 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -169,21 +169,21 @@ static void igb_ptp_write_i210(struct igb_adapter *adapter,
 }
 
 /**
- * igb_ptp_systim_to_hwtstamp - convert system time value to hw timestamp
- * @adapter: board private structure
- * @hwtstamps: timestamp structure to update
- * @systim: unsigned 64bit system time value.
+ *  igb_ptp_systim_to_hwtstamp - convert system time value to hw timestamp
+ *  @adapter: board private structure
+ *  @hwtstamps: timestamp structure to update
+ *  @systim: unsigned 64bit system time value.
  *
- * We need to convert the system time value stored in the RX/TXSTMP registers
- * into a hwtstamp which can be used by the upper level timestamping functions.
+ *  We need to convert the system time value stored in the RX/TXSTMP registers
+ *  into a hwtstamp which can be used by the upper level timestamping functions.
  *
- * The 'tmreg_lock' spinlock is used to protect the consistency of the
- * system time value. This is needed because reading the 64 bit time
- * value involves reading two (or three) 32 bit registers. The first
- * read latches the value. Ditto for writing.
+ *  The 'tmreg_lock' spinlock is used to protect the consistency of the
+ *  system time value. This is needed because reading the 64 bit time
+ *  value involves reading two (or three) 32 bit registers. The first
+ *  read latches the value. Ditto for writing.
  *
- * In addition, here have extended the system time with an overflow
- * counter in software.
+ *  In addition, here have extended the system time with an overflow
+ *  counter in software.
  **/
 static void igb_ptp_systim_to_hwtstamp(struct igb_adapter *adapter,
 				       struct skb_shared_hwtstamps *hwtstamps,
@@ -478,11 +478,11 @@ static int igb_ptp_enable(struct ptp_clock_info *ptp,
 }
 
 /**
- * igb_ptp_tx_work
- * @work: pointer to work struct
+ *  igb_ptp_tx_work
+ *  @work: pointer to work struct
  *
- * This work function polls the TSYNCTXCTL valid bit to determine when a
- * timestamp has been taken for the current stored skb.
+ *  This work function polls the TSYNCTXCTL valid bit to determine when a
+ *  timestamp has been taken for the current stored skb.
  */
 void igb_ptp_tx_work(struct work_struct *work)
 {
@@ -528,13 +528,13 @@ static void igb_ptp_overflow_check_82576(struct work_struct *work)
 }
 
 /**
- * igb_ptp_rx_hang - detect error case when Rx timestamp registers latched
- * @adapter: private network adapter structure
+ *  igb_ptp_rx_hang - detect error case when Rx timestamp registers latched
+ *  @adapter: private network adapter structure
  *
- * This watchdog task is scheduled to detect error case where hardware has
- * dropped an Rx packet that was timestamped when the ring is full. The
- * particular error is rare but leaves the device in a state unable to timestamp
- * any future packets.
+ *  This watchdog task is scheduled to detect error case where hardware has
+ *  dropped an Rx packet that was timestamped when the ring is full. The
+ *  particular error is rare but leaves the device in a state unable to timestamp
+ *  any future packets.
  */
 void igb_ptp_rx_hang(struct igb_adapter *adapter)
 {
@@ -568,12 +568,12 @@ void igb_ptp_rx_hang(struct igb_adapter *adapter)
 }
 
 /**
- * igb_ptp_tx_hwtstamp - utility function which checks for TX time stamp
- * @adapter: Board private structure.
+ *  igb_ptp_tx_hwtstamp - utility function which checks for TX time stamp
+ *  @adapter: Board private structure.
  *
- * If we were asked to do hardware stamping and such a time stamp is
- * available, then it must have been for this skb here because we only
- * allow only one such packet into the queue.
+ *  If we were asked to do hardware stamping and such a time stamp is
+ *  available, then it must have been for this skb here because we only
+ *  allow only one such packet into the queue.
  */
 void igb_ptp_tx_hwtstamp(struct igb_adapter *adapter)
 {
@@ -592,14 +592,14 @@ void igb_ptp_tx_hwtstamp(struct igb_adapter *adapter)
 }
 
 /**
- * igb_ptp_rx_pktstamp - retrieve Rx per packet timestamp
- * @q_vector: Pointer to interrupt specific structure
- * @va: Pointer to address containing Rx buffer
- * @skb: Buffer containing timestamp and packet
+ *  igb_ptp_rx_pktstamp - retrieve Rx per packet timestamp
+ *  @q_vector: Pointer to interrupt specific structure
+ *  @va: Pointer to address containing Rx buffer
+ *  @skb: Buffer containing timestamp and packet
  *
- * This function is meant to retrieve a timestamp from the first buffer of an
- * incoming frame.  The value is stored in little endian format starting on
- * byte 8.
+ *  This function is meant to retrieve a timestamp from the first buffer of an
+ *  incoming frame.  The value is stored in little endian format starting on
+ *  byte 8.
  */
 void igb_ptp_rx_pktstamp(struct igb_q_vector *q_vector,
 			 unsigned char *va,
@@ -617,12 +617,12 @@ void igb_ptp_rx_pktstamp(struct igb_q_vector *q_vector,
 }
 
 /**
- * igb_ptp_rx_rgtstamp - retrieve Rx timestamp stored in register
- * @q_vector: Pointer to interrupt specific structure
- * @skb: Buffer containing timestamp and packet
+ *  igb_ptp_rx_rgtstamp - retrieve Rx timestamp stored in register
+ *  @q_vector: Pointer to interrupt specific structure
+ *  @skb: Buffer containing timestamp and packet
  *
- * This function is meant to retrieve a timestamp from the internal registers
- * of the adapter and store it in the skb.
+ *  This function is meant to retrieve a timestamp from the internal registers
+ *  of the adapter and store it in the skb.
  */
 void igb_ptp_rx_rgtstamp(struct igb_q_vector *q_vector,
 			 struct sk_buff *skb)
@@ -657,13 +657,13 @@ void igb_ptp_rx_rgtstamp(struct igb_q_vector *q_vector,
 }
 
 /**
- * igb_ptp_get_ts_config - get hardware time stamping config
- * @netdev:
- * @ifreq:
+ *  igb_ptp_get_ts_config - get hardware time stamping config
+ *  @netdev:network interface device structure
+ *  @ifr: interface request
  *
- * Get the hwtstamp_config settings to return to the user. Rather than attempt
- * to deconstruct the settings from the registers, just return a shadow copy
- * of the last known settings.
+ *  Get the hwtstamp_config settings to return to the user. Rather than attempt
+ *  to deconstruct the settings from the registers, just return a shadow copy
+ *  of the last known settings.
  **/
 int igb_ptp_get_ts_config(struct net_device *netdev, struct ifreq *ifr)
 {
@@ -675,22 +675,21 @@ int igb_ptp_get_ts_config(struct net_device *netdev, struct ifreq *ifr)
 }
 
 /**
- * igb_ptp_set_timestamp_mode - setup hardware for timestamping
- * @adapter: networking device structure
- * @config: hwtstamp configuration
+ *  igb_ptp_set_timestamp_mode - setup hardware for timestamping
+ *  @adapter: networking device structure
+ *  @config: hwtstamp configuration
  *
- * Outgoing time stamping can be enabled and disabled. Play nice and
- * disable it when requested, although it shouldn't case any overhead
- * when no packet needs it. At most one packet in the queue may be
- * marked for time stamping, otherwise it would be impossible to tell
- * for sure to which packet the hardware time stamp belongs.
+ *  Outgoing time stamping can be enabled and disabled. Play nice and
+ *  disable it when requested, although it shouldn't case any overhead
+ *  when no packet needs it. At most one packet in the queue may be
+ *  marked for time stamping, otherwise it would be impossible to tell
+ *  for sure to which packet the hardware time stamp belongs.
  *
- * Incoming time stamping has to be configured via the hardware
- * filters. Not all combinations are supported, in particular event
- * type has to be specified. Matching the kind of event packet is
- * not supported, with the exception of "all V2 events regardless of
- * level 2 or 4".
- *
+ *  Incoming time stamping has to be configured via the hardware
+ *  filters. Not all combinations are supported, in particular event
+ *  type has to be specified. Matching the kind of event packet is
+ *  not supported, with the exception of "all V2 events regardless of
+ *  level 2 or 4".
  */
 static int igb_ptp_set_timestamp_mode(struct igb_adapter *adapter,
 				      struct hwtstamp_config *config)
@@ -843,10 +842,9 @@ static int igb_ptp_set_timestamp_mode(struct igb_adapter *adapter,
 }
 
 /**
- * igb_ptp_set_ts_config - set hardware time stamping config
- * @netdev:
- * @ifreq:
- *
+ *  igb_ptp_set_ts_config - set hardware time stamping config
+ *  @netdev:network interface device structure
+ *  @ifr: interface request
  **/
 int igb_ptp_set_ts_config(struct net_device *netdev, struct ifreq *ifr)
 {
@@ -992,10 +990,10 @@ void igb_ptp_init(struct igb_adapter *adapter)
 }
 
 /**
- * igb_ptp_stop - Disable PTP device and stop the overflow check.
- * @adapter: Board private structure.
+ *  igb_ptp_stop - Disable PTP device and stop the overflow check.
+ *  @adapter: Board private structure.
  *
- * This function stops the PTP support and cancels the delayed work.
+ *  This function stops the PTP support and cancels the delayed work.
  **/
 void igb_ptp_stop(struct igb_adapter *adapter)
 {
@@ -1030,10 +1028,10 @@ void igb_ptp_stop(struct igb_adapter *adapter)
 }
 
 /**
- * igb_ptp_reset - Re-enable the adapter for PTP following a reset.
- * @adapter: Board private structure.
+ *  igb_ptp_reset - Re-enable the adapter for PTP following a reset.
+ *  @adapter: Board private structure.
  *
- * This function handles the reset work required to re-enable the PTP device.
+ *  This function handles the reset work required to re-enable the PTP device.
  **/
 void igb_ptp_reset(struct igb_adapter *adapter)
 {

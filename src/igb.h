@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2017 Intel Corporation.
+  Copyright(c) 2007 - 2018 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -126,6 +126,8 @@ struct igb_adapter;
 #define OUI_LEN                            3
 #define IGB_MAX_VMDQ_QUEUES                8
 
+#define MAX_STD_JUMBO_FRAME_SIZE	9216
+
 struct vf_data_storage {
 	unsigned char vf_mac_addresses[ETH_ALEN];
 	u16 vf_mc_hashes[IGB_MAX_VF_MC_ENTRIES];
@@ -199,6 +201,13 @@ struct vf_data_storage {
 
 /* How many Rx Buffers do we bundle into one write to the hardware ? */
 #define IGB_RX_BUFFER_WRITE	16	/* Must be power of 2 */
+
+#ifdef HAVE_STRUCT_DMA_ATTRS
+#define IGB_RX_DMA_ATTR        NULL
+#else
+#define IGB_RX_DMA_ATTR \
+	(DMA_ATTR_SKIP_CPU_SYNC | DMA_ATTR_WEAK_ORDERING)
+#endif
 
 #define IGB_EEPROM_APME         0x0400
 #define AUTO_ALL_MODES          0
@@ -279,7 +288,7 @@ enum igb_tx_flags {
  * maintain a power of two alignment we have to limit ourselves to 32K.
  */
 #define IGB_MAX_TXD_PWR		15
-#define IGB_MAX_DATA_PER_TXD	(1 << IGB_MAX_TXD_PWR)
+#define IGB_MAX_DATA_PER_TXD	BIT(IGB_MAX_TXD_PWR)
 
 /* Tx Descriptors needed, worst case */
 #define TXD_USE_COUNT(S)	DIV_ROUND_UP((S), IGB_MAX_DATA_PER_TXD)
@@ -685,22 +694,22 @@ struct igb_vmdq_adapter {
 };
 #endif
 
-#define IGB_FLAG_HAS_MSI		(1 << 0)
-#define IGB_FLAG_DCA_ENABLED		(1 << 1)
-#define IGB_FLAG_LLI_PUSH		(1 << 2)
-#define IGB_FLAG_QUAD_PORT_A		(1 << 3)
-#define IGB_FLAG_QUEUE_PAIRS		(1 << 4)
-#define IGB_FLAG_EEE			(1 << 5)
-#define IGB_FLAG_DMAC			(1 << 6)
-#define IGB_FLAG_DETECT_BAD_DMA		(1 << 7)
-#define IGB_FLAG_PTP			(1 << 8)
-#define IGB_FLAG_RSS_FIELD_IPV4_UDP	(1 << 9)
-#define IGB_FLAG_RSS_FIELD_IPV6_UDP	(1 << 10)
-#define IGB_FLAG_WOL_SUPPORTED		(1 << 11)
-#define IGB_FLAG_NEED_LINK_UPDATE	(1 << 12)
-#define IGB_FLAG_LOOPBACK_ENABLE	(1 << 13)
-#define IGB_FLAG_MEDIA_RESET		(1 << 14)
-#define IGB_FLAG_MAS_ENABLE		(1 << 15)
+#define IGB_FLAG_HAS_MSI		BIT(0)
+#define IGB_FLAG_DCA_ENABLED		BIT(1)
+#define IGB_FLAG_LLI_PUSH		BIT(2)
+#define IGB_FLAG_QUAD_PORT_A		BIT(3)
+#define IGB_FLAG_QUEUE_PAIRS		BIT(4)
+#define IGB_FLAG_EEE			BIT(5)
+#define IGB_FLAG_DMAC			BIT(6)
+#define IGB_FLAG_DETECT_BAD_DMA		BIT(7)
+#define IGB_FLAG_PTP			BIT(8)
+#define IGB_FLAG_RSS_FIELD_IPV4_UDP	BIT(9)
+#define IGB_FLAG_RSS_FIELD_IPV6_UDP	BIT(10)
+#define IGB_FLAG_WOL_SUPPORTED		BIT(11)
+#define IGB_FLAG_NEED_LINK_UPDATE	BIT(12)
+#define IGB_FLAG_LOOPBACK_ENABLE	BIT(13)
+#define IGB_FLAG_MEDIA_RESET		BIT(14)
+#define IGB_FLAG_MAS_ENABLE		BIT(15)
 
 /* Media Auto Sense */
 #define IGB_MAS_ENABLE_0		0X0001

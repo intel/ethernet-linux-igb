@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2017 Intel Corporation.
+  Copyright(c) 2007 - 2018 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -52,6 +52,9 @@ void e1000_init_nvm_ops_generic(struct e1000_hw *hw)
 /**
  *  e1000_null_nvm_read - No-op function, return 0
  *  @hw: pointer to the HW structure
+ *  @a: dummy variable
+ *  @b: dummy variable
+ *  @c: dummy variable
  **/
 s32 e1000_null_read_nvm(struct e1000_hw E1000_UNUSEDARG *hw,
 			u16 E1000_UNUSEDARG a, u16 E1000_UNUSEDARG b,
@@ -74,6 +77,7 @@ void e1000_null_nvm_generic(struct e1000_hw E1000_UNUSEDARG *hw)
 /**
  *  e1000_null_led_default - No-op function, return 0
  *  @hw: pointer to the HW structure
+ *  @data: dummy variable
  **/
 s32 e1000_null_led_default(struct e1000_hw E1000_UNUSEDARG *hw,
 			   u16 E1000_UNUSEDARG *data)
@@ -85,6 +89,9 @@ s32 e1000_null_led_default(struct e1000_hw E1000_UNUSEDARG *hw,
 /**
  *  e1000_null_write_nvm - No-op function, return 0
  *  @hw: pointer to the HW structure
+ *  @a: dummy variable
+ *  @b: dummy variable
+ *  @c: dummy variable
  **/
 s32 e1000_null_write_nvm(struct e1000_hw E1000_UNUSEDARG *hw,
 			 u16 E1000_UNUSEDARG a, u16 E1000_UNUSEDARG b,

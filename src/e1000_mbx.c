@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2017 Intel Corporation.
+  Copyright(c) 2007 - 2018 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -27,6 +27,7 @@
 /**
  *  e1000_null_mbx_check_for_flag - No-op function, return 0
  *  @hw: pointer to the HW structure
+ *  @mbx_id: id of mailbox to read
  **/
 static s32 e1000_null_mbx_check_for_flag(struct e1000_hw E1000_UNUSEDARG *hw,
 					 u16 E1000_UNUSEDARG mbx_id)
@@ -39,6 +40,9 @@ static s32 e1000_null_mbx_check_for_flag(struct e1000_hw E1000_UNUSEDARG *hw,
 /**
  *  e1000_null_mbx_transact - No-op function, return 0
  *  @hw: pointer to the HW structure
+ *  @msg: The message buffer
+ *  @size: Length of buffer
+ *  @mbx_id: id of mailbox to read
  **/
 static s32 e1000_null_mbx_transact(struct e1000_hw E1000_UNUSEDARG *hw,
 				   u32 E1000_UNUSEDARG *msg,
@@ -524,6 +528,7 @@ s32 e1000_init_mbx_params_pf(struct e1000_hw *hw)
 		mbx->stats.reqs = 0;
 		mbx->stats.acks = 0;
 		mbx->stats.rsts = 0;
+		/* Fall through */
 	default:
 		return E1000_SUCCESS;
 	}

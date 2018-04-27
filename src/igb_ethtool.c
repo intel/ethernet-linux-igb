@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2017 Intel Corporation.
+  Copyright(c) 2007 - 2018 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -2801,6 +2801,15 @@ static int igb_get_rxfh_indir(struct net_device *netdev, u32 *indir)
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	int i;
 
+#if (defined(ETHTOOL_GRSSH) && !defined(HAVE_ETHTOOL_GSRSSH) \
+     && defined(HAVE_RXFH_HASHFUNC))
+	if (hfunc)
+		*hfunc = ETH_RSS_HASH_TOP;
+
+#endif
+	if (!indir)
+		return 0;
+
 	for (i = 0; i < IGB_RETA_SIZE; i++)
 		indir[i] = adapter->rss_indir_tbl[i];
 
@@ -3035,6 +3044,7 @@ static int igb_set_channels(struct net_device *dev,
 		/* The PF has 3 interrupts and 1 queue pair w/ SR-IOV */
 		if (adapter->vfs_allocated_count)
 			break;
+		/* Fall through */
 	case e1000_82576:
 		/*
 		 * The PF has access to 6 interrupt vectors if the number of
@@ -3044,7 +3054,7 @@ static int igb_set_channels(struct net_device *dev,
 		if ((adapter->vfs_allocated_count > 0) &&
 		    (adapter->vfs_allocated_count < 7))
 			break;
-		/* fall through */
+		/* Fall through */
 	case e1000_82580:
 	case e1000_i210:
 	default:

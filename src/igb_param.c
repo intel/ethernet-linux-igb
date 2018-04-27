@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2017 Intel Corporation.
+  Copyright(c) 2007 - 2018 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -644,6 +644,7 @@ void igb_check_options(struct igb_adapter *adapter)
 						    adapter);
 				if (adapter->rss_queues)
 					break;
+				/* Fall through */
 			case 0:
 				adapter->rss_queues = min_t(u32, opt.arg.r.max,
 							    num_online_cpus());

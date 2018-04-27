@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2017 Intel Corporation.
+  Copyright(c) 2007 - 2018 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -93,6 +93,8 @@ void e1000_null_mac_generic(struct e1000_hw E1000_UNUSEDARG *hw)
 /**
  *  e1000_null_link_info - No-op function, return 0
  *  @hw: pointer to the HW structure
+ *  @s: dummy variable
+ *  @d: dummy variable
  **/
 s32 e1000_null_link_info(struct e1000_hw E1000_UNUSEDARG *hw,
 			 u16 E1000_UNUSEDARG *s, u16 E1000_UNUSEDARG *d)
@@ -114,6 +116,8 @@ bool e1000_null_mng_mode(struct e1000_hw E1000_UNUSEDARG *hw)
 /**
  *  e1000_null_update_mc - No-op function, return void
  *  @hw: pointer to the HW structure
+ *  @h: dummy variable
+ *  @a: dummy variable
  **/
 void e1000_null_update_mc(struct e1000_hw E1000_UNUSEDARG *hw,
 			  u8 E1000_UNUSEDARG *h, u32 E1000_UNUSEDARG a)
@@ -125,6 +129,8 @@ void e1000_null_update_mc(struct e1000_hw E1000_UNUSEDARG *hw,
 /**
  *  e1000_null_write_vfta - No-op function, return void
  *  @hw: pointer to the HW structure
+ *  @a: dummy variable
+ *  @b: dummy variable
  **/
 void e1000_null_write_vfta(struct e1000_hw E1000_UNUSEDARG *hw,
 			   u32 E1000_UNUSEDARG a, u32 E1000_UNUSEDARG b)
@@ -136,6 +142,8 @@ void e1000_null_write_vfta(struct e1000_hw E1000_UNUSEDARG *hw,
 /**
  *  e1000_null_rar_set - No-op function, return 0
  *  @hw: pointer to the HW structure
+ *  @h: dummy variable
+ *  @a: dummy variable
  **/
 int e1000_null_rar_set(struct e1000_hw E1000_UNUSEDARG *hw,
 			u8 E1000_UNUSEDARG *h, u32 E1000_UNUSEDARG a)

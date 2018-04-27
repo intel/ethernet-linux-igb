@@ -14,12 +14,11 @@ for the Gigabit Family of Adapters.
 modprobe igb [<option>=<VAL1>,<VAL2>,...]
 .PD 1v
 .SH DESCRIPTION
-This driver is intended for \fB2.6.30\fR and later kernels. 
+This driver is intended for \fB2.6.30\fR and later kernels. A version of the driver may already be included by your distribution and/or the kernel.org kernel.
+
 This driver includes support for Intel(R) Itanium(R)2-based systems.
 .LP
-This driver is only supported as a loadable module at this time. Intel is
-not supplying patches against the kernel source to allow for static linking of
-the drivers.
+This driver is only supported as a loadable module at this time. Intel is not supplying patches against the kernel source to allow for static linking of the drivers.
 
 
 For questions related to hardware requirements, refer to the documentation
@@ -27,7 +26,7 @@ supplied with your Intel adapter. All hardware requirements listed apply to
 use with Linux.
 
 .LP
-This driver supports 2.5 Gbps operating speed on 2500BASE-KX only for 
+This driver supports 2.5 Gbps operating speed on 2500BASE-KX only for
 I354-based network connections.
 .SH OPTIONS
 The following optional parameters are used by entering them on the
@@ -122,7 +121,7 @@ will force a lower level of interrupt support.
 0 = Assign up to the lesser value of the number of CPUs or the number of queues
 .IP
 X = Assign X queues, where X is less than or equal to the maximum number of
-queues (8 queues). 
+queues (8 queues).
 The driver allows maximum supported queue value. For example,
 I350-based adapters allow RSS=8, where 8 queues is the maximum allowable
 queues.
@@ -204,27 +203,16 @@ allocated causing slower memory access and impacting throughput, CPU, or both.
 A link between two EEE-compliant devices will result in periodic bursts of
 data followed by periods where the link is in an idle state. This Low Power
 Idle (LPI) state is supported in both 1 Gbps and 100 Mbps link speeds.
-
 .LP
 .B DMAC
 .IP
-.B Valid Range: 0, 1, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000,
-9000, 10000
+.B Valid Range: 0, 1, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000
 .IP
-This parameter enables or disables DMA Coalescing feature. Values are in
-microseconds and set the internal DMA Coalescing internal timer.
+This parameter enables or disables DMA Coalescing feature. Values are in microseconds and set the internal DMA Coalescing internal timer.
 .IP
-DMA (Direct Memory Access) allows the network device to move packet data
-directly to the system's memory, reducing CPU utilization. However, the
-frequency and random intervals at which packets arrive do not allow the
-system to enter a lower power state. DMA Coalescing allows the adapter
-to collect packets before it initiates a DMA event. This may increase
-network latency but also increases the chances that the system will enter
-a lower power state.
+DMA (Direct Memory Access) allows the network device to move packet data directly to the system's memory, reducing CPU utilization. However, the frequency and random intervals at which packets arrive do not allow the system to enter a lower power state. DMA Coalescing allows the adapter to collect packets before it initiates a DMA event. This may increase network latency but also increases the chances that the system will enter a lower power state.
 .IP
-Turning on DMA Coalescing may save energy with kernel 2.6.32 and newer.
-DMA Coalescing must be enabled across all active ports in order to save
-platform power.
+Turning on DMA Coalescing may save energy with kernel 2.6.32 and newer. DMA Coalescing must be enabled across all active ports in order to save platform power.
 .LP
 .B MDD (Malicious Driver Detection)
 .IP
@@ -295,7 +283,7 @@ For additional information regarding building and installation, see the
 README
 included with the driver.
 For general information, go to the Intel support website at:
-.B www.intel.com/support/
+.B http://www.intel.com/support/
 .LP
 If an issue is identified with the released source code on a supported kernel with a supported adapter, email the specific information related to the issue to e1000-devel@lists.sf.net.
 .LP
