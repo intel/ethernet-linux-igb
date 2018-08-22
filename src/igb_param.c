@@ -572,9 +572,11 @@ void igb_check_options(struct igb_adapter *adapter)
 		}
 #endif
 
+#ifdef CONFIG_IGB_VMDQ_NETDEV
 	} else {
 		DPRINTK(PROBE, INFO, "VMDq option is not supported.\n");
 		adapter->vmdq_pools = opt.def;
+#endif
 	}
 	}
 	{ /* RSS - Enable RSS multiqueue receives */
@@ -835,14 +837,16 @@ void igb_check_options(struct igb_adapter *adapter)
 		struct net_device *netdev = adapter->netdev;
 #ifdef module_param_array
 		if (num_LRO > bd) {
-#endif
 			unsigned int lro = LRO[bd];
+
 			igb_validate_option(&lro, &opt, adapter);
 			netdev->features |= lro ? NETIF_F_LRO : 0;
-#ifdef module_param_array
-		} else if (opt.def == OPTION_ENABLED) {
-			netdev->features |= NETIF_F_LRO;
 		}
+#else
+		unsigned int lro = LRO[bd];
+
+		igb_validate_option(&lro, &opt, adapter);
+		netdev->features |= lro ? NETIF_F_LRO : 0;
 #endif
 	}
 #endif /* IGB_NO_LRO */

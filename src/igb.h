@@ -784,63 +784,65 @@ enum e1000_state_t {
 extern char igb_driver_name[];
 extern char igb_driver_version[];
 
-extern int igb_open(struct net_device *netdev);
-extern int igb_close(struct net_device *netdev);
-extern int igb_up(struct igb_adapter *);
-extern void igb_down(struct igb_adapter *);
-extern void igb_reinit_locked(struct igb_adapter *);
-extern void igb_reset(struct igb_adapter *);
-extern int igb_reinit_queues(struct igb_adapter *);
+int igb_open(struct net_device *netdev);
+int igb_close(struct net_device *netdev);
+void igb_up(struct igb_adapter *adapter);
+void igb_down(struct igb_adapter *adapter);
+void igb_reinit_locked(struct igb_adapter *adapter);
+void igb_reset(struct igb_adapter *adapter);
+int igb_reinit_queues(struct igb_adapter *adapter);
 #ifdef ETHTOOL_SRXFHINDIR
-extern void igb_write_rss_indir_tbl(struct igb_adapter *);
+void igb_write_rss_indir_tbl(struct igb_adapter *adapter);
 #endif
-extern int igb_set_spd_dplx(struct igb_adapter *, u16);
-extern int igb_setup_tx_resources(struct igb_ring *);
-extern int igb_setup_rx_resources(struct igb_ring *);
-extern void igb_free_tx_resources(struct igb_ring *);
-extern void igb_free_rx_resources(struct igb_ring *);
-extern void igb_configure_tx_ring(struct igb_adapter *, struct igb_ring *);
-extern void igb_configure_rx_ring(struct igb_adapter *, struct igb_ring *);
-extern void igb_setup_tctl(struct igb_adapter *);
-extern void igb_setup_rctl(struct igb_adapter *);
-extern netdev_tx_t igb_xmit_frame_ring(struct sk_buff *, struct igb_ring *);
-extern void igb_unmap_and_free_tx_resource(struct igb_ring *,
-					   struct igb_tx_buffer *);
-extern void igb_alloc_rx_buffers(struct igb_ring *, u16);
-extern void igb_clean_rx_ring(struct igb_ring *);
-extern int igb_setup_queues(struct igb_adapter *adapter);
-extern void igb_update_stats(struct igb_adapter *);
-extern bool igb_has_link(struct igb_adapter *adapter);
-extern void igb_set_ethtool_ops(struct net_device *);
-extern void igb_check_options(struct igb_adapter *);
-extern void igb_power_up_link(struct igb_adapter *);
+int igb_set_spd_dplx(struct igb_adapter *, u16);
+int igb_setup_tx_resources(struct igb_ring *tx_ring);
+int igb_setup_rx_resources(struct igb_ring *rx_ring);
+void igb_free_tx_resources(struct igb_ring *tx_ring);
+void igb_free_rx_resources(struct igb_ring *rx_ring);
+void igb_configure_tx_ring(struct igb_adapter *adapter,
+			   struct igb_ring *tx_ring);
+void igb_configure_rx_ring(struct igb_adapter *adapter,
+			   struct igb_ring *rx_ring);
+void igb_setup_tctl(struct igb_adapter *adapter);
+void igb_setup_rctl(struct igb_adapter *adapter);
+netdev_tx_t igb_xmit_frame_ring(struct sk_buff *skb, struct igb_ring *tx_ring);
+void igb_unmap_and_free_tx_resource(struct igb_ring *ring,
+				    struct igb_tx_buffer *tx_buffer);
+void igb_alloc_rx_buffers(struct igb_ring *rx_ring, u16 cleaned_count);
+void igb_clean_rx_ring(struct igb_ring *rx_ring);
+int igb_setup_queues(struct igb_adapter *adapter);
+void igb_update_stats(struct igb_adapter *adapter);
+bool igb_has_link(struct igb_adapter *adapter);
+void igb_set_ethtool_ops(struct net_device *netdev);
+void igb_check_options(struct igb_adapter *adapter);
+void igb_power_up_link(struct igb_adapter *adapter);
 #ifdef HAVE_PTP_1588_CLOCK
-extern void igb_ptp_init(struct igb_adapter *adapter);
-extern void igb_ptp_stop(struct igb_adapter *adapter);
-extern void igb_ptp_reset(struct igb_adapter *adapter);
-extern void igb_ptp_tx_work(struct work_struct *work);
-extern void igb_ptp_rx_hang(struct igb_adapter *adapter);
-extern void igb_ptp_tx_hwtstamp(struct igb_adapter *adapter);
-extern void igb_ptp_rx_rgtstamp(struct igb_q_vector *q_vector,
-				struct sk_buff *skb);
-extern void igb_ptp_rx_pktstamp(struct igb_q_vector *q_vector,
-				unsigned char *va,
-				struct sk_buff *skb);
-extern int igb_ptp_hwtstamp_ioctl(struct net_device *netdev,
-				  struct ifreq *ifr, int cmd);
+void igb_ptp_init(struct igb_adapter *adapter);
+void igb_ptp_stop(struct igb_adapter *adapter);
+void igb_ptp_reset(struct igb_adapter *adapter);
+void igb_ptp_tx_work(struct work_struct *work);
+void igb_ptp_rx_hang(struct igb_adapter *adapter);
+void igb_ptp_tx_hwtstamp(struct igb_adapter *adapter);
+void igb_ptp_rx_rgtstamp(struct igb_q_vector *q_vector,
+			 struct sk_buff *skb);
+void igb_ptp_rx_pktstamp(struct igb_q_vector *q_vector,
+			 unsigned char *va,
+			 struct sk_buff *skb);
+int igb_ptp_hwtstamp_ioctl(struct net_device *netdev,
+			   struct ifreq *ifr, int cmd);
 #endif /* HAVE_PTP_1588_CLOCK */
 #ifdef ETHTOOL_OPS_COMPAT
-extern int ethtool_ioctl(struct ifreq *);
+int ethtool_ioctl(struct ifreq *);
 #endif
-extern int igb_write_mc_addr_list(struct net_device *netdev);
-extern int igb_add_mac_filter(struct igb_adapter *adapter, u8 *addr, u16 queue);
-extern int igb_del_mac_filter(struct igb_adapter *adapter, u8 *addr, u16 queue);
-extern int igb_available_rars(struct igb_adapter *adapter);
-extern s32 igb_vlvf_set(struct igb_adapter *, u32, bool, u32);
-extern void igb_configure_vt_default_pool(struct igb_adapter *adapter);
-extern void igb_enable_vlan_tags(struct igb_adapter *adapter);
+int igb_write_mc_addr_list(struct net_device *netdev);
+int igb_add_mac_filter(struct igb_adapter *adapter, u8 *addr, u16 queue);
+int igb_del_mac_filter(struct igb_adapter *adapter, u8 *addr, u16 queue);
+int igb_available_rars(struct igb_adapter *adapter);
+s32 igb_vlvf_set(struct igb_adapter *adapter, u32 vid, bool add, u32 vf);
+void igb_configure_vt_default_pool(struct igb_adapter *adapter);
+void igb_enable_vlan_tags(struct igb_adapter *adapter);
 #ifndef HAVE_VLAN_RX_REGISTER
-extern void igb_vlan_mode(struct net_device *, u32);
+void igb_vlan_mode(struct net_device *, u32);
 #endif
 
 #define E1000_PCS_CFG_IGN_SD	1

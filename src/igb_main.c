@@ -60,7 +60,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.3.5.18" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.3.5.20" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
@@ -1775,7 +1775,7 @@ static s32 igb_init_i2c(struct igb_adapter *adapter)
  *  igb_up - Open the interface and prepare it to handle traffic
  *  @adapter: board private structure
  **/
-int igb_up(struct igb_adapter *adapter)
+void igb_up(struct igb_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	int i;
@@ -1818,8 +1818,6 @@ int igb_up(struct igb_adapter *adapter)
 	if ((adapter->flags & IGB_FLAG_EEE) &&
 	    (!hw->dev_spec._82575.eee_disable))
 		adapter->eee_advert = MDIO_EEE_100TX | MDIO_EEE_1000T;
-
-	return 0;
 }
 
 void igb_down(struct igb_adapter *adapter)
@@ -5888,10 +5886,8 @@ static int igb_change_mtu(struct net_device *netdev, int new_mtu)
 	while (test_and_set_bit(__IGB_RESETTING, &adapter->state))
 		usleep_range(1000, 2000);
 
-#ifndef HAVE_NETDEVICE_MIN_MAX_MTU
 	/* igb_down has a dependency on max_frame_size */
 	adapter->max_frame_size = max_frame;
-#endif
 
 	if (netif_running(netdev))
 		igb_down(adapter);
@@ -9456,10 +9452,7 @@ static void igb_io_resume(struct pci_dev *pdev)
 	}
 
 	if (netif_running(netdev)) {
-		if (igb_up(adapter)) {
-			dev_err(pci_dev_to_dev(pdev), "igb_up failed after reset\n");
-			return;
-		}
+		igb_up(adapter);
 	}
 
 	netif_device_attach(netdev);
