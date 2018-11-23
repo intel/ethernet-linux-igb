@@ -16,6 +16,7 @@ modprobe igb [<option>=<VAL1>,<VAL2>,...]
 .SH DESCRIPTION
 This driver is intended for \fB2.6.30\fR and later kernels. A version of the driver may already be included by your distribution and/or the kernel.org kernel.
 
+This driver includes support for Intel(R) Itanium(R)2-based systems.
 .LP
 This driver is only supported as a loadable module at this time. Intel is not supplying patches against the kernel source to allow for static linking of the drivers.
 
@@ -191,7 +192,7 @@ only useful when interrupt affinity is specified; otherwise, part of the
 interrupt time could run on a different core than where the memory is
 allocated causing slower memory access and impacting throughput, CPU, or both.
 .LP
-.B EEE (Energy Efficient Ethernet)
+.B EEE
 .IP
 .B Valid Range: 0-1
 .IP
@@ -199,16 +200,9 @@ allocated causing slower memory access and impacting throughput, CPU, or both.
 .IP
 1 = Enables EEE
 .IP
-A link between two EEE-compliant devices will result in periodic bursts of data followed by periods where the link is in an idle state. This Low Power Idle (LPI) state is supported at 1 Gbps and 100 Mbps link speeds.
-
-NOTES:
-- EEE support requires auto-negotiation.
-- Both link partners must support EEE.
-- EEE is not supported on all Intel(R) Ethernet Network devices or at all link speeds.
-
-Example:
-ethtool --show-eee devname
-ethtool --set-eee devname [eee on|off]
+A link between two EEE-compliant devices will result in periodic bursts of
+data followed by periods where the link is in an idle state. This Low Power
+Idle (LPI) state is supported in both 1 Gbps and 100 Mbps link speeds.
 .LP
 .B DMAC
 .IP
@@ -246,8 +240,6 @@ Alternatively, you can use the ip command as follows:
 NOTE: The maximum MTU setting for Jumbo Frames is 9216. This value coincides with the maximum Jumbo Frames size of 9234 bytes.
 
 NOTE: Using Jumbo frames at 10 or 100 Mbps is not supported and may result in poor performance or loss of link.
-
-NOTE: Packet loss may have a greater impact on throughput when you use jumbo frames. If you observe a drop in performance after enabling jumbo frames, enabling flow control may mitigate the issue.
 See the section "Jumbo Frames" in the Readme.
 .SH ethtool
 .LP
