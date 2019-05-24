@@ -1,7 +1,7 @@
 ################################################################################
 #
 # Intel(R) Gigabit Ethernet Linux Driver
-# Copyright(c) 2007 - 2018 Intel Corporation.
+# Copyright(c) 2007 - 2019 Intel Corporation.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms and conditions of the GNU General Public License,
@@ -82,6 +82,7 @@
 		103c 8157  Ethernet 1Gb 4-port 366T Adapter
 		108e 7b16  Quad Port GbE PCIe 2.0 ExpressModule, UTP
 		108e 7b18  Quad Port GbE PCIe 2.0 Low Profile Adapter, UTP
+		1137 023e  1GigE I350 LOM
 		17aa 1074  ThinkServer I350-T4 AnyFabric
 		8086 0001  Ethernet Server Adapter I350-T4
 		8086 0002  Ethernet Server Adapter I350-T2

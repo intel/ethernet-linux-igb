@@ -4,7 +4,7 @@ igb Linux* Base Driver for Intel(R) Ethernet Network Connection
 
 ================================================================================
 
-February 23, 2017
+May 15, 2019
 
 ================================================================================
 
@@ -31,13 +31,14 @@ SR-IOV, the virtual function (VF) may be subject to malicious behavior.
 Software-generated layer two frames, like IEEE 802.3x (link flow control), IEEE
 802.1Qbb (priority based flow-control), and others of this type, are not
 expected and can throttle traffic between the host and the virtual switch,
-reducing performance. To resolve this issue, configure all SR-IOV enabled ports
-for VLAN tagging. This configuration allows unexpected, and potentially
-malicious, frames to be dropped.
+reducing performance. To resolve this issue, and to ensure isolation from
+unintended traffic streams, configure all SR-IOV enabled ports for VLAN tagging
+from the administrative interface on the PF. This configuration allows
+unexpected, and potentially malicious, frames to be dropped.
 
 
 Overview
---------
+========
 This driver supports kernel versions 2.6.30 or newer.
 
 Driver information can be obtained using ethtool, lspci, and ifconfig.
@@ -51,12 +52,6 @@ drivers.
 For questions related to hardware requirements, refer to the documentation
 supplied with your Intel adapter. All hardware requirements listed apply to use
 with Linux.
-
-Adapter teaming is implemented using the native Linux Channel bonding module.
-This is included in supported Linux kernels. Channel Bonding documentation can
-be found in the Linux kernel source:
-/documentation/networking/bonding.txt
-
 The driver information previously displayed in the /proc file system is not
 supported in this release.
 
@@ -65,12 +60,14 @@ The igb driver supports IEEE 1588 time stamping for kernels 2.6.30 and newer.
 The igb driver supports 2.5 Gbps operating speed on 2500BASE-KX only for
 I354-based network connections.
 
+This driver no longer supports Itanium(R)-based systems.
+
 
 ================================================================================
 
 
 Identifying Your Adapter
-------------------------
+========================
 For information on how to identify your adapter, and for the latest Intel
 network drivers, refer to the Intel Support website:
 http://www.intel.com/support
@@ -89,8 +86,12 @@ Note: For the build to work properly, the currently running kernel MUST match
 the version and configuration of the installed kernel sources. If you have just
 recompiled the kernel reboot the system before building.
 
+- To compile the driver on some kernel/arch combinations, a package with the
+development version of libelf (e.g. libelf-dev, libelf-devel,
+elfutilsl-libelf-devel) may need to be installed.
+
 Note: RPM functionality has only been tested in Red Hat distributions.
-_lbank_line_
+
 
 1. Move the base driver tar file to the directory of your choice. For
    example, use '/home/username/igb' or '/usr/local/src/igb'.
@@ -328,9 +329,10 @@ SR-IOV, the virtual function (VF) may be subject to malicious behavior.
 Software-generated layer two frames, like IEEE 802.3x (link flow control), IEEE
 802.1Qbb (priority based flow-control), and others of this type, are not
 expected and can throttle traffic between the host and the virtual switch,
-reducing performance. To resolve this issue, configure all SR-IOV enabled ports
-for VLAN tagging. This configuration allows unexpected, and potentially
-malicious, frames to be dropped.
+reducing performance. To resolve this issue, and to ensure isolation from
+unintended traffic streams, configure all SR-IOV enabled ports for VLAN tagging
+from the administrative interface on the PF. This configuration allows
+unexpected, and potentially malicious, frames to be dropped.
 
 
 Configuring VLAN tagging on SR-IOV enabled adapter ports
@@ -371,14 +373,24 @@ interrupt time could run on a different core than where the memory is
 allocated causing slower memory access and impacting throughput, CPU, or both.
 
 
-EEE
----
+EEE (Energy Efficient Ethernet)
+-------------------------------
 Valid Range: 0-1
 0 = Disables EEE
 1 = Enables EEE
-A link between two EEE-compliant devices will result in periodic bursts of
-data followed by periods where the link is in an idle state. This Low Power
-Idle (LPI) state is supported in both 1 Gbps and 100 Mbps link speeds.
+A link between two EEE-compliant devices will result in periodic bursts of data
+followed by periods where the link is in an idle state. This Low Power Idle
+(LPI) state is supported at 1 Gbps and 100 Mbps link speeds.
+
+NOTES:
+- EEE support requires auto-negotiation.
+- Both link partners must support EEE.
+- EEE is not supported on all Intel(R) Ethernet Network devices or at all link
+speeds.
+
+Example:
+ethtool --show-eee devname
+ethtool --set-eee devname [eee on|off]
 
 
 DMAC
@@ -466,6 +478,10 @@ with the maximum Jumbo Frames size of 9234 bytes.
 
 NOTE: Using Jumbo frames at 10 or 100 Mbps is not supported and may result in
 poor performance or loss of link.
+
+NOTE: Packet loss may have a greater impact on throughput when you use jumbo
+frames. If you observe a drop in performance after enabling jumbo frames,
+enabling flow control may mitigate the issue.
 
 
 ethtool
@@ -624,7 +640,7 @@ you require.
 
 
 Known Issues/Troubleshooting
-----------------------------
+============================
 
 MAC address of Virtual Function changes unexpectedly
 ----------------------------------------------------
@@ -653,8 +669,8 @@ Software Issues
 NOTE: After installing the driver, if your Intel Ethernet Network Connection
 is not working, verify that you have installed the correct driver.
 
-Intel(R) Active Management Technology 2.0, 2.1, 2.5 Not Supported in
-Conjunction with Linux driver.
+Intel(R) Active Management Technology 2.0, 2.1, 2.5 are not supported in
+conjunction with the linux driver.
 
 
 
@@ -853,7 +869,7 @@ no longer active. Do this by shutting down all VMs and unloading the VF driver.
 
 
 Support
--------
+=======
 For general information, go to the Intel support website at:
 http://www.intel.com/support/
 
@@ -884,7 +900,7 @@ St - Fifth Floor, Boston, MA 02110-1301 USA.
 The full GNU General Public License is included in this distribution in the
 file called "COPYING".
 
-Copyright(c) 1999 - 2017 Intel Corporation.
+Copyright(c) 1999 - 2019 Intel Corporation.
 ================================================================================
 
 
