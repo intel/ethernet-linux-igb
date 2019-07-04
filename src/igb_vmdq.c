@@ -1,26 +1,5 @@
-/*******************************************************************************
-
-  Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2018 Intel Corporation.
-
-  This program is free software; you can redistribute it and/or modify it
-  under the terms and conditions of the GNU General Public License,
-  version 2, as published by the Free Software Foundation.
-
-  This program is distributed in the hope it will be useful, but WITHOUT
-  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-  more details.
-
-  The full GNU General Public License is included in this distribution in
-  the file called "COPYING".
-
-  Contact Information:
-  Linux NICS <linux.nics@intel.com>
-  e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
-  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
-
-*******************************************************************************/
+// SPDX-License-Identifier: GPL-2.0
+/* Copyright(c) 2007 - 2019 Intel Corporation. */
 
 
 #include <linux/tcp.h>
@@ -368,10 +347,10 @@ static void igb_vmdq_get_drvinfo(struct net_device *netdev,
 	struct igb_adapter *adapter = vadapter->real_adapter;
 	struct net_device *main_netdev = adapter->netdev;
 
-	strncpy(drvinfo->driver, igb_driver_name, 32);
-	strncpy(drvinfo->version, igb_driver_version, 32);
+	strlcpy(drvinfo->driver, igb_driver_name, 32);
+	strlcpy(drvinfo->version, igb_driver_version, 32);
 
-	strncpy(drvinfo->fw_version, "N/A", 4);
+	strlcpy(drvinfo->fw_version, "N/A", 4);
 	snprintf(drvinfo->bus_info, 32, "%s VMDQ %d", main_netdev->name,
 		 vadapter->rx_ring->queue_index);
 	drvinfo->n_stats = 0;

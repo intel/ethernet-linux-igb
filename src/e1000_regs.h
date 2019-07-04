@@ -1,26 +1,5 @@
-/*******************************************************************************
-
-  Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2018 Intel Corporation.
-
-  This program is free software; you can redistribute it and/or modify it
-  under the terms and conditions of the GNU General Public License,
-  version 2, as published by the Free Software Foundation.
-
-  This program is distributed in the hope it will be useful, but WITHOUT
-  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-  more details.
-
-  The full GNU General Public License is included in this distribution in
-  the file called "COPYING".
-
-  Contact Information:
-  Linux NICS <linux.nics@intel.com>
-  e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
-  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
-
-*******************************************************************************/
+/* SPDX-License-Identifier: GPL-2.0 */
+/* Copyright(c) 2007 - 2019 Intel Corporation. */
 
 #ifndef _E1000_REGS_H_
 #define _E1000_REGS_H_
@@ -39,6 +18,7 @@
 #define E1000_BARCTRL			0x5BBC /* BAR ctrl reg */
 #define E1000_BARCTRL_FLSIZE		0x0700 /* BAR ctrl Flsize */
 #define E1000_BARCTRL_CSRSIZE		0x2000 /* BAR ctrl CSR size */
+#define E1000_BARCTRL_CSRSIZE_SHIFT	13
 #define E1000_MPHY_ADDR_CTRL	0x0024 /* GbE MPHY Address Control */
 #define E1000_MPHY_DATA		0x0E10 /* GBE MPHY Data */
 #define E1000_MPHY_STAT		0x0E0C /* GBE MPHY Statistics */
@@ -133,7 +113,10 @@
 #define E1000_RADV	0x0282C  /* Rx Interrupt Absolute Delay Timer - RW */
 #define E1000_EMIADD	0x10     /* Extended Memory Indirect Address */
 #define E1000_EMIDATA	0x11     /* Extended Memory Indirect Data */
-#define E1000_SRWR		0x12018  /* Shadow Ram Write Register - RW */
+/* Shadow Ram Write Register - RW */
+#define E1000_SRWR		0x12018
+#define E1000_EEC_REG		0x12010
+
 #define E1000_I210_FLMNGCTL	0x12038
 #define E1000_I210_FLMNGDATA	0x1203C
 #define E1000_I210_FLMNGCNT	0x12040
@@ -143,6 +126,9 @@
 #define E1000_I210_FLSWCNT	0x12050
 
 #define E1000_I210_FLA		0x1201C
+
+#define E1000_SHADOWINF		0x12068
+#define E1000_FLFWUPDATE	0x12108
 
 #define E1000_INVM_DATA_REG(_n)	(0x12120 + 4*(_n))
 #define E1000_INVM_SIZE		64 /* Number of INVM Data Registers */

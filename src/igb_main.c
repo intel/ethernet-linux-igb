@@ -1,26 +1,5 @@
-/*******************************************************************************
-
-  Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2018 Intel Corporation.
-
-  This program is free software; you can redistribute it and/or modify it
-  under the terms and conditions of the GNU General Public License,
-  version 2, as published by the Free Software Foundation.
-
-  This program is distributed in the hope it will be useful, but WITHOUT
-  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-  more details.
-
-  The full GNU General Public License is included in this distribution in
-  the file called "COPYING".
-
-  Contact Information:
-  Linux NICS <linux.nics@intel.com>
-  e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
-  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
-
-*******************************************************************************/
+// SPDX-License-Identifier: GPL-2.0
+/* Copyright(c) 2007 - 2019 Intel Corporation. */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -60,13 +39,13 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.3.5.22" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.3.5.36" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
 static const char igb_driver_string[] = DRV_SUMMARY;
-static const char igb_copyright[] = "Copyright(c) 2007 - 2018 Intel Corporation.";
+static const char igb_copyright[] = "Copyright(c) 2007 - 2019 Intel Corporation.";
 
 static const struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I354_BACKPLANE_1GBPS) },
@@ -653,6 +632,7 @@ static void igb_configure_msix(struct igb_adapter *adapter)
  **/
 static int igb_request_msix(struct igb_adapter *adapter)
 {
+	unsigned int num_q_vectors = adapter->num_q_vectors;
 	struct net_device *netdev = adapter->netdev;
 	int i, err = 0, vector = 0, free_vector = 0;
 
@@ -661,7 +641,13 @@ static int igb_request_msix(struct igb_adapter *adapter)
 	if (err)
 		goto err_out;
 
-	for (i = 0; i < adapter->num_q_vectors; i++) {
+	if (num_q_vectors > MAX_Q_VECTORS) {
+		num_q_vectors = MAX_Q_VECTORS;
+		dev_warn(&adapter->pdev->dev,
+			 "The number of queue vectors (%d) is higher than max allowed (%d)\n",
+			 adapter->num_q_vectors, MAX_Q_VECTORS);
+	}
+	for (i = 0; i < num_q_vectors; i++) {
 		struct igb_q_vector *q_vector = adapter->q_vector[i];
 
 		vector++;
@@ -1777,6 +1763,7 @@ static s32 igb_init_i2c(struct igb_adapter *adapter)
  **/
 void igb_up(struct igb_adapter *adapter)
 {
+	unsigned int num_q_vectors = adapter->num_q_vectors;
 	struct e1000_hw *hw = &adapter->hw;
 	int i;
 
@@ -1785,7 +1772,13 @@ void igb_up(struct igb_adapter *adapter)
 
 	clear_bit(__IGB_DOWN, &adapter->state);
 
-	for (i = 0; i < adapter->num_q_vectors; i++)
+	if (num_q_vectors > MAX_Q_VECTORS) {
+		num_q_vectors = MAX_Q_VECTORS;
+		dev_warn(&adapter->pdev->dev,
+			 "The number of queue vectors (%d) is higher than max allowed (%d)\n",
+			 adapter->num_q_vectors, MAX_Q_VECTORS);
+	}
+	for (i = 0; i < num_q_vectors; i++)
 		napi_enable(&(adapter->q_vector[i]->napi));
 
 	if (adapter->msix_entries)
@@ -1822,6 +1815,7 @@ void igb_up(struct igb_adapter *adapter)
 
 void igb_down(struct igb_adapter *adapter)
 {
+	unsigned int num_q_vectors = adapter->num_q_vectors;
 	struct net_device *netdev = adapter->netdev;
 	struct e1000_hw *hw = &adapter->hw;
 	u32 tctl, rctl;
@@ -1848,7 +1842,13 @@ void igb_down(struct igb_adapter *adapter)
 	E1000_WRITE_FLUSH(hw);
 	usleep_range(10000, 20000);
 
-	for (i = 0; i < adapter->num_q_vectors; i++)
+	if (num_q_vectors > MAX_Q_VECTORS) {
+		num_q_vectors = MAX_Q_VECTORS;
+		dev_warn(&adapter->pdev->dev,
+			 "The number of queue vectors (%d) is higher than max allowed (%d)\n",
+			 adapter->num_q_vectors, MAX_Q_VECTORS);
+	}
+	for (i = 0; i < num_q_vectors; i++)
 		napi_disable(&(adapter->q_vector[i]->napi));
 
 	igb_irq_disable(adapter);
@@ -2210,6 +2210,59 @@ static int igb_ndo_fdb_add(struct ndmsg *ndm,
 	return err;
 }
 
+#ifdef HAVE_NDO_FEATURES_CHECK
+#define IGB_MAX_TUNNEL_HDR_LEN 80
+#ifdef NETIF_F_GSO_PARTIAL
+#define IGB_MAX_MAC_HDR_LEN	127
+#define IGB_MAX_NETWORK_HDR_LEN	511
+
+static netdev_features_t
+igb_features_check(struct sk_buff *skb, struct net_device *dev,
+		   netdev_features_t features)
+{
+	unsigned int network_hdr_len, mac_hdr_len;
+
+	/* Make certain the headers can be described by a context descriptor */
+	mac_hdr_len = skb_network_header(skb) - skb->data;
+	if (unlikely(mac_hdr_len > IGB_MAX_MAC_HDR_LEN))
+		return features & ~(NETIF_F_HW_CSUM |
+				    NETIF_F_SCTP_CRC |
+				    NETIF_F_HW_VLAN_CTAG_TX |
+				    NETIF_F_TSO |
+				    NETIF_F_TSO6);
+
+	network_hdr_len = skb_checksum_start(skb) - skb_network_header(skb);
+	if (unlikely(network_hdr_len >  IGB_MAX_NETWORK_HDR_LEN))
+		return features & ~(NETIF_F_HW_CSUM |
+				    NETIF_F_SCTP_CRC |
+				    NETIF_F_TSO |
+				    NETIF_F_TSO6);
+
+	/* We can only support IPV4 TSO in tunnels if we can mangle the
+	 * inner IP ID field, so strip TSO if MANGLEID is not supported.
+	 */
+	if (skb->encapsulation && !(features & NETIF_F_TSO_MANGLEID))
+		features &= ~NETIF_F_TSO;
+
+	return features;
+}
+#else /* NETIF_F_GSO_PARTIAL */
+static netdev_features_t
+igb_features_check(struct sk_buff *skb, struct net_device *dev,
+		   netdev_features_t features)
+{
+	if (!skb->encapsulation)
+		return features;
+
+	if (unlikely(skb_inner_mac_header(skb) - skb_transport_header(skb) >
+				IGB_MAX_TUNNEL_HDR_LEN))
+		return features & ~NETIF_F_CSUM_MASK;
+
+	return features;
+}
+#endif /* NETIF_F_GSO_PARTIAL */
+#endif /* HAVE_NDO_FEATURES_CHECK */
+
 #ifndef USE_DEFAULT_FDB_DEL_DUMP
 #ifdef USE_CONST_DEV_UC_CHAR
 static int igb_ndo_fdb_del(struct ndmsg *ndm,
@@ -2256,14 +2309,19 @@ static int igb_ndo_fdb_dump(struct sk_buff *skb,
 }
 #endif /* USE_DEFAULT_FDB_DEL_DUMP */
 #ifdef HAVE_BRIDGE_ATTRIBS
-#ifdef HAVE_NDO_BRIDGE_SET_DEL_LINK_FLAGS
+#ifdef HAVE_NDO_BRIDGE_SETLINK_EXTACK
 static int igb_ndo_bridge_setlink(struct net_device *dev,
 				  struct nlmsghdr *nlh,
-				  u16 flags)
+				  u16 __always_unused flags,
+				  struct netlink_ext_ack __always_unused *extack)
+#elif defined(HAVE_NDO_BRIDGE_SET_DEL_LINK_FLAGS)
+static int igb_ndo_bridge_setlink(struct net_device *dev,
+				  struct nlmsghdr *nlh,
+				  u16 __always_unused flags)
 #else
 static int igb_ndo_bridge_setlink(struct net_device *dev,
 				  struct nlmsghdr *nlh)
-#endif /* HAVE_NDO_BRIDGE_SET_DEL_LINK_FLAGS */
+#endif /* HAVE_NDO_BRIDGE_SETLINK_EXTACK */
 {
 	struct igb_adapter *adapter = netdev_priv(dev);
 	struct e1000_hw *hw = &adapter->hw;
@@ -2401,7 +2459,10 @@ static const struct net_device_ops igb_netdev_ops = {
 	.ndo_bridge_setlink	= igb_ndo_bridge_setlink,
 	.ndo_bridge_getlink	= igb_ndo_bridge_getlink,
 #endif /* HAVE_BRIDGE_ATTRIBS */
-#endif
+#endif /* HAVE_FDB_OPS */
+#ifdef HAVE_NDO_FEATURES_CHECK
+	.ndo_features_check     = igb_features_check,
+#endif /* HAVE_NDO_FEATURES_CHECK */
 #ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
 };
 
@@ -2769,7 +2830,7 @@ static int igb_probe(struct pci_dev *pdev,
 	netdev->watchdog_timeo = 5 * HZ;
 #endif
 
-	strncpy(netdev->name, pci_name(pdev), sizeof(netdev->name) - 1);
+	strlcpy(netdev->name, pci_name(pdev), sizeof(netdev->name));
 
 	adapter->bd_number = cards_found;
 
@@ -2779,6 +2840,15 @@ static int igb_probe(struct pci_dev *pdev,
 		goto err_sw_init;
 
 	e1000_get_bus_info(hw);
+
+	/* 82576 accesses flash differently */
+	if (adapter->hw.mac.type == e1000_82576) {
+		adapter->flash_addr = ioremap(pci_resource_start(pdev, 1),
+			      pci_resource_len(pdev, 1));
+		if (!adapter->flash_addr)
+			dev_warn(&pdev->dev, "Flash address mapping failed.");
+		hw->flash_address = adapter->flash_addr;
+	}
 
 	hw->phy.autoneg_wait_to_complete = FALSE;
 	hw->mac.adaptive_ifs = FALSE;
@@ -2816,15 +2886,27 @@ static int igb_probe(struct pci_dev *pdev,
 			    NETIF_F_RXCSUM |
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
 			    NETIF_F_HW_VLAN_CTAG_RX |
-			    NETIF_F_HW_VLAN_CTAG_TX;
+			    NETIF_F_HW_VLAN_CTAG_TX |
 #else
 			    NETIF_F_HW_VLAN_RX |
-			    NETIF_F_HW_VLAN_TX;
+			    NETIF_F_HW_VLAN_TX |
 #endif
-
+			    NETIF_F_HW_CSUM;
 	if (hw->mac.type >= e1000_82576)
 		netdev->features |= NETIF_F_SCTP_CSUM;
 
+#ifdef NETIF_F_GSO_PARTIAL
+#define IGB_GSO_PARTIAL_FEATURES (NETIF_F_GSO_GRE | \
+				  NETIF_F_GSO_GRE_CSUM | \
+				  NETIF_F_GSO_UDP_TUNNEL | \
+				  NETIF_F_GSO_UDP_TUNNEL_CSUM)
+/*				  NETIF_F_GSO_IPIP | \  */
+/*				  NETIF_F_GSO_SIT | \	*/
+
+	netdev->gso_partial_features = IGB_GSO_PARTIAL_FEATURES;
+	netdev->features |= NETIF_F_GSO_PARTIAL | IGB_GSO_PARTIAL_FEATURES;
+
+#endif /* NETIF_F_GSO_PARTIAL */
 #ifdef HAVE_NDO_SET_FEATURES
 	/* copy netdev features into list of user selectable features */
 #ifndef HAVE_RHEL6_NET_DEVICE_OPS_EXT
@@ -2837,8 +2919,10 @@ static int igb_probe(struct pci_dev *pdev,
 	hw_features = get_netdev_hw_features(netdev);
 
 #endif /* HAVE_RHEL6_NET_DEVICE_OPS_EXT */
-	hw_features |= netdev->features;
+	/* give us the option of enabling LRO later */
+	hw_features |= NETIF_F_LRO;
 
+	hw_features |= netdev->features;
 #else
 #ifdef NETIF_F_GRO
 
@@ -2847,7 +2931,6 @@ static int igb_probe(struct pci_dev *pdev,
 #endif /* NETIF_F_GRO */
 #endif /* HAVE_NDO_SET_FEATURES */
 
-	/* set this bit last since it cannot be part of hw_features */
 #ifdef NETIF_F_HW_VLAN_CTAG_FILTER
 	netdev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
 #endif /* NETIF_F_HW_FLAN_CTAG_FILTER */
@@ -2856,23 +2939,47 @@ static int igb_probe(struct pci_dev *pdev,
 #endif /* NETIF_F_HW_VLAN_TX */
 
 #ifdef HAVE_NDO_SET_FEATURES
+	hw_features |=
+#ifdef NETIF_F_GSO_PARTIAL
+		NETIF_F_HW_VLAN_CTAG_RX |
+		NETIF_F_HW_VLAN_CTAG_TX |
+#endif
+		NETIF_F_RXALL;
+
+	if (hw->mac.type >= e1000_i350)
+		hw_features |= NETIF_F_NTUPLE;
+
 #ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
 	set_netdev_hw_features(netdev, hw_features);
+
 #else
 	netdev->hw_features = hw_features;
+
 #endif
 #endif
-
-#ifdef HAVE_NETDEV_VLAN_FEATURES
-	netdev->vlan_features |= NETIF_F_TSO |
-				 NETIF_F_TSO6 |
-				 NETIF_F_IP_CSUM |
-				 NETIF_F_IPV6_CSUM |
-				 NETIF_F_SG;
-
-#endif /* HAVE_NETDEV_VLAN_FEATURES */
 	if (pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
+
+#ifdef NETIF_F_GSO_PARTIAL
+#ifdef HAVE_NETDEV_VLAN_FEATURES
+	netdev->vlan_features |= netdev->features | NETIF_F_TSO_MANGLEID;
+#endif
+	netdev->mpls_features |= NETIF_F_HW_CSUM;
+	netdev->hw_enc_features |= netdev->vlan_features;
+#endif /* NETIF_F_GSO_PARTIAL */
+
+#ifdef NETIF_F_HW_VLAN_CTAG_RX
+	/* set this bit last since it cannot be part of vlan_features */
+	netdev->features |=
+		NETIF_F_HW_VLAN_CTAG_RX |
+		NETIF_F_HW_VLAN_CTAG_TX |
+		NETIF_F_HW_VLAN_CTAG_FILTER;
+#endif /* NETIF_F_HW_VLAN_CTAG_RX */
+
+#ifdef NETIF_F_GSO_PARTIAL
+	netdev->priv_flags |= IFF_SUPP_NOFCS;
+	netdev->priv_flags |= IFF_UNICAST_FLT;
+#endif
 
 #ifdef HAVE_NETDEVICE_MIN_MAX_MTU
 	/* MTU range: 68 - 9216 */
@@ -3058,7 +3165,7 @@ static int igb_probe(struct pci_dev *pdev,
 	 */
 	igb_get_hw_control(adapter);
 
-	strncpy(netdev->name, "eth%d", IFNAMSIZ);
+	strlcpy(netdev->name, "eth%d", IFNAMSIZ);
 	err = register_netdev(netdev);
 	if (err)
 		goto err_register;
@@ -3196,6 +3303,8 @@ err_sw_init:
 	igb_clear_interrupt_scheme(adapter);
 	igb_reset_sriov_capability(adapter);
 	iounmap(adapter->io_addr);
+	if (adapter->flash_addr)
+		iounmap(adapter->flash_addr);
 err_ioremap:
 	free_netdev(netdev);
 err_alloc_etherdev:
@@ -3280,7 +3389,9 @@ static void igb_remove(struct pci_dev *pdev)
 
 	if (adapter->io_addr)
 		iounmap(adapter->io_addr);
-	if (hw->flash_address)
+	if (adapter->flash_addr)
+		iounmap(adapter->flash_addr);
+	if (hw->flash_address && hw->flash_address != adapter->flash_addr)
 		iounmap(hw->flash_address);
 	pci_release_selected_regions(pdev,
 				     pci_select_bars(pdev, IORESOURCE_MEM));
@@ -3888,7 +3999,7 @@ static void igb_setup_mrqc(struct igb_adapter *adapter)
 			vtctl &= ~(E1000_VT_CTL_DEFAULT_POOL_MASK |
 				   E1000_VT_CTL_DISABLE_DEF_POOL);
 			vtctl |= adapter->vfs_allocated_count <<
-				E1000_VT_CTL_DEFAULT_POOL_SHIFT;
+				 E1000_VT_CTL_DEFAULT_POOL_SHIFT;
 			E1000_WRITE_REG(hw, E1000_VT_CTL, vtctl);
 		}
 		if (adapter->rss_queues > 1)
@@ -4711,15 +4822,14 @@ static void igb_spoof_check(struct igb_adapter *adapter)
 	case e1000_82576:
 		for (j = 0; j < adapter->vfs_allocated_count; j++) {
 			if (adapter->wvbr & BIT(j) ||
-			    adapter->wvbr & BIT(j
-				+ IGB_STAGGERED_QUEUE_OFFSET)) {
+			    adapter->wvbr &
+			    BIT(j + IGB_STAGGERED_QUEUE_OFFSET)) {
 				DPRINTK(DRV, WARNING,
 					"Spoof event(s) detected on VF %d\n",
 					j);
 				adapter->wvbr &=
 					~(BIT(j) |
-					  BIT(j +
-					      IGB_STAGGERED_QUEUE_OFFSET));
+					  BIT(j + IGB_STAGGERED_QUEUE_OFFSET));
 			}
 		}
 		break;
@@ -5303,6 +5413,96 @@ static void igb_tx_ctxtdesc(struct igb_ring *tx_ring, u32 vlan_macip_lens,
 	context_desc->mss_l4len_idx	= cpu_to_le32(mss_l4len_idx);
 }
 
+#ifdef NETIF_F_GSO_PARTIAL
+static int igb_tso(struct igb_ring *tx_ring,
+		   struct igb_tx_buffer *first,
+		   u8 *hdr_len)
+{
+#ifdef NETIF_F_TSO
+	u32 vlan_macip_lens, type_tucmd, mss_l4len_idx;
+	struct sk_buff *skb = first->skb;
+	union {
+		struct iphdr *v4;
+		struct ipv6hdr *v6;
+		unsigned char *hdr;
+	} ip;
+	union {
+		struct tcphdr *tcp;
+		unsigned char *hdr;
+	} l4;
+	u32 paylen, l4_offset;
+
+	if (skb->ip_summed != CHECKSUM_PARTIAL)
+		return 0;
+
+	if (!skb_is_gso(skb))
+#endif /* NETIF_F_TSO */
+		return 0;
+#ifdef NETIF_F_TSO
+
+	if (skb_header_cloned(skb)) {
+		int err = pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
+
+		if (err)
+			return err;
+	}
+
+	ip.hdr = skb_network_header(skb);
+	l4.hdr = skb_checksum_start(skb);
+
+	/* ADV DTYP TUCMD MKRLOC/ISCSIHEDLEN */
+	type_tucmd = E1000_ADVTXD_TUCMD_L4T_TCP;
+
+	/* initialize outer IP header fields */
+	if (ip.v4->version == 4) {
+		/* IP header will have to cancel out any data that
+		 * is not a part of the outer IP header
+		 */
+		ip.v4->check = csum_fold(csum_add(lco_csum(skb),
+						  csum_unfold(l4.tcp->check)));
+		type_tucmd |= E1000_ADVTXD_TUCMD_IPV4;
+
+		ip.v4->tot_len = 0;
+		first->tx_flags |= IGB_TX_FLAGS_TSO |
+				   IGB_TX_FLAGS_CSUM |
+				   IGB_TX_FLAGS_IPV4;
+#ifdef NETIF_F_TSO6
+	} else {
+		ip.v6->payload_len = 0;
+		first->tx_flags |= IGB_TX_FLAGS_TSO |
+				   IGB_TX_FLAGS_CSUM;
+#endif
+	}
+
+	/* determine offset of inner transport header */
+	l4_offset = l4.hdr - skb->data;
+
+	/* compute length of segmentation header */
+	*hdr_len = (l4.tcp->doff * 4) + l4_offset;
+
+	/* remove payload length from inner checksum */
+	paylen = skb->len - l4_offset;
+	csum_replace_by_diff(&l4.tcp->check, htonl(paylen));
+
+	/* update gso size and bytecount with header size */
+	first->gso_segs = skb_shinfo(skb)->gso_segs;
+	first->bytecount += (first->gso_segs - 1) * *hdr_len;
+
+	/* MSS L4LEN IDX */
+	mss_l4len_idx = (*hdr_len - l4_offset) << E1000_ADVTXD_L4LEN_SHIFT;
+	mss_l4len_idx |= skb_shinfo(skb)->gso_size << E1000_ADVTXD_MSS_SHIFT;
+
+	/* VLAN MACLEN IPLEN */
+	vlan_macip_lens = l4.hdr - ip.hdr;
+	vlan_macip_lens |= (ip.hdr - skb->data) << E1000_ADVTXD_MACLEN_SHIFT;
+	vlan_macip_lens |= first->tx_flags & IGB_TX_FLAGS_VLAN_MASK;
+
+	igb_tx_ctxtdesc(tx_ring, vlan_macip_lens, type_tucmd, mss_l4len_idx);
+
+	return 1;
+#endif  /* NETIF_F_TSO */
+}
+#else
 static int igb_tso(struct igb_ring *tx_ring,
 		   struct igb_tx_buffer *first,
 		   u8 *hdr_len)
@@ -5336,21 +5536,21 @@ static int igb_tso(struct igb_ring *tx_ring,
 		iph->tot_len = 0;
 		iph->check = 0;
 		tcp_hdr(skb)->check = ~csum_tcpudp_magic(iph->saddr,
-							 iph->daddr, 0,
-							 IPPROTO_TCP,
-							 0);
+				iph->daddr, 0,
+				IPPROTO_TCP,
+				0);
 		type_tucmd |= E1000_ADVTXD_TUCMD_IPV4;
 		first->tx_flags |= IGB_TX_FLAGS_TSO |
-				   IGB_TX_FLAGS_CSUM |
-				   IGB_TX_FLAGS_IPV4;
+			IGB_TX_FLAGS_CSUM |
+			IGB_TX_FLAGS_IPV4;
 #ifdef NETIF_F_TSO6
 	} else if (skb_is_gso_v6(skb)) {
 		ipv6_hdr(skb)->payload_len = 0;
 		tcp_hdr(skb)->check = ~csum_ipv6_magic(&ipv6_hdr(skb)->saddr,
-						       &ipv6_hdr(skb)->daddr,
-						       0, IPPROTO_TCP, 0);
+				&ipv6_hdr(skb)->daddr,
+				0, IPPROTO_TCP, 0);
 		first->tx_flags |= IGB_TX_FLAGS_TSO |
-				   IGB_TX_FLAGS_CSUM;
+			IGB_TX_FLAGS_CSUM;
 #endif
 	}
 
@@ -5376,6 +5576,7 @@ static int igb_tso(struct igb_ring *tx_ring,
 	return 1;
 #endif  /* NETIF_F_TSO */
 }
+#endif /* NETIF_F_GSO_PARTIAL */
 
 static void igb_tx_csum(struct igb_ring *tx_ring, struct igb_tx_buffer *first)
 {
@@ -5497,9 +5698,9 @@ static void igb_tx_olinfo_status(struct igb_ring *tx_ring,
 	tx_desc->read.olinfo_status = cpu_to_le32(olinfo_status);
 }
 
-static void igb_tx_map(struct igb_ring *tx_ring,
-		       struct igb_tx_buffer *first,
-		       const u8 hdr_len)
+static int igb_tx_map(struct igb_ring *tx_ring,
+		      struct igb_tx_buffer *first,
+		      const u8 hdr_len)
 {
 	struct sk_buff *skb = first->skb;
 	struct igb_tx_buffer *tx_buffer;
@@ -5599,6 +5800,9 @@ static void igb_tx_map(struct igb_ring *tx_ring,
 
 	tx_ring->next_to_use = i;
 
+	/* software timestamp the skb */
+	skb_tx_timestamp(skb);
+
 	writel(i, tx_ring->tail);
 
 	/* we need this if more than one processor can write to our tail
@@ -5606,7 +5810,7 @@ static void igb_tx_map(struct igb_ring *tx_ring,
 	 */
 	mmiowb();
 
-	return;
+	return 0;
 
 dma_error:
 	dev_err(tx_ring->dev, "TX DMA map failed\n");
@@ -5623,6 +5827,8 @@ dma_error:
 	}
 
 	tx_ring->next_to_use = i;
+
+	return -1;
 }
 
 static int __igb_maybe_stop_tx(struct igb_ring *tx_ring, const u16 size)
@@ -5741,7 +5947,12 @@ netdev_tx_t igb_xmit_frame_ring(struct sk_buff *skb,
 	else if (!tso)
 		igb_tx_csum(tx_ring, first);
 
+#ifdef HAVE_PTP_1588_CLOCK
+	if (igb_tx_map(tx_ring, first, hdr_len))
+		goto cleanup_tx_tstamp;
+#else
 	igb_tx_map(tx_ring, first, hdr_len);
+#endif
 
 #ifndef HAVE_TRANS_START_IN_QUEUE
 	netdev_ring(tx_ring)->trans_start = jiffies;
@@ -5754,6 +5965,18 @@ netdev_tx_t igb_xmit_frame_ring(struct sk_buff *skb,
 
 out_drop:
 	igb_unmap_and_free_tx_resource(tx_ring, first);
+#ifdef HAVE_PTP_1588_CLOCK
+cleanup_tx_tstamp:
+	if (unlikely(tx_flags & IGB_TX_FLAGS_TSTAMP)) {
+		struct igb_adapter *adapter = netdev_priv(tx_ring->netdev);
+
+		dev_kfree_skb_any(adapter->ptp_tx_skb);
+		adapter->ptp_tx_skb = NULL;
+		if (adapter->hw.mac.type == e1000_82576)
+			cancel_work_sync(&adapter->ptp_tx_work);
+		clear_bit_unlock(__IGB_PTP_TX_IN_PROGRESS, &adapter->state);
+	}
+#endif
 
 	return NETDEV_TX_OK;
 }
@@ -5928,8 +6151,9 @@ void igb_update_stats(struct igb_adapter *adapter)
 	int i;
 	u64 bytes, packets;
 #ifndef IGB_NO_LRO
-	u32 flushed = 0, coal = 0;
+	unsigned int num_q_vectors = adapter->num_q_vectors;
 	struct igb_q_vector *q_vector;
+	u32 flushed = 0, coal = 0;
 #endif
 
 #define PHY_IDLE_ERROR_COUNT_MASK 0x00FF
@@ -5946,7 +6170,14 @@ void igb_update_stats(struct igb_adapter *adapter)
 
 #endif
 #ifndef IGB_NO_LRO
-	for (i = 0; i < adapter->num_q_vectors; i++) {
+	if (num_q_vectors > MAX_Q_VECTORS) {
+		num_q_vectors = MAX_Q_VECTORS;
+		dev_warn(&adapter->pdev->dev,
+			 "The number of queue vectors (%d) is higher than max allowed (%d)\n",
+			 adapter->num_q_vectors,
+			 MAX_Q_VECTORS);
+	}
+	for (i = 0; i < num_q_vectors; i++) {
 		q_vector = adapter->q_vector[i];
 		if (!q_vector)
 			continue;
@@ -6715,10 +6946,10 @@ static int igb_ndo_set_vf_spoofchk(struct net_device *netdev, int vf,
 	dtxswc = E1000_READ_REG(hw, reg_offset);
 	if (setting)
 		dtxswc |= (BIT(vf) |
-			   BIT((vf + E1000_DTXSWC_VLAN_SPOOF_SHIFT)));
+			   BIT(vf + E1000_DTXSWC_VLAN_SPOOF_SHIFT));
 	else
 		dtxswc &= ~(BIT(vf) |
-			   (BIT(vf + E1000_DTXSWC_VLAN_SPOOF_SHIFT)));
+			    BIT(vf + E1000_DTXSWC_VLAN_SPOOF_SHIFT));
 	E1000_WRITE_REG(hw, reg_offset, dtxswc);
 
 	adapter->vf_data[vf].spoofchk_enabled = setting;
@@ -7553,7 +7784,7 @@ static bool igb_add_rx_frag(struct igb_ring *rx_ring,
 	/* we need the header to contain the greater of either ETH_HLEN or
 	 * 60 bytes if the skb->len is less than 60 for skb_pad.
 	 */
-	pull_len = eth_get_headlen(va, IGB_RX_HDR_LEN);
+	pull_len = eth_get_headlen(skb->dev, va, IGB_RX_HDR_LEN);
 
 	/* align pull length to size of long to optimize memcpy performance */
 	memcpy(__skb_put(skb, pull_len), va, ALIGN(pull_len, sizeof(long)));
@@ -8136,7 +8367,7 @@ static void igb_process_skb_fields(struct igb_ring *rx_ring,
 {
 	struct net_device *dev = rx_ring->netdev;
 	__le16 pkt_info = rx_desc->wb.lower.lo_dword.hs_rss.pkt_info;
-	bool notype;
+	bool notype = false;
 
 #ifdef NETIF_F_RXHASH
 	igb_rx_hash(rx_ring, rx_desc, skb);
@@ -9564,10 +9795,10 @@ static void igb_set_vf_rate_limit(struct e1000_hw *hw, int vf, int tx_rate,
 		/* Calculate the rate factor values to set */
 		rf_int = link_speed / tx_rate;
 		rf_dec = (link_speed - (rf_int * tx_rate));
-		rf_dec = (rf_dec * (1<<E1000_RTTBCNRC_RF_INT_SHIFT)) / tx_rate;
+		rf_dec = (rf_dec * BIT(E1000_RTTBCNRC_RF_INT_SHIFT)) / tx_rate;
 
 		bcnrc_val = E1000_RTTBCNRC_RS_ENA;
-		bcnrc_val |= ((rf_int<<E1000_RTTBCNRC_RF_INT_SHIFT) &
+		bcnrc_val |= ((rf_int << E1000_RTTBCNRC_RF_INT_SHIFT) &
 				E1000_RTTBCNRC_RF_INT_MASK);
 		bcnrc_val |= (rf_dec & E1000_RTTBCNRC_RF_DEC_MASK);
 	} else {

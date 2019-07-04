@@ -1,26 +1,5 @@
-/*******************************************************************************
-
-  Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2018 Intel Corporation.
-
-  This program is free software; you can redistribute it and/or modify it
-  under the terms and conditions of the GNU General Public License,
-  version 2, as published by the Free Software Foundation.
-
-  This program is distributed in the hope it will be useful, but WITHOUT
-  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-  more details.
-
-  The full GNU General Public License is included in this distribution in
-  the file called "COPYING".
-
-  Contact Information:
-  Linux NICS <linux.nics@intel.com>
-  e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
-  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
-
-*******************************************************************************/
+/* SPDX-License-Identifier: GPL-2.0 */
+/* Copyright(c) 2007 - 2019 Intel Corporation. */
 
 #ifndef _E1000_HW_H_
 #define _E1000_HW_H_
@@ -492,6 +471,35 @@ struct e1000_host_mng_command_info {
 #include "e1000_manage.h"
 #include "e1000_mbx.h"
 
+/* NVM Update commands */
+#define E1000_NVMUPD_CMD_REG_READ	0x0000000B
+#define E1000_NVMUPD_CMD_REG_WRITE	0x0000000C
+
+/* NVM Update features API */
+#define E1000_NVMUPD_FEATURES_API_VER_MAJOR		0
+#define E1000_NVMUPD_FEATURES_API_VER_MINOR		0
+#define E1000_NVMUPD_FEATURES_API_FEATURES_ARRAY_LEN	12
+#define E1000_NVMUPD_EXEC_FEATURES			0xE
+#define E1000_NVMUPD_FEATURE_FLAT_NVM_SUPPORT		(1 << 0)
+#define E1000_NVMUPD_FEATURE_REGISTER_ACCESS_SUPPORT	(1 << 1)
+
+#define E1000_NVMUPD_MOD_PNT_MASK			0xFF
+
+struct e1000_nvm_access {
+	u32 command;
+	u32 config;
+	u32 offset;	/* in bytes */
+	u32 data_size;	/* in bytes */
+	u8 data[1];
+};
+
+struct e1000_nvm_features {
+	u8 major;
+	u8 minor;
+	u16 size;
+	u8 features[E1000_NVMUPD_FEATURES_API_FEATURES_ARRAY_LEN];
+};
+
 /* Function pointers for the MAC. */
 struct e1000_mac_operations {
 	s32  (*init_params)(struct e1000_hw *);
@@ -777,6 +785,8 @@ struct e1000_hw {
 	u16 vendor_id;
 
 	u8  revision_id;
+	/* NVM Update features */
+	struct e1000_nvm_features nvmupd_features;
 };
 
 #include "e1000_82575.h"

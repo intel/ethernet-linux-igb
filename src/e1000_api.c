@@ -1,26 +1,5 @@
-/*******************************************************************************
-
-  Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2018 Intel Corporation.
-
-  This program is free software; you can redistribute it and/or modify it
-  under the terms and conditions of the GNU General Public License,
-  version 2, as published by the Free Software Foundation.
-
-  This program is distributed in the hope it will be useful, but WITHOUT
-  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-  more details.
-
-  The full GNU General Public License is included in this distribution in
-  the file called "COPYING".
-
-  Contact Information:
-  Linux NICS <linux.nics@intel.com>
-  e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
-  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
-
-*******************************************************************************/
+// SPDX-License-Identifier: GPL-2.0
+/* Copyright(c) 2007 - 2019 Intel Corporation. */
 
 #include "e1000_api.h"
 
@@ -289,6 +268,17 @@ s32 e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device)
 		if (ret_val)
 			goto out;
 	}
+
+	/* NVM Update features structure initialization */
+	hw->nvmupd_features.major = E1000_NVMUPD_FEATURES_API_VER_MAJOR;
+	hw->nvmupd_features.minor = E1000_NVMUPD_FEATURES_API_VER_MINOR;
+	hw->nvmupd_features.size = sizeof(hw->nvmupd_features);
+	memset(hw->nvmupd_features.features, 0x0,
+	       E1000_NVMUPD_FEATURES_API_FEATURES_ARRAY_LEN *
+	       sizeof(*hw->nvmupd_features.features));
+
+	hw->nvmupd_features.features[0] =
+		E1000_NVMUPD_FEATURE_REGISTER_ACCESS_SUPPORT;
 
 out:
 	return ret_val;

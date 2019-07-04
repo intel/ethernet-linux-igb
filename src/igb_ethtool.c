@@ -1,26 +1,5 @@
-/*******************************************************************************
-
-  Intel(R) Gigabit Ethernet Linux Driver
-  Copyright(c) 2007 - 2018 Intel Corporation.
-
-  This program is free software; you can redistribute it and/or modify it
-  under the terms and conditions of the GNU General Public License,
-  version 2, as published by the Free Software Foundation.
-
-  This program is distributed in the hope it will be useful, but WITHOUT
-  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-  more details.
-
-  The full GNU General Public License is included in this distribution in
-  the file called "COPYING".
-
-  Contact Information:
-  Linux NICS <linux.nics@intel.com>
-  e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
-  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
-
-*******************************************************************************/
+// SPDX-License-Identifier: GPL-2.0
+/* Copyright(c) 2007 - 2019 Intel Corporation. */
 
 /* ethtool support for igb */
 
@@ -150,6 +129,246 @@ static const char igb_gstrings_test[][ETH_GSTRING_LEN] = {
 #define IGB_TEST_LEN (sizeof(igb_gstrings_test) / ETH_GSTRING_LEN)
 #endif /* ETHTOOL_TEST */
 
+#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+static int igb_get_link_ksettings(struct net_device *netdev,
+				  struct ethtool_link_ksettings *cmd)
+{
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw *hw = &adapter->hw;
+	struct e1000_dev_spec_82575 *dev_spec = &hw->dev_spec._82575;
+	struct sfp_e1000_flags *eth_flags = &dev_spec->eth_flags;
+	u32 status;
+	u32 speed;
+	u32 supported, advertising;
+
+	status = E1000_READ_REG(hw, E1000_STATUS);
+	if (hw->phy.media_type == e1000_media_type_copper) {
+		supported = (SUPPORTED_10baseT_Half |
+			     SUPPORTED_10baseT_Full |
+			     SUPPORTED_100baseT_Half |
+			     SUPPORTED_100baseT_Full |
+			     SUPPORTED_1000baseT_Full|
+			     SUPPORTED_Autoneg |
+			     SUPPORTED_TP |
+			     SUPPORTED_Pause);
+		advertising = ADVERTISED_TP;
+
+		if (hw->mac.autoneg == 1) {
+			advertising |= ADVERTISED_Autoneg;
+			/* the e1000 autoneg seems to match ethtool nicely */
+			advertising |= hw->phy.autoneg_advertised;
+		}
+
+		cmd->base.port = PORT_TP;
+		cmd->base.phy_address = hw->phy.addr;
+	} else {
+		supported = (SUPPORTED_FIBRE |
+			     SUPPORTED_1000baseKX_Full |
+			     SUPPORTED_Autoneg |
+			     SUPPORTED_Pause);
+		advertising = (ADVERTISED_FIBRE |
+			       ADVERTISED_1000baseKX_Full);
+		if (hw->mac.type == e1000_i354) {
+			if (hw->device_id ==
+			     E1000_DEV_ID_I354_BACKPLANE_2_5GBPS &&
+			    !(status & E1000_STATUS_2P5_SKU_OVER)) {
+				supported |= SUPPORTED_2500baseX_Full;
+				supported &= ~SUPPORTED_1000baseKX_Full;
+				advertising |= ADVERTISED_2500baseX_Full;
+				advertising &= ~ADVERTISED_1000baseKX_Full;
+			}
+		}
+		if (eth_flags->e100_base_fx) {
+			supported |= SUPPORTED_100baseT_Full;
+			advertising |= ADVERTISED_100baseT_Full;
+		}
+		if (hw->mac.autoneg == 1)
+			advertising |= ADVERTISED_Autoneg;
+
+		cmd->base.port = PORT_FIBRE;
+	}
+	if (hw->mac.autoneg != 1)
+		advertising &= ~(ADVERTISED_Pause |
+				 ADVERTISED_Asym_Pause);
+
+	switch (hw->fc.requested_mode) {
+	case e1000_fc_full:
+		advertising |= ADVERTISED_Pause;
+		break;
+	case e1000_fc_rx_pause:
+		advertising |= (ADVERTISED_Pause |
+				ADVERTISED_Asym_Pause);
+		break;
+	case e1000_fc_tx_pause:
+		advertising |=  ADVERTISED_Asym_Pause;
+		break;
+	default:
+		advertising &= ~(ADVERTISED_Pause |
+				 ADVERTISED_Asym_Pause);
+	}
+	if (status & E1000_STATUS_LU) {
+		if ((status & E1000_STATUS_2P5_SKU) &&
+		    !(status & E1000_STATUS_2P5_SKU_OVER)) {
+			speed = SPEED_2500;
+		} else if (status & E1000_STATUS_SPEED_1000) {
+			speed = SPEED_1000;
+		} else if (status & E1000_STATUS_SPEED_100) {
+			speed = SPEED_100;
+		} else {
+			speed = SPEED_10;
+		}
+		if ((status & E1000_STATUS_FD) ||
+		    hw->phy.media_type != e1000_media_type_copper)
+			cmd->base.duplex = DUPLEX_FULL;
+		else
+			cmd->base.duplex = DUPLEX_HALF;
+	} else {
+		speed = SPEED_UNKNOWN;
+		cmd->base.duplex = DUPLEX_UNKNOWN;
+	}
+	cmd->base.speed = speed;
+	if (hw->phy.media_type == e1000_media_type_fiber ||
+	    hw->mac.autoneg)
+		cmd->base.autoneg = AUTONEG_ENABLE;
+	else
+		cmd->base.autoneg = AUTONEG_DISABLE;
+#ifdef ETH_TP_MDI_X
+
+	/* MDI-X => 2; MDI =>1; Invalid =>0 */
+	if (hw->phy.media_type == e1000_media_type_copper)
+		cmd->base.eth_tp_mdix = hw->phy.is_mdix ? ETH_TP_MDI_X :
+						      ETH_TP_MDI;
+	else
+		cmd->base.eth_tp_mdix = ETH_TP_MDI_INVALID;
+
+#ifdef ETH_TP_MDI_AUTO
+	if (hw->phy.mdix == AUTO_ALL_MODES)
+		cmd->base.eth_tp_mdix_ctrl = ETH_TP_MDI_AUTO;
+	else
+		cmd->base.eth_tp_mdix_ctrl = hw->phy.mdix;
+
+#endif
+#endif /* ETH_TP_MDI_X */
+	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.supported,
+						supported);
+	ethtool_convert_legacy_u32_to_link_mode(cmd->link_modes.advertising,
+						advertising);
+
+	return 0;
+}
+
+static int igb_set_link_ksettings(struct net_device *netdev,
+				  const struct ethtool_link_ksettings *cmd)
+{
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw *hw = &adapter->hw;
+	u32 advertising;
+
+	if (cmd->base.duplex  == DUPLEX_HALF) {
+		if (!hw->dev_spec._82575.eee_disable)
+			dev_info(pci_dev_to_dev(adapter->pdev), "EEE disabled: not supported with half duplex\n");
+		hw->dev_spec._82575.eee_disable = true;
+	} else {
+		if (hw->dev_spec._82575.eee_disable)
+			dev_info(pci_dev_to_dev(adapter->pdev), "EEE enabled\n");
+		hw->dev_spec._82575.eee_disable = false;
+	}
+
+	/* When SoL/IDER sessions are active, autoneg/speed/duplex
+	 * cannot be changed
+	 */
+	if (e1000_check_reset_block(hw)) {
+		dev_err(&adapter->pdev->dev,
+			"Cannot change link characteristics when SoL/IDER is active.\n");
+		return -EINVAL;
+	}
+
+#ifdef ETH_TP_MDI_AUTO
+	/* MDI setting is only allowed when autoneg enabled because
+	 * some hardware doesn't allow MDI setting when speed or
+	 * duplex is forced.
+	 */
+	if (cmd->base.eth_tp_mdix_ctrl) {
+		if (hw->phy.media_type != e1000_media_type_copper)
+			return -EOPNOTSUPP;
+
+		if (cmd->base.eth_tp_mdix_ctrl != ETH_TP_MDI_AUTO &&
+		    cmd->base.autoneg != AUTONEG_ENABLE) {
+			dev_err(&adapter->pdev->dev, "forcing MDI/MDI-X state is not supported when link speed and/or duplex are forced\n");
+			return -EINVAL;
+		}
+	}
+
+#endif /* ETH_TP_MDI_AUTO */
+	while (test_and_set_bit(__IGB_RESETTING, &adapter->state))
+		usleep_range(1000, 2000);
+
+	ethtool_convert_link_mode_to_legacy_u32(&advertising,
+						cmd->link_modes.advertising);
+
+	if (cmd->base.autoneg == AUTONEG_ENABLE) {
+		hw->mac.autoneg = 1;
+		if (hw->phy.media_type == e1000_media_type_fiber) {
+			hw->phy.autoneg_advertised = advertising |
+						     ADVERTISED_FIBRE |
+						     ADVERTISED_Autoneg;
+			switch (adapter->link_speed) {
+			case SPEED_2500:
+				hw->phy.autoneg_advertised =
+					ADVERTISED_2500baseX_Full;
+				break;
+			case SPEED_1000:
+				hw->phy.autoneg_advertised =
+					ADVERTISED_1000baseT_Full;
+				break;
+			case SPEED_100:
+				hw->phy.autoneg_advertised =
+					ADVERTISED_100baseT_Full;
+				break;
+			default:
+				break;
+			}
+		} else {
+			hw->phy.autoneg_advertised = advertising |
+						     ADVERTISED_TP |
+						     ADVERTISED_Autoneg;
+		}
+		advertising = hw->phy.autoneg_advertised;
+		if (adapter->fc_autoneg)
+			hw->fc.requested_mode = e1000_fc_default;
+	} else {
+		if (igb_set_spd_dplx(adapter,
+				     cmd->base.speed + cmd->base.duplex)) {
+			clear_bit(__IGB_RESETTING, &adapter->state);
+			return -EINVAL;
+		}
+	}
+
+#ifdef ETH_TP_MDI_AUTO
+	/* MDI-X => 2; MDI => 1; Auto => 3 */
+	if (cmd->base.eth_tp_mdix_ctrl) {
+		/* fix up the value for auto (3 => 0) as zero is mapped
+		 * internally to auto
+		 */
+		if (cmd->base.eth_tp_mdix_ctrl == ETH_TP_MDI_AUTO)
+			hw->phy.mdix = AUTO_ALL_MODES;
+		else
+			hw->phy.mdix = cmd->base.eth_tp_mdix_ctrl;
+	}
+
+#endif /* ETH_TP_MDI_AUTO */
+	/* reset the link */
+	if (netif_running(adapter->netdev)) {
+		igb_down(adapter);
+		igb_up(adapter);
+	} else {
+		igb_reset(adapter);
+	}
+
+	clear_bit(__IGB_RESETTING, &adapter->state);
+	return 0;
+}
+#else /* !HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE */
 static int igb_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
@@ -379,6 +598,7 @@ static int igb_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 	return 0;
 }
 
+#endif /* !HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE */
 static u32 igb_get_link(struct net_device *netdev)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
@@ -492,7 +712,7 @@ static void igb_get_regs(struct net_device *netdev,
 
 	memset(p, 0, IGB_REGS_LEN * sizeof(u32));
 
-	regs->version = (1 << 24) | (hw->revision_id << 16) | hw->device_id;
+	regs->version = (1u << 24) | (hw->revision_id << 16) | hw->device_id;
 
 	/* General Registers */
 	regs_buff[0] = E1000_READ_REG(hw, E1000_CTRL);
@@ -703,10 +923,152 @@ static void igb_get_regs(struct net_device *netdev,
 	}
 }
 
+static u8 igb_nvmupd_get_module(u32 val)
+{
+	return (u8)(val & E1000_NVMUPD_MOD_PNT_MASK);
+}
+
+static int igb_nvmupd_validate_offset(struct igb_adapter *adapter, u32 offset)
+{
+	if (offset >= E1000_REGISTER_SET_SIZE)
+		return 0;
+
+	switch (offset) {
+	case E1000_CTRL:
+	case E1000_STATUS:
+	case E1000_EECD:
+	case E1000_EERD:
+	case E1000_CTRL_EXT:
+	case E1000_FLA:
+	case E1000_FLOP:
+	case E1000_SWSM:
+	case E1000_FWSM:
+	case E1000_SW_FW_SYNC:
+	case E1000_IOVTCL:
+	case E1000_I350_BARCTRL:
+	case E1000_THSTAT:
+	case E1000_EEC_REG:
+	case E1000_SRWR:
+	case E1000_I210_FLA:
+	case E1000_I210_FLSWCTL:
+	case E1000_I210_FLSWDATA:
+	case E1000_I210_FLSWCNT:
+	case E1000_SHADOWINF:
+	case E1000_FLFWUPDATE:
+	case E1000_RAL(0):
+	case E1000_RAL(1):
+	case E1000_RAL(2):
+	case E1000_RAL(3):
+	case E1000_RAL(4):
+	case E1000_RAL(5):
+	case E1000_RAL(6):
+	case E1000_RAL(7):
+	case E1000_RAL(8):
+	case E1000_RAL(9):
+	case E1000_RAL(10):
+	case E1000_RAL(11):
+	case E1000_RAL(12):
+	case E1000_RAL(13):
+	case E1000_RAL(14):
+	case E1000_RAL(15):
+	case E1000_RAH(0):
+	case E1000_RAH(1):
+	case E1000_RAH(2):
+	case E1000_RAH(3):
+	case E1000_RAH(4):
+	case E1000_RAH(5):
+	case E1000_RAH(6):
+	case E1000_RAH(7):
+	case E1000_RAH(8):
+	case E1000_RAH(9):
+	case E1000_RAH(10):
+	case E1000_RAH(11):
+	case E1000_RAH(12):
+	case E1000_RAH(13):
+	case E1000_RAH(14):
+	case E1000_RAH(15):
+		return 0;
+	default:
+		dev_warn(&adapter->pdev->dev, "Bad offset: %x\n", offset);
+		return -ENOTTY;
+	}
+}
+
+static int igb_nvmupd_command(struct e1000_hw *hw,
+			      struct e1000_nvm_access *nvm,
+			      u8 *bytes)
+{
+	struct igb_adapter *adapter = hw->back;
+	resource_size_t bar0_len;
+	int ret_val = 0;
+	u32 command;
+	u8 module;
+
+	bar0_len = pci_resource_len(adapter->pdev, 0);
+	command = nvm->command;
+	module = igb_nvmupd_get_module(nvm->config);
+
+	switch (command) {
+	case E1000_NVMUPD_CMD_REG_READ:
+		switch (module) {
+		case E1000_NVMUPD_EXEC_FEATURES:
+			if (nvm->data_size == hw->nvmupd_features.size)
+				memcpy(bytes, &hw->nvmupd_features,
+				hw->nvmupd_features.size);
+			else
+				ret_val = -ENOMEM;
+		break;
+		default:
+			if (igb_nvmupd_validate_offset(adapter, nvm->offset))
+				return -ENOTTY;
+			if (nvm->offset >= bar0_len) {
+				if (hw->mac.type == e1000_82576 &&
+				    hw->flash_address) {
+					if (nvm->data_size == 1)
+						*bytes = E1000_READ_FLASH_REG8(
+							hw,
+							nvm->offset - bar0_len);
+					else
+						*((u32 *)bytes) =
+							E1000_READ_FLASH_REG(hw,
+							nvm->offset - bar0_len);
+				} else
+					ret_val = -EFAULT;
+			} else if (nvm->data_size == 1)
+				*bytes = E1000_READ_REG8(hw, nvm->offset);
+			else
+				*((u32 *)bytes) = E1000_READ_REG(hw,
+								 nvm->offset);
+		break;
+		}
+	break;
+	case E1000_NVMUPD_CMD_REG_WRITE:
+		if (igb_nvmupd_validate_offset(adapter, nvm->offset))
+			return -ENOTTY;
+		if (nvm->offset >= bar0_len) {
+			if (hw->mac.type == e1000_82576 && hw->flash_address)
+				E1000_WRITE_FLASH_REG(hw,
+						      nvm->offset - bar0_len,
+						      *((u32 *)bytes));
+			else
+				ret_val = -EFAULT;
+		} else
+			E1000_WRITE_REG(hw, nvm->offset, *((u32 *)bytes));
+	break;
+	}
+
+	return ret_val;
+}
+
+
 static int igb_get_eeprom_len(struct net_device *netdev)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
-	return adapter->hw.nvm.word_size * 2;
+	struct pci_dev *pdev = adapter->pdev;
+	if (adapter->hw.mac.type == e1000_82576)
+		return pci_resource_len(pdev, 0) + pci_resource_len(pdev, 1);
+	else
+		return pci_resource_len(pdev, 0);
 }
 
 static int igb_get_eeprom(struct net_device *netdev,
@@ -717,11 +1079,21 @@ static int igb_get_eeprom(struct net_device *netdev,
 	u16 *eeprom_buff;
 	int first_word, last_word;
 	int ret_val = 0;
+	struct e1000_nvm_access *nvm;
+	u32 magic;
 	u16 i;
 
 	if (eeprom->len == 0)
 		return -EINVAL;
 
+	magic = hw->vendor_id | (hw->device_id << 16);
+	if (eeprom->magic && eeprom->magic != magic) {
+		nvm = (struct e1000_nvm_access *)eeprom;
+		ret_val = igb_nvmupd_command(hw, nvm, bytes);
+		return ret_val;
+	}
+
+	/* normal ethtool get_eeprom support */
 	eeprom->magic = hw->vendor_id | (hw->device_id << 16);
 
 	first_word = eeprom->offset >> 1;
@@ -764,11 +1136,21 @@ static int igb_set_eeprom(struct net_device *netdev,
 	u16 *eeprom_buff;
 	void *ptr;
 	int max_len, first_word, last_word, ret_val = 0;
+	struct e1000_nvm_access *nvm;
+	u32 magic;
 	u16 i;
 
 	if (eeprom->len == 0)
 		return -EOPNOTSUPP;
 
+	magic = hw->vendor_id | (hw->device_id << 16);
+	if (eeprom->magic && eeprom->magic != magic) {
+		nvm = (struct e1000_nvm_access *)eeprom;
+		ret_val = igb_nvmupd_command(hw, nvm, bytes);
+		return ret_val;
+	}
+
+	/* normal ethtool get_eeprom support */
 	if (eeprom->magic != (hw->vendor_id | (hw->device_id << 16)))
 		return -EFAULT;
 
@@ -822,14 +1204,14 @@ static void igb_get_drvinfo(struct net_device *netdev,
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 
-	strncpy(drvinfo->driver,  igb_driver_name, sizeof(drvinfo->driver) - 1);
-	strncpy(drvinfo->version, igb_driver_version,
-		sizeof(drvinfo->version) - 1);
+	strlcpy(drvinfo->driver,  igb_driver_name, sizeof(drvinfo->driver));
+	strlcpy(drvinfo->version, igb_driver_version,
+		sizeof(drvinfo->version));
 
-	strncpy(drvinfo->fw_version, adapter->fw_version,
-		sizeof(drvinfo->fw_version) - 1);
-	strncpy(drvinfo->bus_info, pci_name(adapter->pdev),
-		sizeof(drvinfo->bus_info) - 1);
+	strlcpy(drvinfo->fw_version, adapter->fw_version,
+		sizeof(drvinfo->fw_version));
+	strlcpy(drvinfo->bus_info, pci_name(adapter->pdev),
+		sizeof(drvinfo->bus_info));
 	drvinfo->n_stats = IGB_STATS_LEN;
 	drvinfo->testinfo_len = IGB_TEST_LEN;
 	drvinfo->regdump_len = igb_get_regs_len(netdev);
@@ -1206,7 +1588,7 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 	/* Test each interrupt */
 	for (; i < 31; i++) {
 		/* Interrupt to test */
-		mask = 1 << i;
+		mask = BIT(i);
 
 		if (!(mask & ics_mask))
 			continue;
@@ -1872,7 +2254,7 @@ static int igb_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 
-	if (wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE))
+	if (wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE | WAKE_FILTER))
 		return -EOPNOTSUPP;
 
 	if (!(adapter->flags & IGB_FLAG_WOL_SUPPORTED))
@@ -2174,8 +2556,16 @@ static int igb_get_ts_info(struct net_device *dev,
 {
 	struct igb_adapter *adapter = netdev_priv(dev);
 
-	switch (adapter->hw.mac.type) {
 #ifdef HAVE_PTP_1588_CLOCK
+	if (adapter->ptp_clock)
+		info->phc_index = ptp_clock_index(adapter->ptp_clock);
+	else
+		info->phc_index = -1;
+#else
+	info->phc_index = -1;
+#endif
+
+	switch (adapter->hw.mac.type) {
 	case e1000_82575:
 		info->so_timestamping =
 			SOF_TIMESTAMPING_TX_SOFTWARE |
@@ -2188,6 +2578,7 @@ static int igb_get_ts_info(struct net_device *dev,
 	case e1000_i354:
 	case e1000_i210:
 	case e1000_i211:
+#ifdef HAVE_PTP_1588_CLOCK
 		info->so_timestamping =
 			SOF_TIMESTAMPING_TX_SOFTWARE |
 			SOF_TIMESTAMPING_RX_SOFTWARE |
@@ -2196,28 +2587,31 @@ static int igb_get_ts_info(struct net_device *dev,
 			SOF_TIMESTAMPING_RX_HARDWARE |
 			SOF_TIMESTAMPING_RAW_HARDWARE;
 
-		if (adapter->ptp_clock)
-			info->phc_index = ptp_clock_index(adapter->ptp_clock);
-		else
-			info->phc_index = -1;
-
 		info->tx_types =
-			(1 << HWTSTAMP_TX_OFF) |
-			(1 << HWTSTAMP_TX_ON);
+			BIT(HWTSTAMP_TX_OFF) |
+			BIT(HWTSTAMP_TX_ON);
 
-		info->rx_filters = 1 << HWTSTAMP_FILTER_NONE;
+		info->rx_filters = BIT(HWTSTAMP_FILTER_NONE);
 
 		/* 82576 does not support timestamping all packets. */
 		if (adapter->hw.mac.type >= e1000_82580)
-			info->rx_filters |= 1 << HWTSTAMP_FILTER_ALL;
+			info->rx_filters |= BIT(HWTSTAMP_FILTER_ALL);
 		else
 			info->rx_filters |=
-				(1 << HWTSTAMP_FILTER_PTP_V1_L4_SYNC) |
-				(1 << HWTSTAMP_FILTER_PTP_V1_L4_DELAY_REQ) |
-				(1 << HWTSTAMP_FILTER_PTP_V2_EVENT);
+				BIT(HWTSTAMP_FILTER_PTP_V1_L4_SYNC) |
+				BIT(HWTSTAMP_FILTER_PTP_V1_L4_DELAY_REQ) |
+				BIT(HWTSTAMP_FILTER_PTP_V2_EVENT);
+#else /* HAVE_PTP_1588_CLOCK */
+		/* If PTP 1588 HW support is not available, report software
+		 * timestamping only.
+		 */
+		info->so_timestamping =
+			SOF_TIMESTAMPING_TX_SOFTWARE |
+			SOF_TIMESTAMPING_RX_SOFTWARE |
+			SOF_TIMESTAMPING_SOFTWARE;
+#endif /* HAVE_PTP_1588_CLOCK */
 
 		return 0;
-#endif /* HAVE_PTP_1588_CLOCK */
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -2969,11 +3363,8 @@ static void igb_get_channels(struct net_device *dev,
 
 	/* report maximum channels */
 	ch->max_combined = igb_max_rss_queues(adapter);
-	ch->max_rx = ch->max_combined;
-	if (adapter->vfs_allocated_count)
-		ch->max_tx = 1;
-	else
-		ch->max_tx = ch->max_combined;
+	ch->max_rx = 0;
+	ch->max_tx = 0;
 
 	/* report info for other vector */
 	if (adapter->msix_entries) {
@@ -3078,8 +3469,13 @@ static int igb_set_channels(struct net_device *dev,
 
 #endif /* ETHTOOL_SCHANNELS */
 static const struct ethtool_ops igb_ethtool_ops = {
+#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+	.get_link_ksettings     = igb_get_link_ksettings,
+	.set_link_ksettings     = igb_set_link_ksettings,
+#else
 	.get_settings           = igb_get_settings,
 	.set_settings           = igb_set_settings,
+#endif
 	.get_drvinfo            = igb_get_drvinfo,
 	.get_regs_len           = igb_get_regs_len,
 	.get_regs               = igb_get_regs,
