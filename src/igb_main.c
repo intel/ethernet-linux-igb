@@ -39,7 +39,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.3.5.36" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.3.5.39" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
@@ -2158,20 +2158,25 @@ static int igb_set_features(struct net_device *netdev,
 #endif /* HAVE_NDO_SET_FEATURES */
 
 #ifdef HAVE_FDB_OPS
-#ifdef USE_CONST_DEV_UC_CHAR
-static int igb_ndo_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
-			   struct net_device *dev,
-			   const unsigned char *addr,
-#ifdef HAVE_NDO_FDB_ADD_VID
-			   u16 vid,
-#endif /* HAVE_NDO_FDB_ADD_VID */
-			   u16 flags)
-#else /* USE_CONST_DEV_UC_CHAR */
-static int igb_ndo_fdb_add(struct ndmsg *ndm,
-			   struct net_device *dev,
-			   unsigned char *addr,
-			   u16 flags)
-#endif /* USE_CONST_DEV_UC_CHAR */
+#if defined(HAVE_NDO_FDB_ADD_EXTACK)
+static int
+igb_ndo_fdb_add(struct ndmsg *ndm, struct nlattr __always_unused *tb[],
+		struct net_device *dev, const unsigned char *addr, u16 vid,
+		u16 flags, struct netlink_ext_ack __always_unused *extack)
+#elif defined(HAVE_NDO_FDB_ADD_VID)
+static int
+igb_ndo_fdb_add(struct ndmsg *ndm, struct nlattr __always_unused *tb[],
+		struct net_device *dev, const unsigned char *addr, u16 vid,
+		u16 flags)
+#elif defined(USE_CONST_DEV_UC_CHAR)
+static int
+igb_ndo_fdb_add(struct ndmsg *ndm, struct nlattr __always_unused *tb[],
+		struct net_device *dev, const unsigned char *addr, u16 flags)
+#else
+static int
+igb_ndo_fdb_add(struct ndmsg *ndm, struct nlattr __always_unused *tb[],
+		struct net_device *dev, unsigned char *addr, u16 flags)
+#endif
 {
 	struct igb_adapter *adapter = netdev_priv(dev);
 	struct e1000_hw *hw = &adapter->hw;
@@ -5805,10 +5810,18 @@ static int igb_tx_map(struct igb_ring *tx_ring,
 
 	writel(i, tx_ring->tail);
 
-	/* we need this if more than one processor can write to our tail
-	 * at a time, it syncronizes IO on IA64/Altix systems
+#ifndef SPIN_UNLOCK_IMPLIES_MMIOWB
+	/* The following mmiowb() is required on certain
+	 * architechtures (IA64/Altix in particular) in order to
+	 * synchronize the I/O calls with respect to a spin lock. This
+	 * is because the wmb() on those architectures does not
+	 * guarantee anything for posted I/O writes.
+	 *
+	 * Note that the associated spin_unlock() is not within the
+	 * driver code, but in the networking core stack.
 	 */
 	mmiowb();
+#endif /* SPIN_UNLOCK_IMPLIES_MMIOWB */
 
 	return 0;
 

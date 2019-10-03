@@ -18,11 +18,8 @@ May 15, 2019
 - License
 
 
-================================================================================
-
-
 Important Notes
----------------
+===============
 
 Configuring SR-IOV for improved network security
 ------------------------------------------------
@@ -63,9 +60,6 @@ I354-based network connections.
 This driver no longer supports Itanium(R)-based systems.
 
 
-================================================================================
-
-
 Identifying Your Adapter
 ========================
 For information on how to identify your adapter, and for the latest Intel
@@ -73,11 +67,8 @@ network drivers, refer to the Intel Support website:
 http://www.intel.com/support
 
 
-================================================================================
-
-
 Building and Installation
--------------------------
+=========================
 To build a binary RPM* package of this driver, run 'rpmbuild -tb
 igb-<x.x.x>.tar.gz', where <x.x.x> is the version number for the driver tar
 file.
@@ -142,11 +133,8 @@ The dracut utility may be used on RedHat distributions:
 	# update-initramfs -u
 
 
-================================================================================
-
-
 Command Line Parameters
------------------------
+=======================
 If the driver is built as a module, the following optional parameters are used
 by entering them on the command line with the modprobe command using this
 syntax:
@@ -415,11 +403,8 @@ When this parameter is set, the driver detects malicious VF driver and
 disables its Tx/Rx queues until a VF driver reset occurs.
 
 
-================================================================================
-
-
 Additional Features and Configurations
--------------------------------------------
+======================================
 
 Configuring the Driver on Different Distributions
 -------------------------------------------------
@@ -634,9 +619,6 @@ IProute2 tool from Sourceforge if your version does not have all the features
 you require.
 
 
-================================================================================
-
-
 Known Issues/Troubleshooting
 ============================
 
@@ -710,7 +692,6 @@ tree and entering:
 
 Performance Degradation with Jumbo Frames
 -----------------------------------------
-
 Degradation in throughput performance may be observed in some Jumbo frames
 environments. If this is observed, increasing the application's socket buffer
 size and/or increasing the /proc/sys/net/ipv4/tcp_*mem entry values may help.
@@ -801,9 +782,8 @@ kernel.
 Rx Page Allocation Errors
 -------------------------
 'Page allocation failure. order:0' errors may occur under stress with kernels
-2.6.25 and newer.
-This is caused by the way the Linux kernel reports this stressed condition.
-
+2.6.25 and newer. This is caused by the way the Linux kernel reports this
+stressed condition.
 
 Under Redhat 5.4-GA, System May Crash when Closing Guest OS Window after
 Loading/Unloading Physical Function (PF) Driver
@@ -860,9 +840,6 @@ Prior to unloading the PF driver, you must first ensure that all VFs are
 no longer active. Do this by shutting down all VMs and unloading the VF driver.
 
 
-================================================================================
-
-
 Support
 =======
 For general information, go to the Intel support website at:
@@ -875,11 +852,8 @@ with a supported adapter, email the specific information related to the issue
 to e1000-devel@lists.sf.net.
 
 
-================================================================================
-
-
 License
--------
+=======
 This program is free software; you can redistribute it and/or modify it under
 the terms and conditions of the GNU General Public License, version 2, as
 published by the Free Software Foundation.
@@ -896,11 +870,10 @@ The full GNU General Public License is included in this distribution in the
 file called "COPYING".
 
 Copyright(c) 1999 - 2019 Intel Corporation.
-================================================================================
 
 
 Trademarks
-----------
+==========
 Intel and Itanium are trademarks or registered trademarks of Intel Corporation
 or its subsidiaries in the United States and/or other countries.
 
