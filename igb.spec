@@ -1,6 +1,6 @@
 Name: igb
 Summary: Intel(R) Gigabit Ethernet Linux Driver
-Version: 5.3.5.39
+Version: 5.3.5.42
 Release: 1
 Source: %{name}-%{version}.tar.gz
 Vendor: Intel Corporation

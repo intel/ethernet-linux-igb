@@ -39,7 +39,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.3.5.39" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.3.5.42" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
@@ -2936,9 +2936,6 @@ static int igb_probe(struct pci_dev *pdev,
 #endif /* NETIF_F_GRO */
 #endif /* HAVE_NDO_SET_FEATURES */
 
-#ifdef NETIF_F_HW_VLAN_CTAG_FILTER
-	netdev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
-#endif /* NETIF_F_HW_FLAN_CTAG_FILTER */
 #ifdef NETIF_F_HW_VLAN_TX
 	netdev->features |= NETIF_F_HW_VLAN_FILTER;
 #endif /* NETIF_F_HW_VLAN_TX */

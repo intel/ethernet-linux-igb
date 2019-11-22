@@ -152,7 +152,7 @@ to 1 or greater.
 .B max_vfs
 This parameter adds support for SR-IOV. It causes the driver to spawn up to max_vfs worth of virtual functions.
 .IP
-.B Valid Range: 0-7
+.B Valid Range:  0-7
 .IP
 If the value is greater than 0 it will also force the VMDq parameter to be 1 or more.
 .IP
@@ -194,6 +194,7 @@ allocated causing slower memory access and impacting throughput, CPU, or both.
 .IP
 1 = Enables EEE
 .IP
+
 A link between two EEE-compliant devices will result in periodic bursts of data followed by periods where the link is in an idle state. This Low Power Idle (LPI) state is supported at 1 Gbps and 100 Mbps link speeds.
 
 NOTES:
@@ -202,8 +203,9 @@ NOTES:
 - EEE is not supported on all Intel(R) Ethernet Network devices or at all link speeds.
 
 Example:
-ethtool --show-eee devname
-ethtool --set-eee devname [eee on|off]
+
+# ethtool --show-eee <ethX>
+# ethtool --set-eee <ethX> [eee on|off]
 .LP
 .B DMAC
 .IP
@@ -230,12 +232,14 @@ disables its Tx/Rx queues until a VF driver reset occurs.
 .LP
 Jumbo Frames support is enabled by changing the Maximum Transmission Unit (MTU) to a value larger than the default value of 1500.
 
-Use the ifconfig command to increase the MTU size. For example, enter the following where X is the interface number:
+Use the ifconfig command to increase the MTU size. For example, enter the following where <ethX> is the interface number:
 
-   ifconfig ethX mtu 9000 up
+# ifconfig <ethX> mtu 9000 up
+
 Alternatively, you can use the ip command as follows:
-   ip link set mtu 9000 dev ethX
-   ip link set up dev ethX
+
+# ip link set mtu 9000 dev <ethX>
+# ip link set up dev <ethX>
 
 .LP
 NOTE: The maximum MTU setting for Jumbo Frames is 9216. This value coincides with the maximum Jumbo Frames size of 9234 bytes.
@@ -287,6 +291,7 @@ README
 included with the driver.
 For general information, go to the Intel support website at:
 .B http://www.intel.com/support/
+
 .LP
 If an issue is identified with the released source code on a supported kernel with a supported adapter, email the specific information related to the issue to e1000-devel@lists.sf.net.
 .LP

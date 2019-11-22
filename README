@@ -1,6 +1,5 @@
 
 igb Linux* Base Driver for Intel(R) Ethernet Network Connection
--------------------------------------------------------------
 
 ================================================================================
 
@@ -8,6 +7,8 @@ May 15, 2019
 
 ================================================================================
 
+Contents
+========
 - Overview
 - Identifying Your Adapter
 - Building and Installation
@@ -23,20 +24,23 @@ Important Notes
 
 Configuring SR-IOV for improved network security
 ------------------------------------------------
-In a virtualized environment, on Intel(R) Ethernet Server Adapters that support
-SR-IOV, the virtual function (VF) may be subject to malicious behavior.
+In a virtualized environment, on Intel(R) Ethernet Network Adapters that
+support SR-IOV, the virtual function (VF) may be subject to malicious behavior.
 Software-generated layer two frames, like IEEE 802.3x (link flow control), IEEE
 802.1Qbb (priority based flow-control), and others of this type, are not
 expected and can throttle traffic between the host and the virtual switch,
 reducing performance. To resolve this issue, and to ensure isolation from
 unintended traffic streams, configure all SR-IOV enabled ports for VLAN tagging
 from the administrative interface on the PF. This configuration allows
-unexpected, and potentially malicious, frames to be dropped.
+unexpected, and potentially malicious, frames to be dropped. See "Configuring
+VLAN Tagging on SR-IOV Enabled Adapter Ports" in this README for configuration
+instructions.
 
 
 Overview
 ========
-This driver supports kernel versions 2.6.30 or newer.
+This driver supports kernel versions 2.6.30 or newer. The associated Virtual
+Function (VF) driver for this driver is igbvf.
 
 Driver information can be obtained using ethtool, lspci, and ifconfig.
 Instructions on updating ethtool can be found in the section Additional
@@ -48,9 +52,6 @@ drivers.
 For questions related to hardware requirements, refer to the documentation
 supplied with your Intel adapter. All hardware requirements listed apply to use
 with Linux.
-
-The driver information previously displayed in the /proc file system is not
-supported in this release.
 
 The igb driver supports IEEE 1588 time stamping for kernels 2.6.30 and newer.
 
@@ -69,68 +70,99 @@ http://www.intel.com/support
 
 Building and Installation
 =========================
-To build a binary RPM* package of this driver, run 'rpmbuild -tb
-igb-<x.x.x>.tar.gz', where <x.x.x> is the version number for the driver tar
-file.
 
-Note: For the build to work properly, the currently running kernel MUST match
-the version and configuration of the installed kernel sources. If you have just
-recompiled the kernel reboot the system before building.
-
-- To compile the driver on some kernel/arch combinations, a package with the
-development version of libelf (e.g. libelf-dev, libelf-devel,
-elfutilsl-libelf-devel) may need to be installed.
-
+To build a binary RPM package of this driver
+--------------------------------------------
 Note: RPM functionality has only been tested in Red Hat distributions.
 
+1. Run the following command, where <x.x.x> is the version number for the
+   driver tar file.
 
-1. Move the base driver tar file to the directory of your choice. For
-   example, use '/home/username/igb' or '/usr/local/src/igb'.
+   # rpmbuild -tb igb-<x.x.x>.tar.gz
+
+   NOTE: For the build to work properly, the currently running kernel MUST
+   match the version and configuration of the installed kernel sources. If
+   you have just recompiled the kernel, reboot the system before building.
+
+2. After building the RPM, the last few lines of the tool output contain the
+   location of the RPM file that was built. Install the RPM with one of the
+   following commands, where <RPM> is the location of the RPM file:
+
+   # rpm -Uvh <RPM>
+       or
+   # dnf/yum localinstall <RPM>
+
+NOTES:
+- To compile the driver on some kernel/arch combinations, you may need to
+install a package with the development version of libelf (e.g. libelf-dev,
+libelf-devel, elfutilsl-libelf-devel).
+- When compiling an out-of-tree driver, details will vary by distribution.
+However, you will usually need a kernel-devel RPM or some RPM that provides the
+kernel headers at a minimum. The RPM kernel-devel will usually fill in the link
+at /lib/modules/'uname -r'/build.
+
+
+To manually build the driver
+----------------------------
+1. Move the base driver tar file to the directory of your choice.
+   For example, use '/home/username/igb' or '/usr/local/src/igb'.
 
 2. Untar/unzip the archive, where <x.x.x> is the version number for the
    driver tar file:
-   tar zxf igb-<x.x.x>.tar.gz
+
+   # tar zxf igb-<x.x.x>.tar.gz
 
 3. Change to the driver src directory, where <x.x.x> is the version number
    for the driver tar:
-   cd igb-<x.x.x>/src/
+
+   # cd igb-<x.x.x>/src/
 
 4. Compile the driver module:
+
    # make install
+
    The binary will be installed as:
-   /lib/modules/<KERNEL VERSION>/updates/drivers/net/ethernet/intel/igb/igb.ko
+   /lib/modules/<KERNEL VER>/updates/drivers/net/ethernet/intel/igb/igb.ko
 
    The install location listed above is the default location. This may differ
    for various Linux distributions.
 
-5. Load the module using the modprobe command:
-   modprobe <igb> [parameter=port1_value,port2_value]
+5. Load the module using the modprobe command.
 
-   Make sure that any older igb drivers are removed from the kernel before
-   loading the new module:
-   rmmod igb; modprobe igb
+   To check the version of the driver and then load it:
+
+   # modinfo igb
+   # modprobe igb [parameter=port1_value,port2_value]
+
+   Alternately, make sure that any older igb drivers are removed from the
+   kernel before loading the new module:
+
+   # rmmod igb; modprobe igb
 
 6. Assign an IP address to the interface by entering the following,
-   where ethX is the interface name that was shown in dmesg after modprobe:
-  
-   ip address add <IP_address>/<netmask bits> dev ethX
+   where <ethX> is the interface name that was shown in dmesg after modprobe:
+
+   # ip address add <IP_address>/<netmask bits> dev <ethX>
 
 7. Verify that the interface works. Enter the following, where IP_address
    is the IP address for another machine on the same subnet as the interface
    that is being tested:
-   ping <IP_address>
+
+   # ping <IP_address>
+
+Note: For certain distributions like (but not limited to) Red Hat Enterprise
+Linux 7 and Ubuntu, once the driver is installed, you may need to update the
+initrd/initramfs file to prevent the OS loading old versions of the igb driver.
+Use the dracut utility on Red Hat distributions:
+	# dracut --force
+
+   For Ubuntu:
+	# update-initramfs -u
 
 To build igb driver with DCA
 ----------------------------
 If your kernel supports DCA, the driver will build by default with DCA enabled.
 
-Note: For certain distributions like (but not limited to) RedHat Enterprise
-Linux 7 and Ubuntu, once the driver is installed the initrd/initramfs file may
-need to be updated to prevent the OS loading old versions of the igb driver.
-The dracut utility may be used on RedHat distributions:
-	# dracut --force
-   For Ubuntu:
-	# update-initramfs -u
 
 
 Command Line Parameters
@@ -138,12 +170,14 @@ Command Line Parameters
 If the driver is built as a module, the following optional parameters are used
 by entering them on the command line with the modprobe command using this
 syntax:
-modprobe igb [<option>=<VAL1>,<VAL2>,...]
+
+# modprobe igb [<option>=<VAL1>,<VAL2>,...]
 
 There needs to be a <VAL#> for each network port in the system supported by
 this driver. The values will be applied to each instance, in function order.
 For example:
-modprobe igb InterruptThrottleRate=16000,16000
+
+# modprobe igb InterruptThrottleRate=16000,16000
 
 In this case, there are two network ports supported by igb in the system.
 The default value for each parameter is generally the recommended setting,
@@ -272,7 +306,7 @@ max_vfs
 -------
 This parameter adds support for SR-IOV. It causes the driver to spawn up to
 max_vfs worth of virtual functions.
-Valid Range: 0-7
+Valid Range:  0-7
 If the value is greater than 0 it will also force the VMDq parameter to be 1 or
 more.
 
@@ -281,11 +315,11 @@ dual port adapter, or more than one adapter in your system, and want N virtual
 functions per port, you must specify a number for each port with each parameter
 separated by a comma. For example:
 
-  modprobe igb max_vfs=4
+# modprobe igb max_vfs=4
 
 This will spawn 4 VFs on the first port.
 
-  modprobe igb max_vfs=2,4
+# modprobe igb max_vfs=2,4
 
 This will spawn 2 VFs on the first port and 4 VFs on the second port.
 
@@ -299,36 +333,26 @@ support it, you can check sysfs to find the mapping.
 
 NOTE: When either SR-IOV mode or VMDq mode is enabled, hardware VLAN filtering
 and VLAN tag stripping/insertion will remain enabled. Please remove the old
-VLAN filter before the new VLAN filter is added. For example,
-ip link set eth0 vf 0 vlan 100	// set vlan 100 for VF 0
-ip link set eth0 vf 0 vlan 0	// Delete vlan 100
-ip link set eth0 vf 0 vlan 200	// set a new vlan 200 for VF 0
+VLAN filter before the new VLAN filter is added. For example:
+
+# ip link set eth0 vf 0 vlan 100	// set vlan 100 for VF 0
+# ip link set eth0 vf 0 vlan 0	// Delete vlan 100
+# ip link set eth0 vf 0 vlan 200	// set a new vlan 200 for VF 0
 
 
-Configuring SR-IOV for improved network security
-------------------------------------------------
-In a virtualized environment, on Intel(R) Ethernet Server Adapters that support
-SR-IOV, the virtual function (VF) may be subject to malicious behavior.
-Software-generated layer two frames, like IEEE 802.3x (link flow control), IEEE
-802.1Qbb (priority based flow-control), and others of this type, are not
-expected and can throttle traffic between the host and the virtual switch,
-reducing performance. To resolve this issue, and to ensure isolation from
-unintended traffic streams, configure all SR-IOV enabled ports for VLAN tagging
-from the administrative interface on the PF. This configuration allows
-unexpected, and potentially malicious, frames to be dropped.
-
-
-Configuring VLAN tagging on SR-IOV enabled adapter ports
+Configuring VLAN Tagging on SR-IOV Enabled Adapter Ports
 --------------------------------------------------------
 To configure VLAN tagging for the ports on an SR-IOV enabled adapter, use the
 following command. The VLAN configuration should be done before the VF driver
-is loaded or the VM is booted.
+is loaded or the VM is booted. The VF is not aware of the VLAN tag being
+inserted on transmit and removed on received frames (sometimes called "port
+VLAN" mode).
 
-$ ip link set dev <PF netdev id> vf <id> vlan <vlan id>
+# ip link set dev <PF netdev id> vf <id> vlan <vlan id>
 
-For example, the following instructions will configure PF eth0 and the first VF
-on VLAN 10.
-$ ip link set dev eth0 vf 0 vlan 10
+For example, the following will configure PF eth0 and the first VF on VLAN 10:
+
+# ip link set dev eth0 vf 0 vlan 10
 
 
 QueuePairs
@@ -361,6 +385,7 @@ EEE (Energy Efficient Ethernet)
 Valid Range: 0-1
 0 = Disables EEE
 1 = Enables EEE
+
 A link between two EEE-compliant devices will result in periodic bursts of data
 followed by periods where the link is in an idle state. This Low Power Idle
 (LPI) state is supported at 1 Gbps and 100 Mbps link speeds.
@@ -372,8 +397,9 @@ NOTES:
 speeds.
 
 Example:
-ethtool --show-eee devname
-ethtool --set-eee devname [eee on|off]
+
+# ethtool --show-eee <ethX>
+# ethtool --set-eee <ethX> [eee on|off]
 
 
 DMAC
@@ -406,6 +432,25 @@ disables its Tx/Rx queues until a VF driver reset occurs.
 Additional Features and Configurations
 ======================================
 
+ethtool
+-------
+The driver utilizes the ethtool interface for driver configuration and
+diagnostics, as well as displaying statistical information. The latest ethtool
+version is required for this functionality. Download it at:
+https://kernel.org/pub/software/network/ethtool/
+
+
+Viewing Link Messages
+---------------------
+Link messages will not be displayed to the console if the distribution is
+restricting system messages. In order to see network driver link messages on
+your console, set dmesg to eight by entering the following:
+
+# dmesg -n 8
+
+NOTE: This setting is not saved across reboots.
+
+
 Configuring the Driver on Different Distributions
 -------------------------------------------------
 Configuring a network driver to load properly when the system is started is
@@ -420,19 +465,9 @@ or module name, the name for the Base Driver is igb.
 For example, if you install the igb driver for two adapters (eth0 and eth1) and
 want to set the interrupt mode to MSI-X and MSI, respectively, add the
 following to modules.conf or /etc/modprobe.conf:
-alias eth0 igb
-alias eth1 igb
-options igb InterruptThrottleRate=3,1
-
-
-Viewing Link Messages
----------------------
-Link messages will not be displayed to the console if the distribution is
-restricting system messages. In order to see network driver link messages on
-your console, set dmesg to eight by entering the following:
-dmesg -n 8
-
-NOTE: This setting is not saved across reboots.
+  alias eth0 igb
+  alias eth1 igb
+  options igb InterruptThrottleRate=3,1
 
 
 Jumbo Frames
@@ -441,17 +476,20 @@ Jumbo Frames support is enabled by changing the Maximum Transmission Unit (MTU)
 to a value larger than the default value of 1500.
 
 Use the ifconfig command to increase the MTU size. For example, enter the
-following where X is the interface number:
+following where <ethX> is the interface number:
 
-   ifconfig ethX mtu 9000 up
+# ifconfig <ethX> mtu 9000 up
+
 Alternatively, you can use the ip command as follows:
-   ip link set mtu 9000 dev ethX
-   ip link set up dev ethX
+
+# ip link set mtu 9000 dev <ethX>
+# ip link set up dev <ethX>
 
 This setting is not saved across reboots. The setting change can be made
-permanent by adding 'MTU=9000' to the file:
-/etc/sysconfig/network-scripts/ifcfg-ethX for RHEL or to the file
-/etc/sysconfig/network/<config_file> for SLES.
+permanent by adding 'MTU=9000' to the following file:
+  /etc/sysconfig/network-scripts/ifcfg-<ethX> for RHEL
+      or
+  /etc/sysconfig/network/<config_file> for SLES
 
 NOTE: The maximum MTU setting for Jumbo Frames is 9216. This value coincides
 with the maximum Jumbo Frames size of 9234 bytes.
@@ -462,14 +500,6 @@ poor performance or loss of link.
 NOTE: Packet loss may have a greater impact on throughput when you use jumbo
 frames. If you observe a drop in performance after enabling jumbo frames,
 enabling flow control may mitigate the issue.
-
-
-ethtool
--------
-The driver utilizes the ethtool interface for driver configuration and
-diagnostics, as well as displaying statistical information. The latest ethtool
-version is required for this functionality. Download it at:
-https://kernel.org/pub/software/network/ethtool/
 
 
 Speed and Duplex Configuration
@@ -496,7 +526,8 @@ following website:
    https://kernel.org/pub/software/network/ethtool/
 
 To see the speed configurations your device supports, run the following:
-   ethtool ethX
+
+# ethtool <ethX>
 
 Caution: Only experienced network administrators should force speed and duplex
 or change autonegotiation advertising manually. The settings at the switch must
@@ -577,8 +608,8 @@ IEEE 1588 Precision Time Protocol (PTP) Hardware Clock (PHC)
 ------------------------------------------------------------
 Precision Time Protocol (PTP) is used to synchronize clocks in a computer
 network. PTP support varies among Intel devices that support this driver. Use
-"ethtool -T <netdev name>" to get a definitive list of PTP capabilities
-supported by the device.
+'ethtool -T <ethX>' to get a definitive list of PTP capabilities supported by
+the device.
 
 NOTE: PTP requires 3.0.0 or later kernel version that has PTP support enabled
 in the kernel and a user-space software daemon.
@@ -595,13 +626,14 @@ You can verify that the driver is using PTP by looking at the system log to see
 whether a PHC was attempted to be registered or not. If you have a kernel and
 version of ethtool with PTP support, you can check the PTP support in the
 driver by executing:
-ethtool -T ethX
+
+# ethtool -T <ethX>
 
 
-MAC and VLAN anti-spoofing feature
-----------------------------------
-When a malicious driver attempts to send a spoofed packet, it is dropped by the
-hardware and not transmitted.
+MAC and VLAN Anti-Spoofing Feature for VFs
+------------------------------------------
+When a malicious driver on a Virtual Function (VF) interface attempts to send a
+spoofed packet, it is dropped by the hardware and not transmitted.
 
 An interrupt is sent to the PF driver notifying it of the spoof attempt. When a
 spoofed packet is detected, the PF driver will send the following message to
@@ -672,7 +704,7 @@ kernel by configuring your kernel with CONFIG_PCI_MSI unset.
 Detected Tx Unit Hang in Quad Port Adapters
 -------------------------------------------
 In some cases ports 3 and 4 don't pass traffic and report 'Detected Tx Unit
-Hang' followed by 'NETDEV WATCHDOG: ethX: transmit timed out' errors. Ports 1
+Hang' followed by 'NETDEV WATCHDOG: <ethX>: transmit timed out' errors. Ports 1
 and 2 do not show any errors and will pass traffic.
 
 This issue may be resolved by updating to the latest kernel and BIOS. You
@@ -687,6 +719,7 @@ may occur: "Linux kernel source not configured - missing version.h"
 
 To solve this issue, create the version.h file by going to the Linux source
 tree and entering:
+
 # make include/linux/version.h
 
 
@@ -715,25 +748,27 @@ for any IP address assigned to the system. This results in unbalanced receive
 traffic.
 
 If you have multiple interfaces in a server, either turn on ARP filtering by
-entering:
-echo 1 > /proc/sys/net/ipv4/conf/all/arp_filter
+entering the following:
+
+# echo 1 > /proc/sys/net/ipv4/conf/all/arp_filter
 
 This only works if your kernel's version is higher than 2.4.5.
 
-
 NOTE: This setting is not saved across reboots. The configuration change can be
 made permanent by adding the following line to the file /etc/sysctl.conf:
-net.ipv4.conf.all.arp_filter = 1
+
+  net.ipv4.conf.all.arp_filter = 1
 
 Another alternative is to install the interfaces in separate broadcast domains
 (either in different switches or in a switch partitioned to VLANs).
 
 
-Disable rx Flow Control with ethtool
+Disable Rx Flow Control with ethtool
 ------------------------------------
 In order to disable receive flow control using ethtool, you must turn off
 auto-negotiation on the same command line:
-ethtool -A eth? autoneg off rx off
+
+# ethtool -A <ethX> autoneg off rx off
 
 
 Unplugging Network Cable While ethtool -p is Running
@@ -767,6 +802,7 @@ Build Error with Asianux 3.0 - Redefinition of typedef 'irq_handler_t'
 Some systems may experience build issues due to the redefinition of
 irq_handler_t. To resolve this issue, build the driver (step 4 above) using the
 command:
+
 # make CFLAGS_EXTRA=-DAX_RELEASE_CODE=1 install
 
 
@@ -847,6 +883,7 @@ http://www.intel.com/support/
 
 or the Intel Wired Networking project hosted by Sourceforge at:
 http://sourceforge.net/projects/e1000
+
 If an issue is identified with the released source code on a supported kernel
 with a supported adapter, email the specific information related to the issue
 to e1000-devel@lists.sf.net.
