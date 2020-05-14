@@ -102,7 +102,7 @@ than the specified size.
 .IP
 .B Valid Range: 0-2 (0 = Legacy Int, 1 = MSI and 2 = MSI-X)
 .IP
-IntMode controls allow load time control over the type of interrupt
+IntMode controls the allowed load time control over the type of interrupt
 registered for by the driver. MSI-X is required for multiple queue
 support, and some kernels and combinations of kernel .config options
 will force a lower level of interrupt support.
@@ -116,9 +116,6 @@ will force a lower level of interrupt support.
 .IP
 X = Assign X queues, where X is less than or equal to the maximum number of
 queues (8 queues).
-The driver allows maximum supported queue value. For example,
-I350-based adapters allow RSS=8, where 8 queues is the maximum allowable
-queues.
 .IP
 NOTE: For 82575-based adapters, the maximum number of queues is 4; for
 82576-based and newer adapters it is 8; for I210-based adapters it is 4

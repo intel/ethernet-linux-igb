@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2019 Intel Corporation. */
+/* Copyright(c) 2007 - 2020 Intel Corporation. */
 
 /* ethtool support for igb */
 
@@ -32,7 +32,7 @@ struct igb_stats {
 
 #define IGB_STAT(_name, _stat) { \
 	.stat_string = _name, \
-	.sizeof_stat = FIELD_SIZEOF(struct igb_adapter, _stat), \
+	.sizeof_stat = sizeof_field(struct igb_adapter, _stat), \
 	.stat_offset = offsetof(struct igb_adapter, _stat) \
 }
 
@@ -88,7 +88,7 @@ static const struct igb_stats igb_gstrings_stats[] = {
 
 #define IGB_NETDEV_STAT(_net_stat) { \
 	.stat_string = #_net_stat, \
-	.sizeof_stat = FIELD_SIZEOF(struct net_device_stats, _net_stat), \
+	.sizeof_stat = sizeof_field(struct net_device_stats, _net_stat), \
 	.stat_offset = offsetof(struct net_device_stats, _net_stat) \
 }
 
@@ -2253,6 +2253,8 @@ static void igb_get_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 static int igb_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw *hw = &adapter->hw;
+	u32 wufc;
 
 	if (wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE | WAKE_FILTER))
 		return -EOPNOTSUPP;
@@ -2273,6 +2275,13 @@ static int igb_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 		adapter->wol |= E1000_WUFC_MAG;
 	if (wol->wolopts & WAKE_PHY)
 		adapter->wol |= E1000_WUFC_LNKC;
+	wufc = E1000_READ_REG(hw, E1000_WUFC);
+	wufc = (wufc & ~(E1000_WUFC_EX |
+		       E1000_WUFC_MC |
+		       E1000_WUFC_BC |
+		       E1000_WUFC_MAG |
+		       E1000_WUFC_LNKC)) | adapter->wol;
+	E1000_WRITE_REG(hw, E1000_WUFC, wufc);
 	device_set_wakeup_enable(&adapter->pdev->dev, adapter->wol);
 
 	return 0;
@@ -2657,11 +2666,7 @@ static int igb_set_rx_csum(struct net_device *netdev, u32 data)
 static int igb_set_tx_csum(struct net_device *netdev, u32 data)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
-#ifdef NETIF_F_IPV6_CSUM
-	u32 feature_list = NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
-#else
-	u32 feature_list = NETIF_F_IP_CSUM;
-#endif
+	u32 feature_list = 0;
 
 	if (adapter->hw.mac.type >= e1000_82576)
 		feature_list |= NETIF_F_SCTP_CSUM;

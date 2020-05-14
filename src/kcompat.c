@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2019 Intel Corporation. */
+/* Copyright(c) 2007 - 2020 Intel Corporation. */
 
 #include "igb.h"
 #include "kcompat.h"
@@ -2208,6 +2208,100 @@ unsigned int _kc_cpumask_local_spread(unsigned int i, int node)
 #endif
 
 /******************************************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,3,0))
+#if (!(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,4)) && \
+     !(SLE_VERSION_CODE >= SLE_VERSION(12,2,0)))
+/**
+ * _kc_skb_flow_dissect_flow_keys - parse SKB to fill _kc_flow_keys
+ * @skb: SKB used to fille _kc_flow_keys
+ * @flow: _kc_flow_keys to set with SKB fields
+ * @flags: currently unused flags
+ *
+ * The purpose of using kcompat for this function is so the caller doesn't have
+ * to care about which kernel version they are on, which prevents a larger than
+ * normal #ifdef mess created by using a HAVE_* flag for this case. This is also
+ * done for 4.2 kernels to simplify calling skb_flow_dissect_flow_keys()
+ * because in 4.2 kernels skb_flow_dissect_flow_keys() exists, but only has 2
+ * arguments. Recent kernels have skb_flow_dissect_flow_keys() that has 3
+ * arguments.
+ *
+ * The caller needs to understand that this function was only implemented as a
+ * bare-minimum replacement for recent versions of skb_flow_dissect_flow_keys()
+ * and this function is in no way similar to skb_flow_dissect_flow_keys(). An
+ * example use can be found in the ice driver, specifically ice_arfs.c.
+ *
+ * This function is treated as a whitelist of supported fields the SKB can
+ * parse. If new functionality is added make sure to keep this format (i.e. only
+ * check for fields that are explicity wanted).
+ *
+ * Current whitelist:
+ *
+ * TCPv4, TCPv6, UDPv4, UDPv6
+ *
+ * If any unexpected protocol or other field is found this function memsets the
+ * flow passed in back to 0 and returns false. Otherwise the flow is populated
+ * and returns true.
+ */
+bool
+_kc_skb_flow_dissect_flow_keys(const struct sk_buff *skb,
+			       struct _kc_flow_keys *flow,
+			       unsigned int __always_unused flags)
+{
+	memset(flow, 0, sizeof(*flow));
+
+	flow->basic.n_proto = skb->protocol;
+	switch (flow->basic.n_proto) {
+	case htons(ETH_P_IP):
+		flow->basic.ip_proto = ip_hdr(skb)->protocol;
+		flow->addrs.v4addrs.src = ip_hdr(skb)->saddr;
+		flow->addrs.v4addrs.dst = ip_hdr(skb)->daddr;
+		break;
+	case htons(ETH_P_IPV6):
+		flow->basic.ip_proto = ipv6_hdr(skb)->nexthdr;
+		memcpy(&flow->addrs.v6addrs.src, &ipv6_hdr(skb)->saddr,
+		       sizeof(struct in6_addr));
+		memcpy(&flow->addrs.v6addrs.dst, &ipv6_hdr(skb)->daddr,
+		       sizeof(struct in6_addr));
+		break;
+	default:
+		netdev_dbg(skb->dev, "%s: Unsupported/unimplemented layer 3 protocol %04x\n", __func__, htons(flow->basic.n_proto));
+		goto unsupported;
+	}
+
+	switch (flow->basic.ip_proto) {
+	case IPPROTO_TCP:
+	{
+		struct tcphdr *tcph;
+
+		tcph = tcp_hdr(skb);
+		flow->ports.src = tcph->source;
+		flow->ports.dst = tcph->dest;
+		break;
+	}
+	case IPPROTO_UDP:
+	{
+		struct udphdr *udph;
+
+		udph = udp_hdr(skb);
+		flow->ports.src = udph->source;
+		flow->ports.dst = udph->dest;
+		break;
+	}
+	default:
+		netdev_dbg(skb->dev, "%s: Unsupported/unimplemented layer 4 protocol %02x\n", __func__, flow->basic.ip_proto);
+		return false;
+	}
+
+	return true;
+
+unsupported:
+	memset(flow, 0, sizeof(*flow));
+	return false;
+}
+#endif /* ! >= RHEL7.4 && ! >= SLES12.2 */
+#endif /* 4.3.0 */
+
+/******************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(4,5,0) )
 #if (!(RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,3)))
 #ifdef CONFIG_SPARC
@@ -2558,6 +2652,7 @@ void flow_rule_match_ports(const struct flow_rule *rule,
 
 /*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5,3,0))
+#if (!(RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(8,2))))
 #ifdef HAVE_TC_CB_AND_SETUP_QDISC_MQPRIO
 int _kc_flow_block_cb_setup_simple(struct flow_block_offload *f,
 				   struct list_head __always_unused *driver_list,
@@ -2586,4 +2681,5 @@ int _kc_flow_block_cb_setup_simple(struct flow_block_offload *f,
 	}
 }
 #endif /* HAVE_TC_CB_AND_SETUP_QDISC_MQPRIO */
+#endif /* !RHEL >= 8.2 */
 #endif /* 5.3.0 */

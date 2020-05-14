@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
-# Copyright(c) 2007 - 2019 Intel Corporation.
+# Copyright(c) 2007 - 2020 Intel Corporation.
 
 ifneq ($(KERNELRELEASE),)
 # kbuild part of makefile
@@ -49,6 +49,18 @@ endif
 ifeq (0,$(shell [ ${KVER_CODE} -lt $(call get_kvercode,2,4,17) ]; echo "$?"))
   $(warning *** Aborting the build.)
   $(error This driver is not supported on kernel versions older than 2.4.17)
+endif
+
+# Command to update initramfs or display a warning message
+ifeq (${cmd_initrd},)
+  define cmd_initramfs
+  echo "Unable to update initramfs. You may need to do this manually."
+endef
+else
+  define cmd_initramfs
+  @echo "Updating initramfs..."
+  -@$(call cmd_initrd)
+endef
 endif
 
 ######################
@@ -110,6 +122,7 @@ install: default manfile
 	@+$(call devkernelbuild,modules_install)
 	@echo "Running depmod..."
 	@$(call cmd_depmod)
+	$(call cmd_initramfs)
 
 # Target used by rpmbuild spec file
 rpm: default manfile
@@ -118,10 +131,11 @@ rpm: default manfile
 
 uninstall:
 	rm -f ${INSTALL_MOD_PATH}/lib/modules/${KVER}/${INSTALL_MOD_DIR}/${DRIVER}.ko;
-	$(call cmd_depmod)
 	if [ -e ${INSTALL_MOD_PATH}${MANDIR}/man${MANSECTION}/${DRIVER}.${MANSECTION}.gz ] ; then \
 		rm -f ${INSTALL_MOD_PATH}${MANDIR}/man${MANSECTION}/${DRIVER}.${MANSECTION}.gz ; \
 	fi;
+	$(call cmd_depmod)
+	$(call cmd_initramfs)
 
 ########
 # Help #
@@ -139,8 +153,8 @@ help:
 	@echo '  ccc                 - Clean, then check module(s) using coccicheck'
 	@echo 'Other targets:'
 	@echo '  manfile             - Generate a gzipped manpage'
-	@echo '  install             - Build then install the module(s) and manpage'
-	@echo '  uninstall           - Uninstall the module(s) and manpage'
+	@echo '  install             - Build then install the module(s) and manpage, and update initramfs'
+	@echo '  uninstall           - Uninstall the module(s) and manpage, and update initramfs'
 	@echo '  help                - Display this help message'
 	@echo 'Variables:'
 	@echo '  LINUX_VERSION       - Debug tool to force kernel LINUX_VERSION_CODE. Use at your own risk.'

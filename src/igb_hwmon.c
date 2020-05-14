@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2019 Intel Corporation. */
+/* Copyright(c) 2007 - 2020 Intel Corporation. */
 
 #include "igb.h"
 #include "e1000_82575.h"
@@ -203,7 +203,9 @@ int igb_sysfs_init(struct igb_adapter *adapter)
 		goto err;
 	}
 
-	igb_hwmon->device = hwmon_device_register(&adapter->pdev->dev);
+	igb_hwmon->device =
+		hwmon_device_register_with_groups(&adapter->pdev->dev,
+						  "igb", NULL, NULL);
 	if (IS_ERR(igb_hwmon->device)) {
 		rc = PTR_ERR(igb_hwmon->device);
 		goto err;

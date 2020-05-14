@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2019 Intel Corporation. */
+/* Copyright(c) 2007 - 2020 Intel Corporation. */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -39,13 +39,13 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.3.5.42" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.3.5.61" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
 static const char igb_driver_string[] = DRV_SUMMARY;
-static const char igb_copyright[] = "Copyright(c) 2007 - 2019 Intel Corporation.";
+static const char igb_copyright[] = "Copyright(c) 2007 - 2020 Intel Corporation.";
 
 static const struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I354_BACKPLANE_1GBPS) },
@@ -128,7 +128,11 @@ static int igb_poll(struct napi_struct *, int);
 static bool igb_clean_tx_irq(struct igb_q_vector *);
 static bool igb_clean_rx_irq(struct igb_q_vector *, int);
 static int igb_ioctl(struct net_device *, struct ifreq *, int cmd);
+#ifdef HAVE_TX_TIMEOUT_TXQUEUE
+static void igb_tx_timeout(struct net_device *, unsigned int txqueue);
+#else
 static void igb_tx_timeout(struct net_device *);
+#endif
 static void igb_reset_task(struct work_struct *);
 #ifdef HAVE_VLAN_RX_REGISTER
 static void igb_vlan_mode(struct net_device *, struct vlan_group *);
@@ -2026,7 +2030,6 @@ void igb_reset(struct igb_adapter *adapter)
 
 	/* Allow time for pending master requests to run */
 	e1000_reset_hw(hw);
-	E1000_WRITE_REG(hw, E1000_WUC, 0);
 
 	if (adapter->flags & IGB_FLAG_MEDIA_RESET) {
 		e1000_setup_init_funcs(hw, TRUE);
@@ -2875,10 +2878,6 @@ static int igb_probe(struct pci_dev *pdev,
 	 * assignment.
 	 */
 	netdev->features |= NETIF_F_SG |
-			    NETIF_F_IP_CSUM |
-#ifdef NETIF_F_IPV6_CSUM
-			    NETIF_F_IPV6_CSUM |
-#endif
 #ifdef NETIF_F_TSO
 			    NETIF_F_TSO |
 #ifdef NETIF_F_TSO6
@@ -3116,14 +3115,38 @@ static int igb_probe(struct pci_dev *pdev,
 	}
 
 	/* initialize the wol settings based on the eeprom settings */
-	if (adapter->flags & IGB_FLAG_WOL_SUPPORTED)
-		adapter->wol |= E1000_WUFC_MAG;
+	if (adapter->flags & IGB_FLAG_WOL_SUPPORTED) {
+		adapter->wol = E1000_READ_REG(hw, E1000_WUFC) & (E1000_WUFC_EX |
+                       E1000_WUFC_MC |
+                       E1000_WUFC_BC |
+                       E1000_WUFC_MAG |
+                       E1000_WUFC_LNKC);
 
+		if (hw->mac.type == e1000_i210) {
+			u16 nvm_word;
+
+			e1000_read_nvm(hw, NVM_INIT_CONTROL3_PORT_A, 1, &nvm_word);
+			if (nvm_word & IGB_EEPROM_APME)
+				adapter->wol |= E1000_WUFC_MAG;
+			else
+				adapter->wol = 0;
+		}
+	}
 	/* Some vendors want WoL disabled by default, but still supported */
 	if ((hw->mac.type == e1000_i350) &&
 	    (pdev->subsystem_vendor == PCI_VENDOR_ID_HP)) {
+		u32 wufc;
+
 		adapter->flags |= IGB_FLAG_WOL_SUPPORTED;
 		adapter->wol = 0;
+
+		wufc = E1000_READ_REG(hw, E1000_WUFC);
+		wufc = (wufc & ~(E1000_WUFC_EX |
+			       E1000_WUFC_MC |
+			       E1000_WUFC_BC |
+			       E1000_WUFC_MAG |
+			       E1000_WUFC_LNKC)) | adapter->wol;
+		E1000_WRITE_REG(hw, E1000_WUFC, wufc);
 	}
 
 	/* Some vendors want the ability to Use the EEPROM setting as
@@ -5707,7 +5730,7 @@ static int igb_tx_map(struct igb_ring *tx_ring,
 	struct sk_buff *skb = first->skb;
 	struct igb_tx_buffer *tx_buffer;
 	union e1000_adv_tx_desc *tx_desc;
-	struct skb_frag_struct *frag;
+	skb_frag_t *frag;
 	dma_addr_t dma;
 	unsigned int data_len, size;
 	u32 tx_flags = first->tx_flags;
@@ -6037,8 +6060,13 @@ static netdev_tx_t igb_xmit_frame(struct sk_buff *skb,
 /**
  *  igb_tx_timeout - Respond to a Tx Hang
  *  @netdev: network interface device structure
+ *  @txqueue: specific tx queue
  **/
+#ifdef HAVE_TX_TIMEOUT_TXQUEUE
+static void igb_tx_timeout(struct net_device *netdev, unsigned int txqueue)
+#else
 static void igb_tx_timeout(struct net_device *netdev)
+#endif
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
@@ -9280,6 +9308,7 @@ static int __igb_shutdown(struct pci_dev *pdev, bool *enable_wake,
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
 	u32 ctrl, rctl, status;
+	u16 pci_word, nvm_word;
 	u32 wufc = runtime ? E1000_WUFC_LNKC : adapter->wol;
 #ifdef CONFIG_PM
 	int retval = 0;
@@ -9303,6 +9332,8 @@ static int __igb_shutdown(struct pci_dev *pdev, bool *enable_wake,
 #endif
 
 	if (wufc) {
+		u32 wuc;
+
 		igb_setup_rctl(adapter);
 		igb_set_rx_mode(netdev);
 
@@ -9319,15 +9350,41 @@ static int __igb_shutdown(struct pci_dev *pdev, bool *enable_wake,
 		ctrl |= E1000_CTRL_ADVD3WUC;
 		E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 
-		/* Allow time for pending master requests to run */
-		e1000_disable_pcie_master(hw);
-
-		E1000_WRITE_REG(hw, E1000_WUC, E1000_WUC_PME_EN);
+		wuc = E1000_READ_REG(hw, E1000_WUC);
+		wuc |= E1000_WUC_APME;
+		wuc |= E1000_WUC_PME_EN;
+		E1000_WRITE_REG(hw, E1000_WUC, wuc);
 		E1000_WRITE_REG(hw, E1000_WUFC, wufc);
+
+		if (hw->mac.type == e1000_i210) {
+			/* enable WoL via EEPROM */
+			e1000_read_nvm(hw, E1000_NVM_CTRL_WORD_2, 1, &nvm_word);
+			nvm_word |= E1000_NVM_APMPME_ENABLE;
+			e1000_write_nvm(hw, E1000_NVM_CTRL_WORD_2, 1, &nvm_word);
+			e1000_update_nvm_checksum(hw);
+		}
 	} else {
+		ctrl = E1000_READ_REG(hw, E1000_CTRL);
+		ctrl &= ~E1000_CTRL_ADVD3WUC;
+		E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 		E1000_WRITE_REG(hw, E1000_WUC, 0);
 		E1000_WRITE_REG(hw, E1000_WUFC, 0);
+
+		if (hw->mac.type == e1000_i210) {
+			e1000_read_pci_cfg(hw, E1000_PCI_PMCSR, &pci_word);
+			pci_word &= ~E1000_PCI_PMCSR_PME_EN;
+			e1000_write_pci_cfg(hw, E1000_PCI_PMCSR, &pci_word);
+
+			/* disable WoL via EEPROM */
+			e1000_read_nvm(hw, E1000_NVM_CTRL_WORD_2, 1, &nvm_word);
+			nvm_word &= ~E1000_NVM_APMPME_ENABLE;
+			e1000_write_nvm(hw, E1000_NVM_CTRL_WORD_2, 1, &nvm_word);
+			e1000_update_nvm_checksum(hw);
+		}
 	}
+
+	/* Allow time for pending master requests to run */
+	e1000_disable_pcie_master(hw);
 
 	*enable_wake = wufc || adapter->en_mng_pt;
 	if (!*enable_wake)

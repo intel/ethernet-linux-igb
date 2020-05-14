@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright(c) 2007 - 2019 Intel Corporation. */
+/* Copyright(c) 2007 - 2020 Intel Corporation. */
 
 #ifndef _E1000_I210_H_
 #define _E1000_I210_H_
@@ -69,6 +69,7 @@ enum E1000_INVM_STRUCTURE_TYPE {
 /* PLL Defines */
 #define E1000_PCI_PMCSR			0x44
 #define E1000_PCI_PMCSR_D3		0x03
+#define E1000_PCI_PMCSR_PME_EN		0x100
 #define E1000_MAX_PLL_TRIES		5
 #define E1000_PHY_PLL_UNCONF		0xFF
 #define E1000_PHY_PLL_FREQ_PAGE		0xFC0000
@@ -76,5 +77,8 @@ enum E1000_INVM_STRUCTURE_TYPE {
 #define E1000_INVM_DEFAULT_AL		0x202F
 #define E1000_INVM_AUTOLOAD		0x0A
 #define E1000_INVM_PLL_WO_VAL		0x0010
+
+#define E1000_NVM_CTRL_WORD_2		0x0F
+#define E1000_NVM_APMPME_ENABLE		0x8000
 
 #endif

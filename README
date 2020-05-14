@@ -58,8 +58,6 @@ The igb driver supports IEEE 1588 time stamping for kernels 2.6.30 and newer.
 The igb driver supports 2.5 Gbps operating speed on 2500BASE-KX only for
 I354-based network connections.
 
-This driver no longer supports Itanium(R)-based systems.
-
 
 Identifying Your Adapter
 ========================
@@ -259,7 +257,7 @@ than the specified size.
 IntMode
 -------
 Valid Range: 0-2 (0 = Legacy Int, 1 = MSI and 2 = MSI-X)
-IntMode controls allow load time control over the type of interrupt
+IntMode controls the allowed load time control over the type of interrupt
 registered for by the driver. MSI-X is required for multiple queue
 support, and some kernels and combinations of kernel .config options
 will force a lower level of interrupt support.
@@ -272,12 +270,13 @@ Valid Range: 0-8
 0 = Assign up to the lesser value of the number of CPUs or the number of queues
 X = Assign X queues, where X is less than or equal to the maximum number of
 queues (8 queues).
-The driver allows maximum supported queue value. For example,
-I350-based adapters allow RSS=8, where 8 queues is the maximum allowable
-queues.
-NOTE: For 82575-based adapters, the maximum number of queues is 4; for
-82576-based and newer adapters it is 8; for I210-based adapters it is 4
-queues; and for I211-based adapters it is 2 queues.
+
+The maximum number of queues allowed are:
+  - I350-based adapters: 8 queues
+  - 82575-based adapters: 4 queues
+  - 82576-based and newer adapters: 8 queues
+  - I210-based adapters: 4 queues
+  - I211-based adapters: 2 queues
 This parameter is also affected by the VMDq parameter in that it will limit
 the queues more.
 	VMDQ
@@ -348,7 +347,7 @@ is loaded or the VM is booted. The VF is not aware of the VLAN tag being
 inserted on transmit and removed on received frames (sometimes called "port
 VLAN" mode).
 
-# ip link set dev <PF netdev id> vf <id> vlan <vlan id>
+# ip link set dev <ethX> vf <id> vlan <vlan id>
 
 For example, the following will configure PF eth0 and the first VF on VLAN 10:
 
@@ -467,7 +466,7 @@ want to set the interrupt mode to MSI-X and MSI, respectively, add the
 following to modules.conf or /etc/modprobe.conf:
   alias eth0 igb
   alias eth1 igb
-  options igb InterruptThrottleRate=3,1
+  options igb IntMode=2,1
 
 
 Jumbo Frames
@@ -540,9 +539,14 @@ will not attempt to auto-negotiate with its link partner since those adapters
 operate only in full duplex and only at their native speed.
 
 
-Enabling Wake on LAN* (WoL)
----------------------------
-WoL is configured through the ethtool* utility. ethtool is included with all
+Wake on LAN (WoL) Support
+-------------------------
+Some adapters do not support Wake on LAN (WoL). To determine if your adapter
+supports WoL, run the following command:
+
+# ethtool <ethX>
+
+WoL is configured through the ethtool utility. ethtool is included with all
 versions of Red Hat after Red Hat 7.2. For other Linux distributions, download
 and install ethtool from the following website:
 https://kernel.org/pub/software/network/ethtool/.
@@ -550,9 +554,9 @@ https://kernel.org/pub/software/network/ethtool/.
 For instructions on enabling WoL with ethtool, refer to the website listed
 above.
 
-WoL will be enabled on the system during the next shut down or reboot. For
-this driver version, in order to enable WoL, the igb driver must be loaded
-prior to shutting down or suspending the system.
+WoL will be enabled on the system during the next shutdown or reboot. For this
+driver version, in order to enable WoL, the igb driver must be loaded prior to
+shutting down or suspending the system.
 
 NOTES:
 - Wake on LAN is only supported on port A of multi-port devices.
@@ -618,7 +622,7 @@ IGB_PTP is a compile time flag. The user can enable it at compile time to add
 support for PTP from the driver. The flag is used by editing the make file as
 follows when it is being compiled:
 
->make CFLAGS_EXTRA="-DIGB_PTP" install
+# make CFLAGS_EXTRA="-DIGB_PTP" install
 
 NOTE: The driver will fail to compile if your kernel does not support PTP.
 
@@ -638,14 +642,13 @@ spoofed packet, it is dropped by the hardware and not transmitted.
 An interrupt is sent to the PF driver notifying it of the spoof attempt. When a
 spoofed packet is detected, the PF driver will send the following message to
 the system log (displayed by the "dmesg" command):
-Spoof event(s) detected on VF(n), where n = the VF that attempted to do the
-spoofing
+  Spoof event(s) detected on VF(n), where n = the VF that attempted to do
+  the spoofing
 
 
-
-Setting MAC Address, VLAN and Rate Limit Using IProute2 Tool
+Setting MAC Address, VLAN, and Rate Limit Using IProute2 Tool
 ------------------------------------------------------------
-You can set a MAC address of a Virtual Function (VF), a default VLAN and the
+You can set a MAC address of a Virtual Function (VF), a default VLAN, and the
 rate limit using the IProute2 tool. Download the latest version of the
 IProute2 tool from Sourceforge if your version does not have all the features
 you require.
@@ -659,8 +662,8 @@ MAC address of Virtual Function changes unexpectedly
 If a Virtual Function's MAC address is not assigned in the host, then the VF
 (virtual function) driver will use a random MAC address. This random MAC
 address may change each time the VF driver is reloaded. You can assign a static
-MAC address in the host machine. This static MAC address will survive
-a VF driver reload.
+MAC address in the host machine. This static MAC address will survive a VF
+driver reload.
 
 
 Hardware Issues
@@ -683,10 +686,8 @@ Intel(R) Active Management Technology 2.0, 2.1, 2.5 are not supported in
 conjunction with the linux driver.
 
 
-
 Using the igb driver on 2.4 or older 2.6 based kernels
 ------------------------------------------------------
-
 Due to limited support for PCI-Express in 2.4 kernels and older 2.6 kernels,
 the igb driver may run into interrupt related problems on some systems, such
 as no link or hang when bringing up the device.
@@ -779,18 +780,6 @@ commands, except for control-alt-delete. Restarting the system should resolve
 the issue.
 
 
-Trouble Passing Traffic on Ports 1 and 2 Using RHEL3
-----------------------------------------------------
-
-There is a known hardware compatibility issue on some systems with RHEL3
-kernels. Traffic on ports 1 and 2 may be slower than expected, and ping times,
-higher than expected.
-
-This issue MAY be resolved by updating to the latest kernel and BIOS. You can
-check your system BIOS by downloading the Linux Firmware Developer Kit at
-http://www.linuxfirmwarekit.org/.
-
-
 Do Not Use LRO When Routing Packets
 -----------------------------------
 Due to a known general compatibility issue with LRO and routing, do not use LRO
@@ -804,15 +793,6 @@ irq_handler_t. To resolve this issue, build the driver (step 4 above) using the
 command:
 
 # make CFLAGS_EXTRA=-DAX_RELEASE_CODE=1 install
-
-
-MSI-X Issues with Kernels Between 2.6.19 - 2.6.21 (inclusive)
--------------------------------------------------------------
-
-Kernel panics and instability may be observed on any MSI-X hardware if you use
-irqbalance with kernels between 2.6.19 and 2.6.21. If such problems are
-encountered, you may disable the irqbalance daemon or upgrade to a newer
-kernel.
 
 
 Rx Page Allocation Errors
@@ -844,26 +824,6 @@ Currently, the only known workaround is to build the driver with
 CFLAGS_EXTRA=-DDISABLE_PCI_MSI if the driver needs to be loaded/unloaded.
 Otherwise, the driver can be loaded once and will be safe, but unloading it
 will lead to the issue.
-
-Enabling SR-IOV in a 32-bit Microsoft* Windows* Server 2008 Guest OS Using
-Intel® 82576-based GbE or Intel® 82599-based 10GbE Controller Under KVM
-KVM Hypervisor/VMM supports direct assignment of a PCIe device to a VM. This
-includes traditional PCIe devices, as well as SR-IOV-capable devices using
-Intel 82576-based and 82599-based controllers.
-
-While direct assignment of a PCIe device or an SR-IOV Virtual Function (VF) to
-a Linux-based VM running 2.6.32 or newer kernel is functional, there is a
-known issue with Microsoft Windows Server 2008 VM that results in a "yellow
-bang" error. This problem is within the KVM VMM itself, not the Intel driver
-or the SR-IOV logic of the VMM. The KVM emulates an older CPU model for the
-guests, and this older CPU model does not support MSI-X interrupts, which is a
-requirement for Intel SR-IOV.
-
-If you wish to use the Intel 82576- or 82599-based controllers in SR-IOV mode
-with KVM and a Microsoft Windows Server 2008 guest, try the following
-workaround. Configure KVM to emulate a different model of CPU
-when using qemu to create the KVM guest:
-"-cpu qemu64,model=13"
 
 
 Host May Reboot after Removing PF when VF is Active in Guest
@@ -911,8 +871,8 @@ Copyright(c) 1999 - 2019 Intel Corporation.
 
 Trademarks
 ==========
-Intel and Itanium are trademarks or registered trademarks of Intel Corporation
-or its subsidiaries in the United States and/or other countries.
+Intel is a trademark or registered trademark of Intel Corporation or its
+subsidiaries in the United States and/or other countries.
 
 * Other names and brands may be claimed as the property of others.
 
