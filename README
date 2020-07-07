@@ -490,10 +490,10 @@ permanent by adding 'MTU=9000' to the following file:
       or
   /etc/sysconfig/network/<config_file> for SLES
 
-NOTE: The maximum MTU setting for Jumbo Frames is 9216. This value coincides
-with the maximum Jumbo Frames size of 9234 bytes.
+NOTE: The maximum MTU setting for jumbo frames is 9216. This corresponds to the
+maximum jumbo frame size of 9234 bytes.
 
-NOTE: Using Jumbo frames at 10 or 100 Mbps is not supported and may result in
+NOTE: Using jumbo frames at 10 or 100 Mbps is not supported and may result in
 poor performance or loss of link.
 
 NOTE: Packet loss may have a greater impact on throughput when you use jumbo

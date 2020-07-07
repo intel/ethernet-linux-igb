@@ -2282,6 +2282,17 @@ static int igb_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 		       E1000_WUFC_MAG |
 		       E1000_WUFC_LNKC)) | adapter->wol;
 	E1000_WRITE_REG(hw, E1000_WUFC, wufc);
+	if (hw->mac.type == e1000_i210) {
+		u16 nvm_word3;
+
+		e1000_read_nvm(hw, NVM_INIT_CONTROL3_PORT_A, 1, &nvm_word3);
+		if (adapter->wol)
+			nvm_word3 |= IGB_EEPROM_APME;
+		else
+			nvm_word3 &= ~IGB_EEPROM_APME;
+		e1000_write_nvm(hw, NVM_INIT_CONTROL3_PORT_A, 1, &nvm_word3);
+		e1000_update_nvm_checksum(hw);
+	}
 	device_set_wakeup_enable(&adapter->pdev->dev, adapter->wol);
 
 	return 0;

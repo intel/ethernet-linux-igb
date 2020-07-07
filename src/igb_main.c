@@ -39,7 +39,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.3.5.61" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.3.6" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
@@ -9665,7 +9665,7 @@ static pci_ers_result_t igb_io_error_detected(struct pci_dev *pdev,
 			pci_write_config_dword(vfdev, 0xA8, 0x00008000);
 		}
 
-		pci_cleanup_aer_uncorrect_error_status(pdev);
+		pci_aer_clear_nonfatal_status(pdev);
 	}
 
 	/*
@@ -9725,7 +9725,7 @@ static pci_ers_result_t igb_io_slot_reset(struct pci_dev *pdev)
 		result = PCI_ERS_RESULT_RECOVERED;
 	}
 
-	pci_cleanup_aer_uncorrect_error_status(pdev);
+	pci_aer_clear_nonfatal_status(pdev);
 
 	return result;
 }
@@ -10014,13 +10014,47 @@ static void igb_vmm_control(struct igb_adapter *adapter)
 	e1000_vmdq_set_replication_pf(hw, adapter->vfs_allocated_count ||
 				      adapter->vmdq_pools);
 }
+/*igb_get_os_driver_version
+ * @igb_version - pointer for buffer with igb_version
+ *
+ * fw_cmd.drv_version has very specific order -
+ * also this command needs always 8 chars in HEX. (0-F)
+ * Also digits are readed from behind but in correct order.
+ * We need to write numbers in this order: version_sub_build, version_build,
+ * version_minor, version_major
+ * Every number needs two number - if only one digit then we add "0".
+ * When only less than four version empy spaces are filled with "f"
+ * For example - 5.3.5.61 we write as 61050305.
+ * 5.3.5 - write as ff050305
+ */
+static u32 igb_get_os_driver_version(void)
+{
+	static const char driver_version[] = "5.3.6";
+	u8 driver_version_num[] = {0, 0, 0, 0};
+	char const *c = driver_version;
+	uint pos;
+
+	for (pos = 0; pos < ARRAY_SIZE(driver_version_num); ++c) {
+		if(!isdigit(*c) && *c != '.')
+			break;
+		if (isdigit(*c)) {
+			driver_version_num[pos] <<= 4;
+			driver_version_num[pos] += *c -'0';
+ 		} else {
+			++pos;
+		}
+	}
+
+	return driver_version_num[0] <<24 | (driver_version_num[1]<<16) |
+	      (driver_version_num[2]<<8) | (driver_version_num[3]);
+}
 
 static void igb_init_fw(struct igb_adapter *adapter)
 {
-	struct e1000_fw_drv_info fw_cmd;
 	struct e1000_hw *hw = &adapter->hw;
-	int i;
+	struct e1000_fw_drv_info fw_cmd;
 	u16 mask;
+	int i;
 
 	if (hw->mac.type == e1000_i210)
 		mask = E1000_SWFW_EEP_SM;
@@ -10031,23 +10065,37 @@ static void igb_init_fw(struct igb_adapter *adapter)
 		hw->mac.arc_subsystem_valid = false;
 
 	if (!hw->mac.ops.acquire_swfw_sync(hw, mask)) {
+		const u32 family_version = igb_get_os_driver_version();
+
 		for (i = 0; i <= FW_MAX_RETRIES; i++) {
 			E1000_WRITE_REG(hw, E1000_FWSTS, E1000_FWSTS_FWRI);
+			memset(&fw_cmd, 0, sizeof(fw_cmd));
 			fw_cmd.hdr.cmd = FW_CMD_DRV_INFO;
-			fw_cmd.hdr.buf_len = FW_CMD_DRV_INFO_LEN;
+			fw_cmd.hdr.buf_len = FW_CMD_DRV_INFO_LEN_NEW;
 			fw_cmd.hdr.cmd_or_resp.cmd_resv = FW_CMD_RESERVED;
 			fw_cmd.port_num = hw->bus.func;
-			fw_cmd.drv_version = FW_FAMILY_DRV_VER;
-			fw_cmd.hdr.checksum = 0;
-			fw_cmd.hdr.checksum =
-				e1000_calculate_checksum((u8 *)&fw_cmd,
-							 (FW_HDR_LEN +
-							 fw_cmd.hdr.buf_len));
+			fw_cmd.family_drv_version = FW_FAMILY_DRV_VER;
+			fw_cmd.actual_drv_version = family_version;
+			fw_cmd.hdr.checksum = e1000_calculate_checksum
+				((u8 *)&fw_cmd,
+				 (FW_HDR_LEN + fw_cmd.hdr.buf_len));
 			 e1000_host_interface_command(hw, (u8 *)&fw_cmd,
 						      sizeof(fw_cmd));
+			if (fw_cmd.hdr.cmd_or_resp.ret_status ==
+			    HCI_ILLEGAL_PAYLOAD_LENGTH) {
+				fw_cmd.hdr.buf_len = FW_CMD_DRV_INFO_LEN;
+				fw_cmd.actual_drv_version = 0;
+				fw_cmd.hdr.checksum = 0;
+				fw_cmd.hdr.checksum = e1000_calculate_checksum
+					((u8 *)&fw_cmd,
+					 (FW_HDR_LEN + fw_cmd.hdr.buf_len));
+				e1000_host_interface_command(hw, (u8 *)&fw_cmd,
+						      	     sizeof(fw_cmd));
+			}
 			if (fw_cmd.hdr.cmd_or_resp.ret_status
-			    == FW_STATUS_SUCCESS)
+			    == FW_STATUS_SUCCESS) {
 				break;
+			    }
 		}
 	} else
 		dev_warn(pci_dev_to_dev(adapter->pdev),

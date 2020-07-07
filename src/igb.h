@@ -724,15 +724,16 @@ struct igb_vmdq_adapter {
 #define FW_HDR_LEN           0x4
 #define FW_CMD_DRV_INFO      0xDD
 #define FW_CMD_DRV_INFO_LEN  0x5
+#define FW_CMD_DRV_INFO_LEN_NEW 0x9
 #define FW_CMD_RESERVED      0X0
 #define FW_RESP_SUCCESS      0x1
-#define FW_UNUSED_VER        0x0
 #define FW_MAX_RETRIES       3
 #define FW_STATUS_SUCCESS    0x1
-#define FW_FAMILY_DRV_VER    0Xffffffff
+#define FW_FAMILY_DRV_VER    0XFFFFFFFF
 
 #define IGB_MAX_LINK_TRIES   20
 
+#pragma pack(push, 1)
 struct e1000_fw_hdr {
 	u8 cmd;
 	u8 buf_len;
@@ -743,15 +744,25 @@ struct e1000_fw_hdr {
 	u8 checksum;
 };
 
-#pragma pack(push, 1)
 struct e1000_fw_drv_info {
 	struct e1000_fw_hdr hdr;
 	u8 port_num;
-	u32 drv_version;
+	u32 family_drv_version;
+	u32 actual_drv_version;
 	u16 pad; /* end spacing to ensure length is mult. of dword */
 	u8  pad2; /* end spacing to ensure length is mult. of dword2 */
 };
 #pragma pack(pop)
+
+enum host_cmd_id_status {
+	HCI_STATUS_OK = 1,
+	HCI_ILLEGAL_CMD_ID,
+	HCI_UNSUPPORTED_CMD,
+	HCI_ILLEGAL_PAYLOAD_LENGTH,
+	HCI_CHECKSUM_FAILED,
+	HCI_DATA_ERROR,
+	HCI_INVALID_PARAMETER
+};
 
 enum e1000_state_t {
 	__IGB_TESTING,
