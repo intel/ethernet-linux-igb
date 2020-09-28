@@ -45,6 +45,7 @@ Function (VF) driver for this driver is igbvf.
 Driver information can be obtained using ethtool, lspci, and ifconfig.
 Instructions on updating ethtool can be found in the section Additional
 Configurations later in this document.
+
 This driver is only supported as a loadable module at this time. Intel is not
 supplying patches against the kernel source to allow for static linking of the
 drivers.
@@ -149,13 +150,17 @@ To manually build the driver
    # ping <IP_address>
 
 Note: For certain distributions like (but not limited to) Red Hat Enterprise
-Linux 7 and Ubuntu, once the driver is installed, you may need to update the
-initrd/initramfs file to prevent the OS loading old versions of the igb driver.
-Use the dracut utility on Red Hat distributions:
+Linux 7, Ubuntu, and SUSE Linux Enterprise Server (SLES) 11, once the driver is
+installed, you may need to update the initrd/initramfs file to prevent the OS
+loading old versions of the igb driver.
+   For Red Hat distributions:
 	# dracut --force
 
    For Ubuntu:
 	# update-initramfs -u
+
+   For SLES:
+	# mkinitrd
 
 To build igb driver with DCA
 ----------------------------
