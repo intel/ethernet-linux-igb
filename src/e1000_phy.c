@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2020 Intel Corporation. */
+/* Copyright(c) 2007 - 2021 Intel Corporation. */
 
 #include "e1000_api.h"
 
@@ -735,7 +735,7 @@ s32 e1000_read_phy_reg_igp_locked(struct e1000_hw *hw, u32 offset, u16 *data)
 }
 
 /**
- *  e1000_write_phy_reg_igp - Write igp PHY register
+ *  __e1000_write_phy_reg_igp - Write igp PHY register
  *  @hw: pointer to the HW structure
  *  @offset: register offset to write to
  *  @data: data to write at register offset

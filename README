@@ -3,7 +3,7 @@ igb Linux* Base Driver for Intel(R) Ethernet Network Connection
 
 ================================================================================
 
-October 20, 2020
+March 29, 2021
 
 ================================================================================
 
@@ -217,9 +217,8 @@ increased CPU utilization, though it may help throughput in some circumstances.
   on the system and can lower CPU utilization under heavy load, but will
   increase latency as packets are not processed as quickly.
 
-NOTE:
-- Un-supported Adapters: InterruptThrottleRate is NOT supported by
-  82542, 82543, or 82544-based adapters.
+NOTE: InterruptThrottleRate is NOT supported by 82542, 82543, or 82544-based
+adapters.
 
 
 LLI (Low Latency Interrupts)
@@ -341,21 +340,6 @@ VLAN filter before the new VLAN filter is added. For example:
 # ip link set eth0 vf 0 vlan 100	// set vlan 100 for VF 0
 # ip link set eth0 vf 0 vlan 0	// Delete vlan 100
 # ip link set eth0 vf 0 vlan 200	// set a new vlan 200 for VF 0
-
-
-Configuring VLAN Tagging on SR-IOV Enabled Adapter Ports
---------------------------------------------------------
-To configure VLAN tagging for the ports on an SR-IOV enabled adapter, use the
-following command. The VLAN configuration should be done before the VF driver
-is loaded or the VM is booted. The VF is not aware of the VLAN tag being
-inserted on transmit and removed on received frames (sometimes called "port
-VLAN" mode).
-
-# ip link set dev <ethX> vf <id> vlan <vlan id>
-
-For example, the following will configure PF eth0 and the first VF on VLAN 10:
-
-# ip link set dev eth0 vf 0 vlan 10
 
 
 QueuePairs
@@ -546,9 +530,8 @@ supports WoL, run the following command:
 
 # ethtool <ethX>
 
-WoL is configured through the ethtool utility. ethtool is included with all
-versions of Red Hat after Red Hat 7.2. For other Linux distributions, download
-and install ethtool from the following website:
+WoL is configured through the ethtool utility. If your Linux distribution does
+not include ethtool, download and install it from the following website:
 https://kernel.org/pub/software/network/ethtool/.
 
 For instructions on enabling WoL with ethtool, refer to the website listed
@@ -598,6 +581,7 @@ NOTE: LRO requires 2.4.22 or later kernel version.
 IGB_LRO is a compile time flag. The user can enable it at compile time to add
 support for LRO from the driver. The flag is used by adding
 CFLAGS_EXTRA="-DIGB_LRO" to the make file when it's being compiled.
+
 # make CFLAGS_EXTRA="-DIGB_LRO" install
 You can verify that the driver is using LRO by looking at these counters in
 ethtool:
@@ -632,6 +616,21 @@ version of ethtool with PTP support, you can check the PTP support in the
 driver by executing:
 
 # ethtool -T <ethX>
+
+
+Configuring VLAN Tagging on SR-IOV Enabled Adapter Ports
+--------------------------------------------------------
+To configure VLAN tagging for the ports on an SR-IOV enabled adapter, use the
+following command. The VLAN configuration should be done before the VF driver
+is loaded or the VM is booted. The VF is not aware of the VLAN tag being
+inserted on transmit and removed on received frames (sometimes called "port
+VLAN" mode).
+
+# ip link set dev <ethX> vf <id> vlan <vlan id>
+
+For example, the following will configure PF eth0 and the first VF on VLAN 10:
+
+# ip link set dev eth0 vf 0 vlan 10
 
 
 MAC and VLAN Anti-Spoofing Feature for VFs
@@ -801,13 +800,6 @@ Rx Page Allocation Errors
 2.6.25 and newer. This is caused by the way the Linux kernel reports this
 stressed condition.
 
-Under Redhat 5.4-GA, System May Crash when Closing Guest OS Window after
-Loading/Unloading Physical Function (PF) Driver
-
-Do not remove the igb driver from Dom0 while Virtual Functions (VFs) are
-assigned to guests. VFs must first use the xm "pci-detach" command to hot-plug
-the VF device out of the VM it is assigned to or else shut down the VM.
-
 Unloading Physical Function (PF) Driver Causes System Reboots When VM is
 Running and VF is Loaded on the VM.
 
@@ -866,7 +858,7 @@ St - Fifth Floor, Boston, MA 02110-1301 USA.
 The full GNU General Public License is included in this distribution in the
 file called "COPYING".
 
-Copyright(c) 1999 - 2020 Intel Corporation.
+Copyright(c) 1999 - 2021 Intel Corporation.
 
 
 Trademarks

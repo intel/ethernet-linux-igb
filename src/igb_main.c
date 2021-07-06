@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2020 Intel Corporation. */
+/* Copyright(c) 2007 - 2021 Intel Corporation. */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -39,13 +39,13 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.5.2" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.7.2" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
 static const char igb_driver_string[] = DRV_SUMMARY;
-static const char igb_copyright[] = "Copyright(c) 2007 - 2020 Intel Corporation.";
+static const char igb_copyright[] = "Copyright(c) 2007 - 2021 Intel Corporation.";
 
 static const struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I354_BACKPLANE_1GBPS) },
@@ -3511,7 +3511,7 @@ static int igb_sw_init(struct igb_adapter *adapter)
 }
 
 /**
- *  igb_open - Called when a network interface is made active
+ *  __igb_open - Called when a network interface is made active
  *  @netdev: network interface device structure
  *  @resuming: the adapter is resuming from suspend
  *
@@ -3636,7 +3636,7 @@ int igb_open(struct net_device *netdev)
 }
 
 /**
- *  igb_close - Disables a network interface
+ *  __igb_close - Disables a network interface
  *  @netdev: network interface device structure
  *  @suspending: the adapter is going to sleep
  *
@@ -6647,7 +6647,7 @@ static void igb_ping_all_vfs(struct igb_adapter *adapter)
 }
 
 /**
- *  igb_mta_set_ - Set multicast filter table address
+ *  igb_mta_set - Set multicast filter table address
  *  @adapter: pointer to the adapter structure
  *  @hash_value: determines the MTA register and bit to set
  *
@@ -10035,7 +10035,7 @@ static void igb_vmm_control(struct igb_adapter *adapter)
  */
 static u32 igb_get_os_driver_version(void)
 {
-	static const char driver_version[] = "5.5.2";
+	static const char driver_version[] = "5.7.2";
 	u8 driver_version_num[] = {0, 0, 0, 0};
 	char const *c = driver_version;
 	uint pos;

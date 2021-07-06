@@ -5,7 +5,7 @@
 .\" * Other names and brands may be claimed as the property of others.
 .\"
 .
-.TH igb 1 "October 20, 2020"
+.TH igb 1 "March 2, 2021"
 .SH NAME
 igb \-This file describes the Linux* Base Driver
 for the Gigabit Family of Adapters.
@@ -63,10 +63,8 @@ increased CPU utilization, though it may help throughput in some circumstances.
   on the system and can lower CPU utilization under heavy load, but will
   increase latency as packets are not processed as quickly.
 
- .IP
-NOTE:
-- Un-supported Adapters: InterruptThrottleRate is NOT supported by
-  82542, 82543, or 82544-based adapters.
+.IP
+NOTE: InterruptThrottleRate is NOT supported by 82542, 82543, or 82544-based adapters.
 .LP
 .B LLIPort
 .IP
@@ -225,7 +223,7 @@ Turning on DMA Coalescing may save energy with kernel 2.6.32 and newer. DMA Coal
 This parameter is only relevant for I350 devices operating in SR-IOV mode.
 When this parameter is set, the driver detects malicious VF driver and
 disables its Tx/Rx queues until a VF driver reset occurs.
-.SH Jumbo Frames
+.B Jumbo Frames
 .LP
 Jumbo Frames support is enabled by changing the Maximum Transmission Unit (MTU) to a value larger than the default value of 1500.
 
@@ -241,12 +239,6 @@ NOTE: Using jumbo frames at 10 or 100 Mbps is not supported and may result in po
 
 NOTE: Packet loss may have a greater impact on throughput when you use jumbo frames. If you observe a drop in performance after enabling jumbo frames, enabling flow control may mitigate the issue.
 See the section "Jumbo Frames" in the Readme.
-.SH ethtool
-.LP
-The driver utilizes the ethtool interface for driver configuration and diagnostics, as well as displaying statistical information. The latest ethtool version is required for this functionality. Download it at:
-https://kernel.org/pub/software/network/ethtool/
-
-
 .LP
 .B LRO
 .IP
@@ -261,13 +253,10 @@ decreasing CPU utilization for receives.
 .IP
 NOTE: LRO requires 2.4.22 or later kernel version.
 .IP
-IGB_LRO is a compile time flag. The user can enable it at compile time to add
-support for LRO from the driver. The flag is used by adding
-CFLAGS_EXTRA="-DIGB_LRO" to the make file when it's being compiled.
+IGB_LRO is a compile time flag. The user can enable it at compile time to add support for LRO from the driver. The flag is used by adding CFLAGS_EXTRA="-DIGB_LRO" to the make file when it's being compiled.
 # make CFLAGS_EXTRA="-DIGB_LRO" install
 .IP
-You can verify that the driver is using LRO by looking at these counters in
-ethtool:
+You can verify that the driver is using LRO by looking at these counters in ethtool:
 .LP
 - lro_aggregated - counts total packets that were combined
 .LP
@@ -277,6 +266,12 @@ ethtool:
   recycling
 .IP
 NOTE: IPv6 and UDP are not supported by LRO.
+.B ethtool
+.LP
+The driver utilizes the ethtool interface for driver configuration and diagnostics, as well as displaying statistical information. The latest ethtool version is required for this functionality. Download it at:
+https://kernel.org/pub/software/network/ethtool/
+
+
 .SH SUPPORT
 .LP
 For additional information regarding building and installation, see the

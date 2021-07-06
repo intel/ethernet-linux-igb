@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2020 Intel Corporation. */
+/* Copyright(c) 2007 - 2021 Intel Corporation. */
 
 #include "e1000_api.h"
 
@@ -1599,7 +1599,7 @@ s32 e1000_get_speed_and_duplex_copper_generic(struct e1000_hw *hw, u16 *speed,
 }
 
 /**
- *  e1000_get_speed_and_duplex_fiber_generic - Retrieve current speed/duplex
+ *  e1000_get_speed_and_duplex_fiber_serdes_generic - return fiber defaults
  *  @hw: pointer to the HW structure
  *  @speed: stores the current speed
  *  @duplex: stores the current duplex
