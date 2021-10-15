@@ -41,6 +41,10 @@
 		     + __GNUC_PATCHLEVEL__)
 #endif /* GCC_VERSION */
 
+#ifndef IEEE_8021QAZ_APP_SEL_DSCP
+#define IEEE_8021QAZ_APP_SEL_DSCP	5
+#endif
+
 /* Backport macros for controlling GCC diagnostics */
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(4,18,0) )
 
@@ -263,10 +267,6 @@ struct msix_entry {
 
 #ifndef node_online
 #define node_online(node) ((node) == 0)
-#endif
-
-#ifndef cpu_online
-#define cpu_online(cpuid) test_bit((cpuid), &cpu_online_map)
 #endif
 
 #ifndef _LINUX_RANDOM_H
@@ -976,8 +976,6 @@ struct _kc_ethtool_pauseparam {
 #endif /* if (NOT RHEL && NOT SLES && NOT UBUNTU) */
 
 #ifdef __KLOCWORK__
-/* The following are not compiled into the binary driver; they are here
- * only to tune Klocwork scans to workaround false-positive issues.
  */
 #ifdef ARRAY_SIZE
 #undef ARRAY_SIZE
@@ -1405,6 +1403,7 @@ struct vlan_ethhdr {
 /* 2.4.22 => 2.4.17 */
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,22) )
 #define pci_name(x)	((x)->slot_name)
+#define cpu_online(cpuid) test_bit((cpuid), &cpu_online_map)
 
 #ifndef SUPPORTED_10000baseT_Full
 #define SUPPORTED_10000baseT_Full	BIT(12)
@@ -6591,7 +6590,6 @@ const char *_kc_phy_speed_to_str(int speed);
 #define HAVE_TC_CB_AND_SETUP_QDISC_MQPRIO
 #define HAVE_TCF_BLOCK
 #else /* RHEL >= 7.6 || SLES >= 15.1 */
-#define TC_SETUP_QDISC_MQPRIO TC_SETUP_MQPRIO
 #endif /* !(RHEL >= 7.6) && !(SLES >= 15.1) */
 void _kc_ethtool_intersect_link_masks(struct ethtool_link_ksettings *dst,
 				      struct ethtool_link_ksettings *src);
@@ -6654,23 +6652,6 @@ static inline unsigned long _kc_array_index_mask_nospec(unsigned long index,
 	(typeof(_i)) (_i & _mask);					\
 })
 #endif /* array_index_nospec */
-#if (!(RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,6))) && \
-     !(SLE_VERSION_CODE && (SLE_VERSION_CODE >= SLE_VERSION(15,1,0))))
-#ifdef HAVE_TC_CB_AND_SETUP_QDISC_MQPRIO
-#include <net/pkt_cls.h>
-static inline bool
-tc_cls_can_offload_and_chain0(const struct net_device *dev,
-			      struct tc_cls_common_offload *common)
-{
-	if (!tc_can_offload(dev))
-		return false;
-	if (common->chain_index)
-		return false;
-
-	return true;
-}
-#endif /* HAVE_TC_CB_AND_SETUP_QDISC_MQPRIO */
-#endif /* !(RHEL >= 7.6) && !(SLES >= 15.1) */
 #ifndef sizeof_field
 #define sizeof_field(TYPE, MEMBER) (sizeof((((TYPE *)0)->MEMBER)))
 #endif /* sizeof_field */
@@ -6887,6 +6868,7 @@ ptp_read_system_postts(struct ptp_system_timestamp __always_unused *sts)
 #if (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(8,2))
 #define HAVE_TC_INDIR_BLOCK
 #endif /* RHEL 8.2 */
+#define INDIRECT_CALLABLE_DECLARE(x) x
 #else /* >= 5.0.0 */
 #define HAVE_PTP_SYS_OFFSET_EXTENDED_IOCTL
 #define HAVE_PTP_CLOCK_INFO_GETTIMEX64
@@ -6894,6 +6876,7 @@ ptp_read_system_postts(struct ptp_system_timestamp __always_unused *sts)
 #define HAVE_DMA_ALLOC_COHERENT_ZEROES_MEM
 #define HAVE_GENEVE_TYPE
 #define HAVE_TC_INDIR_BLOCK
+#define HAVE_INDIRECT_CALL_WRAPPER_HEADER
 #endif /* 5.0.0 */
 
 /*****************************************************************************/

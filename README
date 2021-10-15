@@ -3,7 +3,7 @@ igb Linux* Base Driver for Intel(R) Ethernet Network Connection
 
 ================================================================================
 
-March 29, 2021
+July 29, 2021
 
 ================================================================================
 
@@ -69,37 +69,6 @@ http://www.intel.com/support
 Building and Installation
 =========================
 
-To build a binary RPM package of this driver
---------------------------------------------
-Note: RPM functionality has only been tested in Red Hat distributions.
-
-1. Run the following command, where <x.x.x> is the version number for the
-   driver tar file.
-
-   # rpmbuild -tb igb-<x.x.x>.tar.gz
-
-   NOTE: For the build to work properly, the currently running kernel MUST
-   match the version and configuration of the installed kernel sources. If
-   you have just recompiled the kernel, reboot the system before building.
-
-2. After building the RPM, the last few lines of the tool output contain the
-   location of the RPM file that was built. Install the RPM with one of the
-   following commands, where <RPM> is the location of the RPM file:
-
-   # rpm -Uvh <RPM>
-       or
-   # dnf/yum localinstall <RPM>
-
-NOTES:
-- To compile the driver on some kernel/arch combinations, you may need to
-install a package with the development version of libelf (e.g. libelf-dev,
-libelf-devel, elfutilsl-libelf-devel).
-- When compiling an out-of-tree driver, details will vary by distribution.
-However, you will usually need a kernel-devel RPM or some RPM that provides the
-kernel headers at a minimum. The RPM kernel-devel will usually fill in the link
-at /lib/modules/'uname -r'/build.
-
-
 To manually build the driver
 ----------------------------
 1. Move the base driver tar file to the directory of your choice.
@@ -149,17 +118,45 @@ To manually build the driver
    # ping <IP_address>
 
 Note: For certain distributions like (but not limited to) Red Hat Enterprise
-Linux 7, Ubuntu, and SUSE Linux Enterprise Server (SLES) 11, once the driver is
-installed, you may need to update the initrd/initramfs file to prevent the OS
-loading old versions of the igb driver.
+Linux 7 and Ubuntu, once the driver is installed, you may need to update the
+initrd/initramfs file to prevent the OS loading old versions of the igb driver.
    For Red Hat distributions:
 	# dracut --force
 
    For Ubuntu:
 	# update-initramfs -u
 
-   For SLES:
-	# mkinitrd
+ 
+To build a binary RPM package of this driver
+--------------------------------------------
+Note: RPM functionality has only been tested in Red Hat distributions.
+
+1. Run the following command, where <x.x.x> is the version number for the
+   driver tar file.
+
+   # rpmbuild -tb igb-<x.x.x>.tar.gz
+
+   NOTE: For the build to work properly, the currently running kernel MUST
+   match the version and configuration of the installed kernel sources. If
+   you have just recompiled the kernel, reboot the system before building.
+
+2. After building the RPM, the last few lines of the tool output contain the
+   location of the RPM file that was built. Install the RPM with one of the
+   following commands, where <RPM> is the location of the RPM file:
+
+   # rpm -Uvh <RPM>
+       or
+   # dnf/yum localinstall <RPM>
+
+NOTES:
+- To compile the driver on some kernel/arch combinations, you may need to
+install a package with the development version of libelf (e.g. libelf-dev,
+libelf-devel, elfutilsl-libelf-devel).
+- When compiling an out-of-tree driver, details will vary by distribution.
+However, you will usually need a kernel-devel RPM or some RPM that provides the
+kernel headers at a minimum. The RPM kernel-devel will usually fill in the link
+at /lib/modules/'uname -r'/build.
+
 
 To build igb driver with DCA
 ----------------------------
@@ -281,12 +278,13 @@ The maximum number of queues allowed are:
   - I210-based adapters: 4 queues
   - I211-based adapters: 2 queues
 This parameter is also affected by the VMDq parameter in that it will limit
-the queues more.
-	VMDQ
-Model 0 1 2 3+
-82575 4 4 3 1
-82576 8 2 2 2
-82580 8 1 1 1
+the queues more. For example, if you set an 82575 device to VMDQ Mode 2, you
+will only be able to set 3 RSS queues. See the following table.
+Model	VMDQ Mode
+Number	0 1 2 3+
+82575	4 4 3 1
+82576	8 2 2 2
+82580	8 1 1 1
 
 
 VMDQ
@@ -503,10 +501,7 @@ and higher cannot be forced. Use the autonegotiation advertising setting to
 manually set devices for 1 Gbps and higher.
 
 Speed, duplex, and autonegotiation advertising are configured through the
-ethtool utility. For the latest version, download and install ethtool from the
-following website:
-
-   https://kernel.org/pub/software/network/ethtool/
+ethtool utility.
 
 To see the speed configurations your device supports, run the following:
 
@@ -578,11 +573,11 @@ the number of packets that have to be processed. LRO combines multiple
 Ethernet frames into a single receive in the stack, thereby potentially
 decreasing CPU utilization for receives.
 NOTE: LRO requires 2.4.22 or later kernel version.
-IGB_LRO is a compile time flag. The user can enable it at compile time to add
-support for LRO from the driver. The flag is used by adding
-CFLAGS_EXTRA="-DIGB_LRO" to the make file when it's being compiled.
+IGB_NO_LRO is a compile time flag. The user can enable it at compile time to
+add support for LRO from the driver. The flag is used by adding
+CFLAGS_EXTRA="-DIGB_NO_LRO" to the make file when it's being compiled.
 
-# make CFLAGS_EXTRA="-DIGB_LRO" install
+# make CFLAGS_EXTRA="-DIGB_NO_LRO" install
 You can verify that the driver is using LRO by looking at these counters in
 ethtool:
 - lro_aggregated - counts total packets that were combined
@@ -703,8 +698,8 @@ kernel by configuring your kernel with CONFIG_PCI_MSI unset.
 
 Detected Tx Unit Hang in Quad Port Adapters
 -------------------------------------------
-In some cases ports 3 and 4 don't pass traffic and report 'Detected Tx Unit
-Hang' followed by 'NETDEV WATCHDOG: <ethX>: transmit timed out' errors. Ports 1
+In some cases, ports 3 and 4 don't pass traffic and report "Detected Tx Unit
+Hang" followed by "NETDEV WATCHDOG: <ethX>: transmit timed out" errors. Ports 1
 and 2 do not show any errors and will pass traffic.
 
 This issue may be resolved by updating to the latest kernel and BIOS. You
@@ -804,18 +799,6 @@ Unloading Physical Function (PF) Driver Causes System Reboots When VM is
 Running and VF is Loaded on the VM.
 
 Do not unload the PF driver (igb) while VFs are assigned to guests.
-
-
-SLES10 SP3 Random System Panic when Reloading Driver
-----------------------------------------------------
-
-This is a known SLES-10 SP3 issue. After requesting interrupts for MSI-X
-vectors, system may panic.
-
-Currently, the only known workaround is to build the driver with
-CFLAGS_EXTRA=-DDISABLE_PCI_MSI if the driver needs to be loaded/unloaded.
-Otherwise, the driver can be loaded once and will be safe, but unloading it
-will lead to the issue.
 
 
 Host May Reboot after Removing PF when VF is Active in Guest

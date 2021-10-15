@@ -101,16 +101,31 @@
 
 /*****************************************************************************/
 #if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(4,12,14,111))
+#define NEED_IDA_ALLOC_MIN_MAX_RANGE_FREE
 #else /* >= 4.12.14-111 */
 #define HAVE_DEVLINK_PORT_ATTRS_SET_PORT_FLAVOUR
 #undef NEED_MACVLAN_ACCEL_PRIV
 #undef NEED_MACVLAN_RELEASE_L2FW_OFFLOAD
 #undef NEED_MACVLAN_SUPPORTS_DEST_FILTER
+#undef NEED_IDA_ALLOC_MIN_MAX_RANGE_FREE
 #endif /* 4.12.14-111 */
+
+/*****************************************************************************/
+#if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(4,12,14,120))
+#else /* >= 4.12.14-120 */
+#define HAVE_NDO_SELECT_QUEUE_SB_DEV
+#define HAVE_TCF_MIRRED_DEV
+#define HAVE_TCF_BLOCK
+#define HAVE_TC_CB_AND_SETUP_QDISC_MQPRIO
+#define HAVE_TCF_BLOCK_CB_REGISTER_EXTACK
+#undef NEED_TC_SETUP_QDISC_MQPRIO
+#undef NEED_TC_CLS_CAN_OFFLOAD_AND_CHAIN0
+#endif /* 4.12.14-120 */
 
 /*****************************************************************************/
 #if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(5,3,8,2))
 #else /* >= 5.3.8-2 */
+#undef NEED_BUS_FIND_DEVICE_CONST_DATA
 #undef NEED_FLOW_INDR_BLOCK_CB_REGISTER
 #undef NEED_SKB_FRAG_OFF_ACCESSORS
 #endif /* 5.3.8-2 */

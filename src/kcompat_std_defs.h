@@ -32,10 +32,41 @@
 #endif
 
 /*****************************************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0))
+#define NEED_DEV_PRINTK_ONCE
+#else /* >= 3,19,0 */
+#endif /* 3,19,0 */
+
+/*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,8,0))
 #else /* >= 4,8,0 */
 #define HAVE_TCF_EXTS_TO_LIST
 #endif /* 4,8,0 */
+
+/*****************************************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0))
+#else /* >= 4,9,0 */
+#define HAVE_KTHREAD_DELAYED_API
+#endif /* 4,9,0 */
+
+/*****************************************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0))
+#define NEED_TC_SETUP_QDISC_MQPRIO
+#else /* >= 4,15,0 */
+#define HAVE_TC_CB_AND_SETUP_QDISC_MQPRIO
+#endif /* 4,15,0 */
+
+/*****************************************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,16,0))
+#define NEED_TC_CLS_CAN_OFFLOAD_AND_CHAIN0
+#else /* >= 4,16,0 */
+#endif /* 4,16,0 */
+
+/*****************************************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,17,0))
+#define NEED_CONVERT_ART_NS_TO_TSC
+#else /* >= 4,17,0 */
+#endif /* 4,17,0 */
 
 /*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,18,0))
@@ -48,6 +79,7 @@
 
 /*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,19,0))
+#define NEED_IDA_ALLOC_MIN_MAX_RANGE_FREE
 #else /* >= 4,19,0 */
 #undef HAVE_TCF_EXTS_TO_LIST
 #define HAVE_TCF_EXTS_FOR_EACH_ACTION
@@ -66,17 +98,30 @@
 #endif /* 5.3.0 */
 
 /*****************************************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,7,0))
-#define NEED_DEVLINK_REGION_CREATE_OPS
-#else /* >= 5.7.0 */
-#endif /* 5.7.0 */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,3,1))
+#define NEED_BUS_FIND_DEVICE_CONST_DATA
+#else /* >= 5.3.1 */
+#endif /* 5.3.1 */
 
 /*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0))
 #define NEED_SKB_FRAG_OFF_ACCESSORS
 #define NEED_FLOW_INDR_BLOCK_CB_REGISTER
 #else /* >= 5.4.0 */
+#define HAVE_XSK_UNALIGNED_CHUNK_PLACEMENT
 #endif /* 5.4.0 */
+
+/*****************************************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,7,0))
+#define NEED_DEVLINK_REGION_CREATE_OPS
+#else /* >= 5.7.0 */
+#endif /* 5.7.0 */
+
+/*****************************************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,8,0))
+#else /* >= 5.8.0 */
+#undef HAVE_XSK_UNALIGNED_CHUNK_PLACEMENT
+#endif /* 5.8.0 */
 
 /*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5,9,0))

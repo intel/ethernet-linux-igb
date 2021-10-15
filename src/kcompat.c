@@ -2270,11 +2270,11 @@ unsigned int _kc_cpumask_local_spread(unsigned int i, int node)
  * and this function is in no way similar to skb_flow_dissect_flow_keys(). An
  * example use can be found in the ice driver, specifically ice_arfs.c.
  *
- * This function is treated as a whitelist of supported fields the SKB can
+ * This function is treated as a allowlist of supported fields the SKB can
  * parse. If new functionality is added make sure to keep this format (i.e. only
  * check for fields that are explicity wanted).
  *
- * Current whitelist:
+ * Current allowlist:
  *
  * TCPv4, TCPv6, UDPv4, UDPv6
  *
