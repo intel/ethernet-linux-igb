@@ -163,12 +163,10 @@ To build igb driver with DCA
 If your kernel supports DCA, the driver will build by default with DCA enabled.
 
 
-
 Command Line Parameters
 =======================
-If the driver is built as a module, the following optional parameters are used
-by entering them on the command line with the modprobe command using this
-syntax:
+If the driver is built as a module, enter optional parameters on the command
+line with the following syntax:
 
 # modprobe igb [<option>=<VAL1>,<VAL2>,...]
 
@@ -179,14 +177,9 @@ For example:
 # modprobe igb InterruptThrottleRate=16000,16000
 
 In this case, there are two network ports supported by igb in the system.
-The default value for each parameter is generally the recommended setting,
+
+- The default value for each parameter is generally the recommended setting,
 unless otherwise noted.
-
-NOTE: For more information about the command line parameters, see the
-application note at: http://www.intel.com/design/network/applnots/ap450.htm.
-
-NOTE: A descriptor describes a data buffer and attributes related to the data
-buffer. This information is accessed by the hardware.
 
 
 InterruptThrottleRate
