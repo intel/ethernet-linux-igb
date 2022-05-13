@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2021 Intel Corporation. */
+/* Copyright(c) 2007 - 2022 Intel Corporation. */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -39,13 +39,13 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.9.3" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.10.2" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
 static const char igb_driver_string[] = DRV_SUMMARY;
-static const char igb_copyright[] = "Copyright(c) 2007 - 2021 Intel Corporation.";
+static const char igb_copyright[] = "Copyright(c) 2007 - 2022 Intel Corporation.";
 
 static const struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I354_BACKPLANE_1GBPS) },
@@ -1068,14 +1068,14 @@ static void igb_set_interrupt_capability(struct igb_adapter *adapter, bool msix)
 		dev_warn(pci_dev_to_dev(pdev),
 			 "Failed to initialize MSI-X interrupts. Falling back to MSI interrupts.\n");
 		igb_reset_interrupt_capability(adapter);
-		/* Fall through */
+		fallthrough;
 	case IGB_INT_MODE_MSI:
 		if (!pci_enable_msi(pdev))
 			adapter->flags |= IGB_FLAG_HAS_MSI;
 		else
 			dev_warn(pci_dev_to_dev(pdev),
 				"Failed to initialize MSI interrupts.  Falling back to legacy interrupts.\n");
-		/* Fall through */
+		fallthrough;
 	case IGB_INT_MODE_LEGACY:
 		/* disable advanced features and set number of queues to 1 */
 		igb_reset_sriov_capability(adapter);
@@ -2635,7 +2635,7 @@ static void igb_set_fw_version(struct igb_adapter *adapter)
 			    fw.invm_major, fw.invm_minor, fw.invm_img_type);
 			break;
 		}
-		/* fall through */
+		fallthrough;
 	default:
 		/* if option rom is valid, display its version too*/
 		if (fw.or_valid) {
@@ -3051,7 +3051,7 @@ static int igb_probe(struct pci_dev *pdev,
 	/* copy the MAC address out of the NVM */
 	if (e1000_read_mac_addr(hw))
 		dev_err(pci_dev_to_dev(pdev), "NVM Read Error\n");
-	memcpy(netdev->dev_addr, hw->mac.addr, netdev->addr_len);
+	eth_hw_addr_set(netdev, hw->mac.addr);
 #ifdef ETHTOOL_GPERMADDR
 	memcpy(netdev->perm_addr, hw->mac.addr, netdev->addr_len);
 
@@ -4578,7 +4578,7 @@ static int igb_set_mac(struct net_device *netdev, void *p)
 	if (!is_valid_ether_addr(addr->sa_data))
 		return -EADDRNOTAVAIL;
 
-	memcpy(netdev->dev_addr, addr->sa_data, netdev->addr_len);
+	eth_hw_addr_set(netdev, addr->sa_data);
 	memcpy(hw->mac.addr, addr->sa_data, netdev->addr_len);
 
 	/* set the correct pool for the new PF MAC address in entry 0 */
@@ -4961,7 +4961,7 @@ bool igb_has_link(struct igb_adapter *adapter)
 	case e1000_media_type_copper:
 		if (!hw->mac.get_link_status)
 			return true;
-		/* Fall through */
+		fallthrough;
 	case e1000_media_type_internal_serdes:
 		e1000_check_for_link(hw);
 		link_active = !hw->mac.get_link_status;
@@ -6019,7 +6019,7 @@ netdev_tx_t igb_xmit_frame_ring(struct sk_buff *skb,
 			adapter->ptp_tx_skb = skb_get(skb);
 			adapter->ptp_tx_start = jiffies;
 			if (adapter->hw.mac.type == e1000_82576)
-				schedule_work(&adapter->ptp_tx_work);
+				igb_ptp_tx_work(&adapter->ptp_tx_work);
 		}
 	}
 #endif /* HAVE_PTP_1588_CLOCK */
@@ -6493,7 +6493,7 @@ static irqreturn_t igb_msix_other(int irq, void *data)
 			/* acknowledge the interrupt */
 			E1000_WRITE_REG(hw, E1000_TSICR, E1000_TSICR_TXTS);
 			/* retrieve hardware timestamp */
-			schedule_work(&adapter->ptp_tx_work);
+			igb_ptp_tx_work(&adapter->ptp_tx_work);
 		}
 	}
 #endif /* HAVE_PTP_1588_CLOCK */
@@ -6639,6 +6639,7 @@ static int __igb_notify_dca(struct device *dev, void *data)
 			break;
 		}
 		/* Fall through - since DCA is disabled. */
+		fallthrough;
 	case DCA_PROVIDER_REMOVE:
 		if (adapter->flags & IGB_FLAG_DCA_ENABLED) {
 			/* without this a class_device is left
@@ -6672,7 +6673,7 @@ static int igb_vf_configure(struct igb_adapter *adapter, int vf)
 {
 	unsigned char mac_addr[ETH_ALEN];
 
-	random_ether_addr(mac_addr);
+	eth_random_addr(mac_addr);
 	igb_set_vf_mac(adapter, vf, mac_addr);
 
 #ifdef IFLA_VF_MAX
@@ -7189,7 +7190,7 @@ static void igb_vf_reset_event(struct igb_adapter *adapter, u32 vf)
 
 	/* generate a new mac address as we were hotplug removed/added */
 	if (!(adapter->vf_data[vf].flags & IGB_VF_FLAG_PF_SET_MAC))
-		random_ether_addr(vf_mac);
+		eth_random_addr(vf_mac);
 
 	/* process remaining reset events */
 	igb_vf_reset(adapter, vf);
@@ -7287,7 +7288,7 @@ static irqreturn_t igb_intr_msi(int irq, void *data)
 			/* acknowledge the interrupt */
 			E1000_WRITE_REG(hw, E1000_TSICR, E1000_TSICR_TXTS);
 			/* retrieve hardware timestamp */
-			schedule_work(&adapter->ptp_tx_work);
+			igb_ptp_tx_work(&adapter->ptp_tx_work);
 		}
 	}
 #endif /* HAVE_PTP_1588_CLOCK */
@@ -7343,7 +7344,7 @@ static irqreturn_t igb_intr(int irq, void *data)
 			/* acknowledge the interrupt */
 			E1000_WRITE_REG(hw, E1000_TSICR, E1000_TSICR_TXTS);
 			/* retrieve hardware timestamp */
-			schedule_work(&adapter->ptp_tx_work);
+			igb_ptp_tx_work(&adapter->ptp_tx_work);
 		}
 	}
 #endif /* HAVE_PTP_1588_CLOCK */
@@ -10218,13 +10219,13 @@ static void igb_vmm_control(struct igb_adapter *adapter)
 		reg |= (E1000_DTXCTL_VLAN_ADDED |
 			E1000_DTXCTL_SPOOF_INT);
 		E1000_WRITE_REG(hw, E1000_DTXCTL, reg);
-		/* Fall through */
+		fallthrough;
 	case e1000_82580:
 		/* enable replication vlan tag stripping */
 		reg = E1000_READ_REG(hw, E1000_RPLOLR);
 		reg |= E1000_RPLOLR_STRVLAN;
 		E1000_WRITE_REG(hw, E1000_RPLOLR, reg);
-		/* Fall through */
+		fallthrough;
 	case e1000_i350:
 	case e1000_i354:
 		/* none of the above registers are supported by i350 */
@@ -10263,7 +10264,7 @@ static void igb_vmm_control(struct igb_adapter *adapter)
  */
 static u32 igb_get_os_driver_version(void)
 {
-	static const char driver_version[] = "5.9.3";
+	static const char driver_version[] = "5.10.2";
 	u8 driver_version_num[] = {0, 0, 0, 0};
 	char const *c = driver_version;
 	uint pos;

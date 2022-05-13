@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2021 Intel Corporation. */
+/* Copyright(c) 2007 - 2022 Intel Corporation. */
 
 
 #include <linux/netdevice.h>
@@ -503,7 +503,7 @@ void igb_check_options(struct igb_adapter *adapter)
 				adapter->vfs_allocated_count = 0;
 				DPRINTK(PROBE, INFO,
 					"SR-IOV option max_vfs not supported.\n");
-				/* Fall through */
+				fallthrough;
 			default:
 				break;
 			}
@@ -625,7 +625,7 @@ void igb_check_options(struct igb_adapter *adapter)
 						    adapter);
 				if (adapter->rss_queues)
 					break;
-				/* Fall through */
+				fallthrough;
 			case 0:
 				adapter->rss_queues = min_t(u32, opt.arg.r.max,
 							    num_online_cpus());

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2021 Intel Corporation. */
+/* Copyright(c) 2007 - 2022 Intel Corporation. */
 
 /* ethtool support for igb */
 
@@ -1222,8 +1222,16 @@ static void igb_get_drvinfo(struct net_device *netdev,
 	drvinfo->eedump_len = igb_get_eeprom_len(netdev);
 }
 
+#ifdef HAVE_ETHTOOL_EXTENDED_RINGPARAMS
+static void
+igb_get_ringparam(struct net_device *netdev,
+		  struct ethtool_ringparam *ring,
+		  struct kernel_ethtool_ringparam __always_unused *ker,
+		  struct netlink_ext_ack __always_unused *extack)
+#else
 static void igb_get_ringparam(struct net_device *netdev,
 			      struct ethtool_ringparam *ring)
+#endif /* HAVE_ETHTOOL_EXTENDED_RINGPARAMS */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 
@@ -1237,8 +1245,16 @@ static void igb_get_ringparam(struct net_device *netdev,
 	ring->rx_jumbo_pending = 0;
 }
 
+#ifdef HAVE_ETHTOOL_EXTENDED_RINGPARAMS
+static int
+igb_set_ringparam(struct net_device *netdev,
+		  struct ethtool_ringparam *ring,
+		  struct kernel_ethtool_ringparam __always_unused *ker,
+		  struct netlink_ext_ack __always_unused *extack)
+#else
 static int igb_set_ringparam(struct net_device *netdev,
 			     struct ethtool_ringparam *ring)
+#endif /* HAVE_ETHTOOL_EXTENDED_RINGPARAMS */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	struct igb_ring *temp_ring;
@@ -2354,8 +2370,14 @@ static int igb_phys_id(struct net_device *netdev, u32 data)
 }
 #endif /* HAVE_ETHTOOL_SET_PHYS_ID */
 
+#ifdef HAVE_ETHTOOL_COALESCE_EXTACK
+static int igb_set_coalesce(struct net_device *netdev, struct ethtool_coalesce *ec,
+			    struct kernel_ethtool_coalesce __maybe_unused *kec,
+			    struct netlink_ext_ack __maybe_unused *extack)
+#else
 static int igb_set_coalesce(struct net_device *netdev,
 			    struct ethtool_coalesce *ec)
+#endif /* HAVE_ETHTOOL_COALESCE_EXTACK */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	int i;
@@ -2436,8 +2458,14 @@ static int igb_set_coalesce(struct net_device *netdev,
 	return 0;
 }
 
+#ifdef HAVE_ETHTOOL_COALESCE_EXTACK
+static int igb_get_coalesce(struct net_device *netdev, struct ethtool_coalesce *ec,
+			    struct kernel_ethtool_coalesce __maybe_unused *kec,
+			    struct netlink_ext_ack __maybe_unused *extack)
+#else
 static int igb_get_coalesce(struct net_device *netdev,
 			    struct ethtool_coalesce *ec)
+#endif /* HAVE_ETHTOOL_COALESCE_EXTACK */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 
@@ -3077,11 +3105,11 @@ static int igb_get_rss_hash_opts(struct igb_adapter *adapter,
 	switch (cmd->flow_type) {
 	case TCP_V4_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
-		/* Fall through */
+		fallthrough;
 	case UDP_V4_FLOW:
 		if (adapter->flags & IGB_FLAG_RSS_FIELD_IPV4_UDP)
 			cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
-		/* Fall through */
+		fallthrough;
 	case SCTP_V4_FLOW:
 	case AH_ESP_V4_FLOW:
 	case AH_V4_FLOW:
@@ -3091,11 +3119,11 @@ static int igb_get_rss_hash_opts(struct igb_adapter *adapter,
 		break;
 	case TCP_V6_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
-		/* Fall through */
+		fallthrough;
 	case UDP_V6_FLOW:
 		if (adapter->flags & IGB_FLAG_RSS_FIELD_IPV6_UDP)
 			cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
-		/* Fall through */
+		fallthrough;
 	case SCTP_V6_FLOW:
 	case AH_ESP_V6_FLOW:
 	case AH_V6_FLOW:
@@ -3622,13 +3650,13 @@ static unsigned int igb_max_rss_queues(struct igb_adapter *adapter)
 			max_rss_queues = 1;
 			break;
 		}
-		/* fall through */
+		fallthrough;
 	case e1000_82576:
 		if (adapter->vfs_allocated_count) {
 			max_rss_queues = 2;
 			break;
 		}
-		/* fall through */
+		fallthrough;
 	case e1000_82580:
 	default:
 		max_rss_queues = IGB_MAX_RX_QUEUES;
@@ -3712,7 +3740,7 @@ static int igb_set_channels(struct net_device *dev,
 		/* The PF has 3 interrupts and 1 queue pair w/ SR-IOV */
 		if (adapter->vfs_allocated_count)
 			break;
-		/* Fall through */
+		fallthrough;
 	case e1000_82576:
 		/*
 		 * The PF has access to 6 interrupt vectors if the number of
@@ -3722,7 +3750,7 @@ static int igb_set_channels(struct net_device *dev,
 		if ((adapter->vfs_allocated_count > 0) &&
 		    (adapter->vfs_allocated_count < 7))
 			break;
-		/* Fall through */
+		fallthrough;
 	case e1000_82580:
 	case e1000_i210:
 	default:

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
-# Copyright(c) 2007 - 2021 Intel Corporation.
+# Copyright(c) 2007 - 2022 Intel Corporation.
 
 # updates for the system pci.ids file
 #
@@ -70,8 +70,10 @@
 		8086 00a2  Ethernet Server Adapter I350-T2
 		8086 00a3  Ethernet Server Adapter I350-T4
 		8086 00aa  Ethernet Network Adapter I350-T4 for OCP NIC 3.0
+		8086 4017  Ethernet Network Adapter I350-T4 for OCP NIC 3.0
 		8086 5001  Ethernet Server Adapter I350-T4
 		8086 5002  Ethernet Server Adapter I350-T2
+		8086 5003  Ethernet 1G 4P I350-t OCP
 	1522  I350 Gigabit Fiber Network Connection
 		108e 7b17  Quad Port GbE PCIe 2.0 ExpressModule, MMF
 		108e 7b19  Dual Port GbE PCIe 2.0 Low Profile Adapter, MMF
