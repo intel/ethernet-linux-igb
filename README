@@ -25,14 +25,16 @@ Important Notes
 Configuring SR-IOV for improved network security
 ------------------------------------------------
 In a virtualized environment, on Intel(R) Ethernet Network Adapters that
-support SR-IOV, the virtual function (VF) may be subject to malicious behavior.
+support SR-IOV or Intel(R) Scalable I/O Virtualization (Intel(R) Scalable IOV),
+the virtual function (VF) may be subject to malicious behavior.
 Software-generated layer two frames, like IEEE 802.3x (link flow control), IEEE
 802.1Qbb (priority based flow-control), and others of this type, are not
 expected and can throttle traffic between the host and the virtual switch,
 reducing performance. To resolve this issue, and to ensure isolation from
-unintended traffic streams, configure all SR-IOV enabled ports for VLAN tagging
-from the administrative interface on the PF. This configuration allows
-unexpected, and potentially malicious, frames to be dropped.
+unintended traffic streams, configure all SR-IOV or Intel Scalable IOV enabled
+ports for VLAN tagging from the administrative interface on the PF. This
+configuration allows unexpected, and potentially malicious, frames to be
+dropped.
 
 
 Overview
@@ -151,7 +153,7 @@ Note: RPM functionality has only been tested in Red Hat distributions.
 NOTES:
 - To compile the driver on some kernel/arch combinations, you may need to
 install a package with the development version of libelf (e.g. libelf-dev,
-libelf-devel, elfutilsl-libelf-devel).
+libelf-devel, elfutils-libelf-devel).
 - When compiling an out-of-tree driver, details will vary by distribution.
 However, you will usually need a kernel-devel RPM or some RPM that provides the
 kernel headers at a minimum. The RPM kernel-devel will usually fill in the link
