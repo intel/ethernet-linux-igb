@@ -212,6 +212,7 @@
 #else /* >= 5.14.17-150400.1 */
 	#undef HAVE_DEVLINK_PARAMS_PUBLISH
 	#undef HAVE_DEVLINK_REGISTER_SETS_DEV
+	#define HAVE_DEVLINK_SET_FEATURES
 #endif /* 5.14.17-150400.1 */
 
 /*****************************************************************************/

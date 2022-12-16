@@ -110,7 +110,9 @@
 #undef NEED_INDIRECT_CALL_WRAPPER_MACROS
 #define HAVE_INDIRECT_CALL_WRAPPER_HEADER
 #define HAVE_GRETAP_TYPE
+#define HAVE_VXLAN_TYPE
 #define HAVE_LINKMODE
+#define HAVE_FLOW_DISSECTOR_KEY_CVLAN
 #endif /* 8.1 */
 
 /*****************************************************************************/
@@ -181,16 +183,35 @@
 #endif /* 8.6 */
 
 /*****************************************************************************/
-#if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(9,0))
-#else /* >= 9.0 */
-#define HAVE_XDP_BUFF_RXQ
-#define HAVE_NDO_ETH_IOCTL
+#if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(8,7))
+#else /* >= 8.7 */
+#define HAVE_ETHTOOL_EXTENDED_RINGPARAMS
 #undef NEED_DEVLINK_ALLOC_SETS_DEV
+#undef NEED_NO_NETDEV_PROG_XDP_WARN_ACTION
 #undef HAVE_DEVLINK_PARAMS_PUBLISH
 #undef HAVE_DEVLINK_RELOAD_ENABLE_DISABLE
 #undef HAVE_DEVLINK_REGISTER_SETS_DEV
 #define HAVE_DEVLINK_NOTIFY_REGISTER
 #define HAVE_DEVLINK_SET_FEATURES
+#endif /* 8.7 */
+
+/*****************************************************************************/
+#if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(9,0))
+#else /* >= 9.0 */
+#define HAVE_XDP_BUFF_RXQ
+#define HAVE_NDO_ETH_IOCTL
+#define NEED_NO_NETDEV_PROG_XDP_WARN_ACTION
+#undef HAVE_ETHTOOL_EXTENDED_RINGPARAMS
 #endif /* 9.0 */
+
+/*****************************************************************************/
+#if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(9,1))
+#else /* >= 9.1 */
+#undef HAVE_PASID_SUPPORT
+#undef NEED_NO_NETDEV_PROG_XDP_WARN_ACTION
+#define HAVE_ETHTOOL_EXTENDED_RINGPARAMS
+#define HAVE_ETHTOOL_COALESCE_EXTACK
+#define HAVE_XDP_DO_FLUSH
+#endif /* 9.1 */
 
 #endif /* _KCOMPAT_RHEL_DEFS_H_ */

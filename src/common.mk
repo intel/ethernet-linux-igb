@@ -274,7 +274,9 @@ endif
 ifneq (,$(findstring uek,${BUILD_KERNEL}))
   EXTRAVERSION := $(shell BK=${BUILD_KERNEL}; echo $${BK\#*-})
   UEK_RELEASE_NUMBER := $(shell EV=${EXTRAVERSION}; echo $${EV%%\.*})
+  UEK_MINOR_RELEASE_NUMBER := $(shell EV=${EXTRAVERSION}; MIV=$${EV\#*\.}; echo $${MIV%%\.*})
   EXTRA_CFLAGS += -DUEK_RELEASE_NUMBER=${UEK_RELEASE_NUMBER}
+  EXTRA_CFLAGS += -DUEK_MINOR_RELEASE_NUMBER=${UEK_MINOR_RELEASE_NUMBER}
 endif
 
 EXTRA_CFLAGS += ${CFLAGS_EXTRA}
@@ -434,8 +436,8 @@ ifeq (${NEED_AUX_BUS},2)
 define auxiliary_post_install
 	install -D -m 644 Module.symvers ${INSTALL_MOD_PATH}/lib/modules/${KVER}/extern-symvers/intel_auxiliary.symvers
 	install -d ${INSTALL_MOD_PATH}/lib/modules/${KVER}/${INSTALL_AUX_DIR}
-	mv -f ${INSTALL_MOD_PATH}/lib/modules/${KVER}/${INSTALL_MOD_DIR}/intel_auxiliary.ko \
-	      ${INSTALL_MOD_PATH}/lib/modules/${KVER}/${INSTALL_AUX_DIR}/intel_auxiliary.ko
+	mv -f ${INSTALL_MOD_PATH}/lib/modules/${KVER}/${INSTALL_MOD_DIR}/intel_auxiliary.ko* \
+	      ${INSTALL_MOD_PATH}/lib/modules/${KVER}/${INSTALL_AUX_DIR}/
 	install -D -m 644 ${AUX_BUS_HEADER} ${INSTALL_MOD_PATH}/${KSRC}/include/linux/auxiliary_bus.h
 endef
 else

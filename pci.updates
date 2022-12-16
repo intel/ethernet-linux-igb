@@ -97,7 +97,7 @@
 		8086 0002  Ethernet Server Adapter I340-F4
 	1533  I210 Gigabit Network Connection
 		103c 0003  Ethernet I210-T1 GbE NIC
-		17aa 1509  I210 Gigabit Network Connection
+		17aa 1059  I210 Gigabit Network Connection
 		17aa 404d  I210 PCIe 1Gb 1-Port RJ45 LOM
 		8086 0001  Ethernet Server Adapter I210-T1
 		8086 0002  Ethernet Server Adapter I210-T1

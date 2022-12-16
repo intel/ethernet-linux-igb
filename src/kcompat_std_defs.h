@@ -62,6 +62,7 @@
 #else /* >= 4,8,0 */
 #define HAVE_TCF_EXTS_TO_LIST
 #define HAVE_PCI_ALLOC_IRQ
+#define HAVE_NDO_UDP_TUNNEL_CALLBACK
 #endif /* 4,8,0 */
 
 /*****************************************************************************/
@@ -140,6 +141,7 @@
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,20,0))
 #define NEED_NETDEV_TX_SENT_QUEUE
 #else /* >= 4.20.0 */
+#define HAVE_VXLAN_TYPE
 #define HAVE_LINKMODE
 #endif /* 4.20.0 */
 
@@ -165,6 +167,7 @@
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5,2,0))
 #else /* >= 5.2.0 */
 #define HAVE_DEVLINK_PORT_ATTRS_SET_SWITCH_ID
+#define HAVE_FLOW_DISSECTOR_KEY_CVLAN
 #endif /* 5.2.0 */
 
 /*****************************************************************************/
@@ -257,6 +260,7 @@
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5,12,0))
 #define NEED_EXPORT_INDIRECT_CALLABLE
 #else /* >= 5.12.0 */
+#undef HAVE_NDO_UDP_TUNNEL_CALLBACK
 #endif /* 5.12.0 */
 
 /*****************************************************************************/
@@ -271,6 +275,7 @@
 #define HAVE_KOBJ_IN_MDEV_PARENT_OPS_CREATE
 #define HAVE_DEV_IN_MDEV_API
 #else /* >= 5.13.0 */
+#define HAVE_XPS_MAP_TYPE
 #endif /* 5.13.0 */
 
 /*****************************************************************************/
@@ -330,5 +335,11 @@
 #else /* >=6.0.0 */
 #define HAVE_FLOW_DISSECTOR_KEY_PPPOE
 #endif /* 6.0.0 */
+
+/*****************************************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6,1,0))
+#else /* >=6.1.0 */
+#define HAVE_FLOW_DISSECTOR_KEY_L2TPV3
+#endif /* 6.1.0 */
 
 #endif /* _KCOMPAT_STD_DEFS_H_ */

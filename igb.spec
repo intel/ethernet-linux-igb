@@ -1,6 +1,6 @@
 Name: igb
 Summary: Intel(R) Gigabit Ethernet Linux Driver
-Version: 5.12.3
+Version: 5.13.7
 Release: 1
 Source: %{name}-%{version}.tar.gz
 Vendor: Intel Corporation
@@ -12,8 +12,7 @@ URL: http://support.intel.com
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
 # do not generate debugging packages by default - newer versions of rpmbuild
 # may instead need:
-#%define debug_package %{nil}
-%debug_package %{nil}
+%global debug_package %{nil}
 # macros for finding system files to update at install time (pci.ids, pcitable)
 %define find() %(for f in %*; do if [ -e $f ]; then echo $f; break; fi; done)
 %define _pciids   /usr/share/pci.ids        /usr/share/hwdata/pci.ids
@@ -21,6 +20,13 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-root
 %define pciids    %find %{_pciids}
 %define pcitable  %find %{_pcitable}
 Requires: kernel, fileutils, findutils, gawk, bash
+
+%if 0%{?BUILD_KERNEL:1}
+%define kernel_ver %{BUILD_KERNEL}
+%define check_aux_args_kernel -b %{BUILD_KERNEL}
+%else
+%define kernel_ver %(uname -r)
+%endif
 
 %description
 This package contains the Intel(R) Gigabit Ethernet Linux Driver.
@@ -30,15 +36,30 @@ This package contains the Intel(R) Gigabit Ethernet Linux Driver.
 
 %build
 make -C src clean
-make -C src
+make -j -C src
 
 %install
-make -C src INSTALL_MOD_PATH=%{buildroot} MANDIR=%{_mandir} rpm
+make -j -C src INSTALL_MOD_PATH=%{buildroot} MANDIR=%{_mandir} rpm
+# Sign the modules(s)
+%if %{?_with_modsign:1}%{!?_with_modsign:0}
+cd %{buildroot}
+%define __strip /bin/true
+%{!?privkey: %define privkey %{_sysconfdir}/pki/SECURE-BOOT-KEY.priv}
+%{!?pubkey: %define pubkey %{_sysconfdir}/pki/SECURE-BOOT-KEY.der}
+%{!?_signfile: %define _signfile %{_usrsrc}/kernels/%{kernel_ver}/scripts/sign-file}
+for module in `find . -type f -name *.ko`;
+do
+strip --strip-debug ${module}
+$(KSRC=%{_usrsrc}/kernels/%{kernel_ver} %{_signfile} sha512 %{privkey} %{pubkey} ${module} > /dev/null 2>&1)
+done
+%endif
+
 # Append .new to driver name to avoid conflict with kernel RPM
 cd %{buildroot}
 find lib -name "igb.*o" -exec mv {} {}.new \; \
          -fprintf %{_builddir}/%{name}-%{version}/file.list "/%p.new\n"
 find lib/modules -name modules.* -exec rm -f {} \;
+
 
 
 %clean
@@ -374,6 +395,11 @@ fi
 
 uname -r | grep BOOT || /sbin/depmod -a > /dev/null 2>&1 || true
 
+if [ -x "/usr/sbin/weak-modules" ]; then
+    modules=( $(cat %{_docdir}/%{name}/file.list | grep '\.ko$' | xargs realpath) )
+    printf '%s\n' "${modules[@]}" | /usr/sbin/weak-modules --no-initramfs --add-modules
+fi
+
 echo "Updating initrd..."
 # Decide which initrd update utility to use.
 # Default is dracut but we'll try mkinitrd if that's not found.
@@ -406,6 +432,9 @@ if [ "$initrd_cmd" != "" ]; then
 fi
 
 %preun
+# save tmp list of installed kernel modules for weak-modules
+cat %{_docdir}/%{name}/file.list | grep '\.ko$' | xargs realpath > /var/run/rpm-%{name}-modules.list
+
 # If doing RPM un-install
 if [ $1 -eq 0 ] ; then
 	FL="%{_docdir}/%{name}-%{version}/file.list
@@ -427,4 +456,40 @@ fi
 
 %postun
 uname -r | grep BOOT || /sbin/depmod -a > /dev/null 2>&1 || true
+
+if [ -x "/usr/sbin/weak-modules" ]; then
+    modules=( $(cat /var/run/rpm-%{name}-modules.list) )
+    printf '%s\n' "${modules[@]}" | /usr/sbin/weak-modules --no-initramfs --remove-modules
+fi
+rm /var/run/rpm-%{name}-modules.list
+
+# Update initramfs or initrd image
+# Since this process varies across distributions,
+# only support the simplest and most common methods. If
+# we can't update the image automatically, we'll display a warning message
+# indicating that the system administrator must perform some work manually.
+
+if which dracut >/dev/null 2>&1; then
+        echo "Updating initramfs with dracut..."
+        if dracut --force ; then
+                echo "Successfully updated initramfs."
+        else
+                echo "Failed to update initramfs."
+                echo "You must update your initramfs image for changes to take place."
+                exit -1
+        fi
+elif which mkinitrd >/dev/null 2>&1; then
+        echo "Updating initrd with mkinitrd..."
+        if mkinitrd; then
+                echo "Successfully updated initrd."
+        else
+                echo "Failed to update initrd."
+                echo "You must update your initrd image for changes to take place."
+                exit -1
+        fi
+else
+        echo "Unable to determine utility to update initrd image."
+        echo "You must update your initrd manually for changes to take place."
+        exit -1
+fi
 
