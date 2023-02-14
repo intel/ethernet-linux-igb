@@ -1,5 +1,5 @@
-/* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright(c) 2007 - 2022 Intel Corporation. */
+/* SPDX-License-Identifier: @SPDX@ */
+/* Copyright(c) 2007 - 2023 Intel Corporation. */
 
 #ifndef _KCOMPAT_SLES_DEFS_H_
 #define _KCOMPAT_SLES_DEFS_H_
@@ -71,6 +71,12 @@
  */
 
 /*****************************************************************************/
+#if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(4,4,0,73))
+#else /* >= 4.4.0-73 */
+#define HAVE_DEVLINK_PORT_SPLIT
+#endif /* 4.4.0-73 */
+
+/*****************************************************************************/
 #if (SLE_KERNEL_CODE > SLE_KERNEL_VERSION(4,12,14,23) && \
      SLE_KERNEL_CODE < SLE_KERNEL_VERSION(4,12,14,94))
 /*
@@ -115,6 +121,7 @@
 #undef NEED_MACVLAN_RELEASE_L2FW_OFFLOAD
 #undef NEED_MACVLAN_SUPPORTS_DEST_FILTER
 #undef NEED_IDA_ALLOC_MIN_MAX_RANGE_FREE
+#define HAVE_DEVLINK_PORT_SPLIT_EXTACK
 #endif /* 4.12.14-111 */
 
 /*****************************************************************************/
@@ -136,7 +143,6 @@
 /* SLES 15-SP1 base */
 #if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(4,12,14,195))
 #else /* >= 4.12.14-195 */
-#define HAVE_DEVLINK_PARAMS
 #undef NEED_NETDEV_TX_SENT_QUEUE
 #endif /* 4.12.14-195 */
 
@@ -148,13 +154,7 @@
 #undef NEED_SKB_FRAG_OFF
 #undef NEED_SKB_FRAG_OFF_ADD
 #define HAVE_FLOW_INDR_BLOCK_LOCK
-#define HAVE_DEVLINK_PARAMS_PUBLISH
 #endif /* 5.3.8-2 */
-
-#if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(5,3,16,2))
-#else /* >= 5.3.16-2 */
-#define HAVE_DEVLINK_HEALTH_OPS_EXTACK
-#endif /* 5.3.16-2 */
 
 #if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(5,3,18,24))
 #else /* >= 5.3.18-24 */
@@ -164,9 +164,6 @@
 #if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(5,3,18,26))
 #else /* >= 5.3.18-26 */
 #undef NEED_CPU_LATENCY_QOS_RENAME
-#define HAVE_DEVLINK_REGION_OPS_SNAPSHOT_OPS
-#define HAVE_DEVLINK_FLASH_UPDATE_PARAMS
-#define HAVE_DEVLINK_RELOAD_ENABLE_DISABLE
 #endif
 
 /*****************************************************************************/
@@ -174,7 +171,6 @@
 #else /* >= 5.3.18-34 */
 #undef NEED_DEVLINK_REGION_CREATE_OPS
 #undef NEED_DEVLINK_PORT_ATTRS_SET_STRUCT
-#define HAVE_DEVLINK_HEALTH_DEFAULT_AUTO_RECOVER
 #endif /* 5.3.18-34 */
 
 /*****************************************************************************/
@@ -202,25 +198,18 @@
 #endif /* 5.3.18-41 */
 
 /*****************************************************************************/
-#if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(5,3,18,59))
-#else /* >= 5.3.18-59 */
-#undef NEED_ETH_HW_ADDR_SET
-#endif /* 5.3.18-59 */
-
-/*****************************************************************************/
 #if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(5, 14, 17, 1))
 #else /* >= 5.14.17-150400.1 */
-	#undef HAVE_DEVLINK_PARAMS_PUBLISH
-	#undef HAVE_DEVLINK_REGISTER_SETS_DEV
-	#define HAVE_DEVLINK_SET_FEATURES
+	#undef NEED_ETHTOOL_SPRINTF
 #endif /* 5.14.17-150400.1 */
 
 /*****************************************************************************/
 #if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(5,14,21,9))
 #else /* >= 5.14.21-150400.9 */
 #undef NEED_DEVLINK_ALLOC_SETS_DEV
-#undef HAVE_DEVLINK_RELOAD_ENABLE_DISABLE
 #define HAVE_ETHTOOL_COALESCE_EXTACK
+#define HAVE_DEVLINK_OPS_CREATE_DEL
+#define HAVE_DEVLINK_SET_STATE_3_PARAM
 #endif /* 5.14.21-150400.9 */
 
 #endif /* _KCOMPAT_SLES_DEFS_H_ */

@@ -1,5 +1,5 @@
-/* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright(c) 2007 - 2022 Intel Corporation. */
+/* SPDX-License-Identifier: @SPDX@ */
+/* Copyright(c) 2007 - 2023 Intel Corporation. */
 
 #ifndef _KCOMPAT_UBUNTU_DEFS_H_
 #define _KCOMPAT_UBUNTU_DEFS_H_

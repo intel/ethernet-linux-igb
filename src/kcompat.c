@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2022 Intel Corporation. */
+/* SPDX-License-Identifier: @SPDX@ */
+/* Copyright(c) 2007 - 2023 Intel Corporation. */
 
 #include "igb.h"
 #include "kcompat.h"
@@ -2771,6 +2771,7 @@ char *devm_kasprintf(struct device *dev, gfp_t gfp, const char *fmt, ...)
 #endif /* NEED_DEVM_KASPRINTF */
 
 #ifdef NEED_PCI_IOV_VF_ID
+#ifdef CONFIG_PCI_IOV
 /*
  * Below function needs to access pci_sriov offset and stride. Since
  * pci_sriov structure is defined in drivers/pci/pci.h which can not
@@ -2821,6 +2822,7 @@ int _kc_pci_iov_vf_id(struct pci_dev *dev)
 		((pf->bus->number << 8) + pf->devfn + pf->sriov->offset)) /
 	       pf->sriov->stride;
 }
+#endif /* CONFIG_PCI_IOV */
 #endif /* NEED_PCI_IOV_VF_ID */
 
 #ifdef NEED_MUL_U64_U64_DIV_U64

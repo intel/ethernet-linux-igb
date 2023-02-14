@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2022 Intel Corporation. */
+/* SPDX-License-Identifier: @SPDX@ */
+/* Copyright(c) 2007 - 2023 Intel Corporation. */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -39,13 +39,13 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.13.7" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.13.16" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
 static const char igb_driver_string[] = DRV_SUMMARY;
-static const char igb_copyright[] = "Copyright(c) 2007 - 2022 Intel Corporation.";
+static const char igb_copyright[] = "Copyright(c) 2007 - 2023 Intel Corporation.";
 
 static const struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I354_BACKPLANE_1GBPS) },
@@ -10264,7 +10264,7 @@ static void igb_vmm_control(struct igb_adapter *adapter)
  */
 static u32 igb_get_os_driver_version(void)
 {
-	static const char driver_version[] = "5.13.7";
+	static const char driver_version[] = "5.13.16";
 	u8 driver_version_num[] = {0, 0, 0, 0};
 	char const *c = driver_version;
 	uint pos;

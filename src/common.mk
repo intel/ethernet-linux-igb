@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: GPL-2.0
-# Copyright(c) 2007 - 2022 Intel Corporation.
+# SPDX-License-Identifier: @SPDX@
+# Copyright(c) 2007 - 2023 Intel Corporation.
 
 #
 # common Makefile rules useful for out-of-tree Linux driver builds
@@ -272,9 +272,9 @@ endif
 
 # Check if it is Oracle Linux UEK kernel and take release patch number from it
 ifneq (,$(findstring uek,${BUILD_KERNEL}))
-  EXTRAVERSION := $(shell BK=${BUILD_KERNEL}; echo $${BK\#*-})
-  UEK_RELEASE_NUMBER := $(shell EV=${EXTRAVERSION}; echo $${EV%%\.*})
-  UEK_MINOR_RELEASE_NUMBER := $(shell EV=${EXTRAVERSION}; MIV=$${EV\#*\.}; echo $${MIV%%\.*})
+  EXTRAVERSION := $(shell echo ${BUILD_KERNEL} | cut -s -d '-' -f2-)
+  UEK_RELEASE_NUMBER := $(shell echo ${EXTRAVERSION} | cut -s -d '.' -f1)
+  UEK_MINOR_RELEASE_NUMBER := $(shell echo ${EXTRAVERSION} | cut -s -d '.' -f2)
   EXTRA_CFLAGS += -DUEK_RELEASE_NUMBER=${UEK_RELEASE_NUMBER}
   EXTRA_CFLAGS += -DUEK_MINOR_RELEASE_NUMBER=${UEK_MINOR_RELEASE_NUMBER}
 endif
@@ -345,6 +345,14 @@ minimum_kver_check = $(eval $(call _minimum_kver_check,${1},${2},${3}))
 # refactor it into the new layout.
 
 ifneq ($(wildcard ./kcompat_defs.h),)
+# call script that populates defines automatically
+#
+# since is_kcompat_defined() is a macro, it's "computed" before any target
+# recipe, kcompat_generated_defs.h is needed prior to that, so needs to be
+# generated also via $(shell) call, which makes error handling ugly
+$(if $(shell KSRC=${KSRC} OUT=kcompat_generated_defs.h CONFFILE=${CONFIG_FILE} \
+    bash kcompat-generator.sh && echo ok), , $(error kcompat-generator.sh failed))
+
 KCOMPAT_DEFINITIONS := $(shell ${CC} ${EXTRA_CFLAGS} -E -dM \
                                      -I${KOBJ}/include \
                                      -I${KOBJ}/include/generated/uapi \

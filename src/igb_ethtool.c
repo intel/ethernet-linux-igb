@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2007 - 2022 Intel Corporation. */
+/* SPDX-License-Identifier: @SPDX@ */
+/* Copyright(c) 2007 - 2023 Intel Corporation. */
 
 /* ethtool support for igb */
 
@@ -1068,11 +1068,8 @@ static int igb_get_eeprom_len(struct net_device *netdev)
 
 	if (adapter->hw.mac.type == e1000_82576)
 		return pci_resource_len(pdev, 0) + pci_resource_len(pdev, 1);
-#ifdef CONFIG_SUSE_KERNEL
+
 	return pci_resource_len(pdev, 0);
-#else
-	return adapter->hw.nvm.word_size * 2;
-#endif
 }
 
 static int igb_get_eeprom(struct net_device *netdev,
