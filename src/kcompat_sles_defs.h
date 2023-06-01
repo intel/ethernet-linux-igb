@@ -174,12 +174,6 @@
 #endif /* 5.3.18-34 */
 
 /*****************************************************************************/
-#if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(5,3,18,37))
-#else /* >= 5.3.18-37 */
-#undef NEED_NET_PREFETCH
-#endif /* 5.3.18-37 */
-
-/*****************************************************************************/
 #if (SLE_KERNEL_CODE < SLE_KERNEL_VERSION(5,3,18,38))
 #else /* >= 5.3.18-38 */
 #undef NEED_DEVLINK_FLASH_UPDATE_TIMEOUT_NOTIFY

@@ -232,7 +232,6 @@
 
 /*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0))
-#define NEED_NET_PREFETCH
 #define NEED_DEVLINK_FLASH_UPDATE_TIMEOUT_NOTIFY
 #define NEED_XSK_BUFF_DMA_SYNC_FOR_CPU
 #define NEED_XSK_BUFF_POOL_RENAME
@@ -299,12 +298,6 @@
 #define HAVE_DEVLINK_NOTIFY_REGISTER
 #define HAVE_XSK_BATCHED_RX_ALLOC
 #endif /* 5.16.0 */
-
-/*****************************************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,17,0))
-#else /* >=5.17.0*/
-#define HAVE_XDP_DO_FLUSH
-#endif /* 5.17.0 */
 
 /*****************************************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0))

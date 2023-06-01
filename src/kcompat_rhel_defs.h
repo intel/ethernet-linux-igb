@@ -134,7 +134,6 @@
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(8,4))
 #else /* >= 8.4 */
 #undef NEED_DEVLINK_PORT_ATTRS_SET_STRUCT
-#undef NEED_NET_PREFETCH
 #undef NEED_DEVLINK_FLASH_UPDATE_TIMEOUT_NOTIFY
 #undef HAVE_XDP_QUERY_PROG
 #define HAVE_AF_XDP_ZC_SUPPORT
@@ -190,7 +189,6 @@
 #else /* >= 9.1 */
 #undef HAVE_PASID_SUPPORT
 #define HAVE_ETHTOOL_COALESCE_EXTACK
-#define HAVE_XDP_DO_FLUSH
 #endif /* 9.1 */
 
 /*****************************************************************************/
