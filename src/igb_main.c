@@ -39,7 +39,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.13.20" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.14.16" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
@@ -318,16 +318,16 @@ static int __init igb_init_module(void)
 {
 	int ret;
 
-	pr_info("%s - version %s\n",
+	IGB_INF("%s - version %s\n",
 	       igb_driver_string, igb_driver_version);
 
-	pr_info("%s\n", igb_copyright);
+	IGB_INF("%s\n", igb_copyright);
 #ifdef IGB_HWMON
 /* only use IGB_PROCFS if IGB_HWMON is not defined */
 #else
 #ifdef IGB_PROCFS
 	if (igb_procfs_topdir_init())
-		pr_info("Procfs failed to initialize topdir\n");
+		IGB_INF("Procfs failed to initialize topdir\n");
 #endif /* IGB_PROCFS */
 #endif /* IGB_HWMON  */
 
@@ -579,6 +579,7 @@ static void igb_configure_msix(struct igb_adapter *adapter)
 	u32 tmp;
 	int i, vector = 0;
 	struct e1000_hw *hw = &adapter->hw;
+	int num_q_vectors = min(MAX_Q_VECTORS, adapter->num_q_vectors);
 
 	adapter->eims_enable_mask = 0;
 
@@ -628,7 +629,7 @@ static void igb_configure_msix(struct igb_adapter *adapter)
 
 	adapter->eims_enable_mask |= adapter->eims_other;
 
-	for (i = 0; i < adapter->num_q_vectors; i++)
+	for (i = 0; i < num_q_vectors; i++)
 		igb_assign_vector(adapter->q_vector[i], vector++);
 
 	E1000_WRITE_FLUSH(hw);
@@ -1182,7 +1183,7 @@ static int igb_alloc_q_vector(struct igb_adapter *adapter,
 
 		/* For 82575, context index must be unique per ring. */
 		if (adapter->hw.mac.type == e1000_82575)
-			set_bit(IGB_RING_FLAG_TX_CTX_IDX, &ring->flags);
+			set_bit(IGB_RING_FLAG_TX_CTX_IDX, ring->flags);
 
 		/* apply Tx specific ring traits */
 		ring->count = adapter->tx_ring_count;
@@ -1208,16 +1209,16 @@ static int igb_alloc_q_vector(struct igb_adapter *adapter,
 
 #if defined(HAVE_RHEL6_NET_DEVICE_OPS_EXT) || !defined(HAVE_NDO_SET_FEATURES)
 		/* enable rx checksum */
-		set_bit(IGB_RING_FLAG_RX_CSUM, &ring->flags);
+		set_bit(IGB_RING_FLAG_RX_CSUM, ring->flags);
 
 #endif
 		/* set flag indicating ring supports SCTP checksum offload */
 		if (adapter->hw.mac.type >= e1000_82576)
-			set_bit(IGB_RING_FLAG_RX_SCTP_CSUM, &ring->flags);
+			set_bit(IGB_RING_FLAG_RX_SCTP_CSUM, ring->flags);
 
 		if ((adapter->hw.mac.type == e1000_i350) ||
 		    (adapter->hw.mac.type == e1000_i354))
-			set_bit(IGB_RING_FLAG_RX_LB_VLAN_BSWAP, &ring->flags);
+			set_bit(IGB_RING_FLAG_RX_LB_VLAN_BSWAP, ring->flags);
 
 		/* apply Rx specific ring traits */
 		ring->count = adapter->rx_ring_count;
@@ -1788,7 +1789,7 @@ void igb_up(struct igb_adapter *adapter)
 	/* hardware has been reset, we need to reload some things */
 	igb_configure(adapter);
 
-	clear_bit(__IGB_DOWN, &adapter->state);
+	clear_bit(__IGB_DOWN, adapter->state);
 
 	if (num_q_vectors > MAX_Q_VECTORS) {
 		num_q_vectors = MAX_Q_VECTORS;
@@ -1842,7 +1843,7 @@ void igb_down(struct igb_adapter *adapter)
 	/* signal that we're down so the interrupt handler does not
 	 * reschedule our watchdog timer
 	 */
-	set_bit(__IGB_DOWN, &adapter->state);
+	set_bit(__IGB_DOWN, adapter->state);
 
 	/* disable receives in the hardware */
 	rctl = E1000_READ_REG(hw, E1000_RCTL);
@@ -1901,11 +1902,11 @@ void igb_down(struct igb_adapter *adapter)
 void igb_reinit_locked(struct igb_adapter *adapter)
 {
 	WARN_ON(in_interrupt());
-	while (test_and_set_bit(__IGB_RESETTING, &adapter->state))
+	while (test_and_set_bit(__IGB_RESETTING, adapter->state))
 		usleep_range(1000, 2000);
 	igb_down(adapter);
 	igb_up(adapter);
-	clear_bit(__IGB_RESETTING, &adapter->state);
+	clear_bit(__IGB_RESETTING, adapter->state);
 }
 
 /**
@@ -2218,7 +2219,7 @@ igb_ndo_fdb_add(struct ndmsg *ndm, struct nlattr __always_unused *tb[],
 	 * ndm_state is given only allow permanent addresses
 	 */
 	if (ndm->ndm_state && !(ndm->ndm_state & NUD_PERMANENT)) {
-		pr_info("%s: FDB only supports static addresses\n",
+		IGB_INF("%s: FDB only supports static addresses\n",
 			igb_driver_name);
 		return -EINVAL;
 	}
@@ -2312,7 +2313,7 @@ static int igb_ndo_fdb_del(struct ndmsg *ndm,
 	int err = -EOPNOTSUPP;
 
 	if (ndm->ndm_state & NUD_PERMANENT) {
-		pr_info("%s: FDB only supports static addresses\n",
+		IGB_INF("%s: FDB only supports static addresses\n",
 			igb_driver_name);
 		return -EINVAL;
 	}
@@ -2454,7 +2455,11 @@ static const struct net_device_ops igb_netdev_ops = {
 #else
 	.ndo_change_mtu		= igb_change_mtu,
 #endif /* HAVE_RHEL7_EXTENDED_MIN_MAX_MTU */
+#ifdef HAVE_NDO_ETH_IOCTL
+	.ndo_eth_ioctl          = igb_ioctl,
+#else
 	.ndo_do_ioctl		= igb_ioctl,
+#endif
 #ifdef HAVE_RHEL7_NET_DEVICE_OPS_EXT
 	/* RHEL7 requires this to be defined to enable extended ops. RHEL7 uses
 	 * the function get_ndo_ext to retrieve offsets for extended fields
@@ -3415,7 +3420,7 @@ static void igb_remove(struct pci_dev *pdev)
 	/* flush_scheduled work may reschedule our watchdog task, so
 	 * explicitly disable watchdog tasks from being rescheduled
 	 */
-	set_bit(__IGB_DOWN, &adapter->state);
+	set_bit(__IGB_DOWN, adapter->state);
 	del_timer_sync(&adapter->watchdog_timer);
 	if (adapter->flags & IGB_FLAG_DETECT_BAD_DMA)
 		del_timer_sync(&adapter->dma_err_timer);
@@ -3535,7 +3540,7 @@ static int igb_sw_init(struct igb_adapter *adapter)
 	/* Explicitly disable IRQ since the NIC can be in any state. */
 	igb_irq_disable(adapter);
 
-	set_bit(__IGB_DOWN, &adapter->state);
+	set_bit(__IGB_DOWN, adapter->state);
 	return 0;
 }
 
@@ -3563,7 +3568,7 @@ static int __igb_open(struct net_device *netdev, bool resuming)
 	int i;
 
 	/* disallow open during test */
-	if (test_bit(__IGB_TESTING, &adapter->state)) {
+	if (test_bit(__IGB_TESTING, adapter->state)) {
 		WARN_ON(resuming);
 		return -EBUSY;
 	}
@@ -3610,7 +3615,7 @@ static int __igb_open(struct net_device *netdev, bool resuming)
 		goto err_set_queues;
 
 	/* From here on the code is the same as igb_up() */
-	clear_bit(__IGB_DOWN, &adapter->state);
+	clear_bit(__IGB_DOWN, adapter->state);
 
 	for (i = 0; i < adapter->num_q_vectors; i++)
 		napi_enable(&(adapter->q_vector[i]->napi));
@@ -3683,7 +3688,7 @@ static int __igb_close(struct net_device *netdev, bool suspending)
 	struct pci_dev *pdev = adapter->pdev;
 #endif /* CONFIG_PM_RUNTIME */
 
-	WARN_ON(test_bit(__IGB_RESETTING, &adapter->state));
+	WARN_ON(test_bit(__IGB_RESETTING, adapter->state));
 
 #ifdef CONFIG_PM_RUNTIME
 	if (!suspending)
@@ -5076,7 +5081,7 @@ static void igb_watchdog_task(struct work_struct *work)
 #endif /* IFLA_VF_MAX */
 
 			/* link state has changed, schedule phy info update */
-			if (!test_bit(__IGB_DOWN, &adapter->state))
+			if (!test_bit(__IGB_DOWN, adapter->state))
 				mod_timer(&adapter->phy_info_timer,
 					  round_jiffies(jiffies + 2 * HZ));
 		}
@@ -5115,7 +5120,7 @@ static void igb_watchdog_task(struct work_struct *work)
 			igb_ping_all_vfs(adapter);
 
 			/* link state has changed, schedule phy info update */
-			if (!test_bit(__IGB_DOWN, &adapter->state))
+			if (!test_bit(__IGB_DOWN, adapter->state))
 				mod_timer(&adapter->phy_info_timer,
 					  round_jiffies(jiffies + 2 * HZ));
 			/* link is down, time to check for alternate media */
@@ -5163,7 +5168,7 @@ static void igb_watchdog_task(struct work_struct *work)
 		}
 
 		/* Force detection of hung controller every watchdog period */
-		set_bit(IGB_RING_FLAG_TX_DETECT_HANG, &tx_ring->flags);
+		set_bit(IGB_RING_FLAG_TX_DETECT_HANG, tx_ring->flags);
 	}
 
 	/* Cause software interrupt to ensure rx ring is cleaned */
@@ -5180,7 +5185,7 @@ static void igb_watchdog_task(struct work_struct *work)
 	igb_spoof_check(adapter);
 
 	/* Reset the timer */
-	if (!test_bit(__IGB_DOWN, &adapter->state)) {
+	if (!test_bit(__IGB_DOWN, adapter->state)) {
 		if (adapter->flags & IGB_FLAG_NEED_LINK_UPDATE)
 			mod_timer(&adapter->watchdog_timer,
 				  round_jiffies(jiffies +  HZ));
@@ -5238,7 +5243,7 @@ static void igb_dma_err_task(struct work_struct *work)
 	}
 dma_timer_reset:
 	/* Reset the timer */
-	if (!test_bit(__IGB_DOWN, &adapter->state))
+	if (!test_bit(__IGB_DOWN, adapter->state))
 		mod_timer(&adapter->dma_err_timer,
 			  round_jiffies(jiffies + HZ / 10));
 }
@@ -5487,7 +5492,7 @@ static void igb_tx_ctxtdesc(struct igb_ring *tx_ring, u32 vlan_macip_lens,
 	type_tucmd |= E1000_TXD_CMD_DEXT | E1000_ADVTXD_DTYP_CTXT;
 
 	/* For 82575, context index must be unique per ring. */
-	if (test_bit(IGB_RING_FLAG_TX_CTX_IDX, &tx_ring->flags))
+	if (test_bit(IGB_RING_FLAG_TX_CTX_IDX, tx_ring->flags))
 		mss_l4len_idx |= tx_ring->reg_idx << 4;
 
 	context_desc->vlan_macip_lens	= cpu_to_le32(vlan_macip_lens);
@@ -5765,7 +5770,7 @@ static void igb_tx_olinfo_status(struct igb_ring *tx_ring,
 	u32 olinfo_status = paylen << E1000_ADVTXD_PAYLEN_SHIFT;
 
 	/* 82575 requires a unique index per ring */
-	if (test_bit(IGB_RING_FLAG_TX_CTX_IDX, &tx_ring->flags))
+	if (test_bit(IGB_RING_FLAG_TX_CTX_IDX, tx_ring->flags))
 		olinfo_status |= tx_ring->reg_idx << 4;
 
 	/* insert L4 checksum */
@@ -6008,7 +6013,7 @@ netdev_tx_t igb_xmit_frame_ring(struct sk_buff *skb,
 
 		if (adapter->tstamp_config.tx_type & HWTSTAMP_TX_ON &&
 		    !test_and_set_bit_lock(__IGB_PTP_TX_IN_PROGRESS,
-					   &adapter->state)) {
+					   adapter->state)) {
 #ifdef SKB_SHARED_TX_IS_UNION
 			skb_tx(skb)->in_progress = 1;
 #else
@@ -6066,7 +6071,7 @@ cleanup_tx_tstamp:
 		adapter->ptp_tx_skb = NULL;
 		if (adapter->hw.mac.type == e1000_82576)
 			cancel_work_sync(&adapter->ptp_tx_work);
-		clear_bit_unlock(__IGB_PTP_TX_IN_PROGRESS, &adapter->state);
+		clear_bit_unlock(__IGB_PTP_TX_IN_PROGRESS, adapter->state);
 	}
 #endif
 
@@ -6093,7 +6098,7 @@ static netdev_tx_t igb_xmit_frame(struct sk_buff *skb,
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 
-	if (test_bit(__IGB_DOWN, &adapter->state)) {
+	if (test_bit(__IGB_DOWN, adapter->state)) {
 		dev_kfree_skb_any(skb);
 		return NETDEV_TX_OK;
 	}
@@ -6161,7 +6166,7 @@ static struct net_device_stats *igb_get_stats(struct net_device *netdev)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 
-	if (!test_bit(__IGB_RESETTING, &adapter->state))
+	if (!test_bit(__IGB_RESETTING, adapter->state))
 		igb_update_stats(adapter);
 
 #ifdef HAVE_NETDEV_STATS_IN_NETDEV
@@ -6203,7 +6208,7 @@ static int igb_change_mtu(struct net_device *netdev, int new_mtu)
 	if (max_frame < (ETH_FRAME_LEN + ETH_FCS_LEN))
 		max_frame = ETH_FRAME_LEN + ETH_FCS_LEN;
 
-	while (test_and_set_bit(__IGB_RESETTING, &adapter->state))
+	while (test_and_set_bit(__IGB_RESETTING, adapter->state))
 		usleep_range(1000, 2000);
 
 	/* igb_down has a dependency on max_frame_size */
@@ -6222,7 +6227,7 @@ static int igb_change_mtu(struct net_device *netdev, int new_mtu)
 	else
 		igb_reset(adapter);
 
-	clear_bit(__IGB_RESETTING, &adapter->state);
+	clear_bit(__IGB_RESETTING, adapter->state);
 
 	return 0;
 }
@@ -6481,7 +6486,7 @@ static irqreturn_t igb_msix_other(int irq, void *data)
 	if (icr & E1000_ICR_LSC) {
 		hw->mac.get_link_status = 1;
 		/* guard against interrupt when we're going down */
-		if (!test_bit(__IGB_DOWN, &adapter->state))
+		if (!test_bit(__IGB_DOWN, adapter->state))
 			mod_timer(&adapter->watchdog_timer, jiffies + 1);
 	}
 
@@ -6606,6 +6611,7 @@ static void igb_setup_dca(struct igb_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	int i;
+	int num_q_vectors = min(MAX_Q_VECTORS, adapter->num_q_vectors);
 
 	if (!(adapter->flags & IGB_FLAG_DCA_ENABLED))
 		return;
@@ -6613,7 +6619,7 @@ static void igb_setup_dca(struct igb_adapter *adapter)
 	/* Always use CB2 mode, difference is masked in the CB driver. */
 	E1000_WRITE_REG(hw, E1000_DCA_CTRL, E1000_DCA_CTRL_DCA_MODE_CB2);
 
-	for (i = 0; i < adapter->num_q_vectors; i++) {
+	for (i = 0; i < num_q_vectors; i++) {
 		adapter->q_vector[i]->cpu = -1;
 		igb_update_dca(adapter->q_vector[i]);
 	}
@@ -7007,7 +7013,7 @@ int igb_ndo_set_vf_vlan(struct net_device *netdev, int vf, u16 vlan, u8 qos)
 		igb_set_vf_vlan_strip(adapter, vf, true);
 		dev_info(&adapter->pdev->dev,
 			 "Setting VLAN %d, QOS 0x%x on VF %d\n", vlan, qos, vf);
-		if (test_bit(__IGB_DOWN, &adapter->state)) {
+		if (test_bit(__IGB_DOWN, adapter->state)) {
 			dev_warn(&adapter->pdev->dev,
 				 "The VF VLAN has been set, but the PF device is not up.\n");
 			dev_warn(&adapter->pdev->dev,
@@ -7276,7 +7282,7 @@ static irqreturn_t igb_intr_msi(int irq, void *data)
 
 	if (icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
 		hw->mac.get_link_status = 1;
-		if (!test_bit(__IGB_DOWN, &adapter->state))
+		if (!test_bit(__IGB_DOWN, adapter->state))
 			mod_timer(&adapter->watchdog_timer, jiffies + 1);
 	}
 
@@ -7332,7 +7338,7 @@ static irqreturn_t igb_intr(int irq, void *data)
 	if (icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
 		hw->mac.get_link_status = 1;
 		/* guard against interrupt when we're going down */
-		if (!test_bit(__IGB_DOWN, &adapter->state))
+		if (!test_bit(__IGB_DOWN, adapter->state))
 			mod_timer(&adapter->watchdog_timer, jiffies + 1);
 	}
 
@@ -7367,7 +7373,7 @@ static void igb_ring_irq_enable(struct igb_q_vector *q_vector)
 			igb_update_ring_itr(q_vector);
 	}
 
-	if (!test_bit(__IGB_DOWN, &adapter->state)) {
+	if (!test_bit(__IGB_DOWN, adapter->state)) {
 		if (adapter->msix_entries)
 			E1000_WRITE_REG(hw, E1000_EIMS, q_vector->eims_value);
 		else
@@ -7428,7 +7434,7 @@ static bool igb_clean_tx_irq(struct igb_q_vector *q_vector)
 	unsigned int budget = q_vector->tx.work_limit;
 	unsigned int i = tx_ring->next_to_clean;
 
-	if (test_bit(__IGB_DOWN, &adapter->state))
+	if (test_bit(__IGB_DOWN, adapter->state))
 		return true;
 
 	tx_buffer = &tx_ring->tx_buffer_info[i];
@@ -7518,17 +7524,17 @@ static bool igb_clean_tx_irq(struct igb_q_vector *q_vector)
 	q_vector->tx.total_packets += total_packets;
 
 #ifdef DEBUG
-	if (test_bit(IGB_RING_FLAG_TX_DETECT_HANG, &tx_ring->flags) &&
+	if (test_bit(IGB_RING_FLAG_TX_DETECT_HANG, tx_ring->flags) &&
 	    !(adapter->disable_hw_reset && adapter->tx_hang_detected)) {
 #else
-	if (test_bit(IGB_RING_FLAG_TX_DETECT_HANG, &tx_ring->flags)) {
+	if (test_bit(IGB_RING_FLAG_TX_DETECT_HANG, tx_ring->flags)) {
 #endif
 		struct e1000_hw *hw = &adapter->hw;
 
 		/* Detect a transmit hang in hardware, this serializes the
 		 * check with the clearing of time_stamp and movement of i
 		 */
-		clear_bit(IGB_RING_FLAG_TX_DETECT_HANG, &tx_ring->flags);
+		clear_bit(IGB_RING_FLAG_TX_DETECT_HANG, tx_ring->flags);
 		if (tx_buffer->next_to_watch &&
 		    time_after(jiffies, tx_buffer->time_stamp +
 			       (adapter->tx_timeout_factor * HZ))
@@ -7591,14 +7597,14 @@ static bool igb_clean_tx_irq(struct igb_q_vector *q_vector)
 		if (netif_is_multiqueue(netdev_ring(tx_ring))) {
 			if (__netif_subqueue_stopped(netdev_ring(tx_ring),
 						ring_queue_index(tx_ring)) &&
-			    !(test_bit(__IGB_DOWN, &adapter->state))) {
+			    !(test_bit(__IGB_DOWN, adapter->state))) {
 				netif_wake_subqueue(netdev_ring(tx_ring),
 						    ring_queue_index(tx_ring));
 				tx_ring->tx_stats.restart_queue++;
 			}
 		} else {
 			if (netif_queue_stopped(netdev_ring(tx_ring)) &&
-			    !(test_bit(__IGB_DOWN, &adapter->state))) {
+			    !(test_bit(__IGB_DOWN, adapter->state))) {
 				netif_wake_queue(netdev_ring(tx_ring));
 				tx_ring->tx_stats.restart_queue++;
 			}
@@ -7850,7 +7856,7 @@ static inline void igb_rx_checksum(struct igb_ring *ring,
 		 * packets, (aka let the stack check the crc32c)
 		 */
 		if (!((skb->len == 60) &&
-		      test_bit(IGB_RING_FLAG_RX_SCTP_CSUM, &ring->flags)))
+		      test_bit(IGB_RING_FLAG_RX_SCTP_CSUM, ring->flags)))
 			ring->rx_stats.csum_err++;
 
 		/* let the stack verify checksum errors */
@@ -8394,7 +8400,7 @@ static void igb_process_skb_fields(struct igb_ring *rx_ring,
 		u16 vid = 0;
 
 		if (igb_test_staterr(rx_desc, E1000_RXDEXT_STATERR_LB) &&
-		    test_bit(IGB_RING_FLAG_RX_LB_VLAN_BSWAP, &rx_ring->flags))
+		    test_bit(IGB_RING_FLAG_RX_LB_VLAN_BSWAP, rx_ring->flags))
 			vid = be16_to_cpu(rx_desc->wb.upper.vlan);
 		else
 			vid = le16_to_cpu(rx_desc->wb.upper.vlan);
@@ -8954,7 +8960,7 @@ void igb_vlan_mode(struct net_device *netdev, u32 features)
 
 	adapter->vlgrp = vlgrp;
 
-	if (!test_bit(__IGB_DOWN, &adapter->state))
+	if (!test_bit(__IGB_DOWN, adapter->state))
 		igb_irq_enable(adapter);
 #else
 #ifdef NETIF_F_HW_VLAN_CTAG_RX
@@ -9084,7 +9090,7 @@ static void igb_vlan_rx_kill_vid(struct net_device *netdev, u16 vid)
 
 	vlan_group_set_device(adapter->vlgrp, vid, NULL);
 
-	if (!test_bit(__IGB_DOWN, &adapter->state))
+	if (!test_bit(__IGB_DOWN, adapter->state))
 		igb_irq_enable(adapter);
 
 #endif /* HAVE_VLAN_RX_REGISTER */
@@ -10046,7 +10052,7 @@ static int igb_ndo_set_vf_mac(struct net_device *netdev, int vf, u8 *mac)
 	dev_info(&adapter->pdev->dev, "setting MAC %pM on VF %d\n", mac, vf);
 	dev_info(&adapter->pdev->dev,
 		 "Reload the VF driver to make this change effective.\n");
-	if (test_bit(__IGB_DOWN, &adapter->state)) {
+	if (test_bit(__IGB_DOWN, adapter->state)) {
 		dev_warn(&adapter->pdev->dev,
 			 "The VF MAC address has been set, but the PF device is not up.\n");
 		dev_warn(&adapter->pdev->dev,
@@ -10264,7 +10270,7 @@ static void igb_vmm_control(struct igb_adapter *adapter)
  */
 static u32 igb_get_os_driver_version(void)
 {
-	static const char driver_version[] = "5.13.20";
+	static const char driver_version[] = "5.14.16";
 	u8 driver_version_num[] = {0, 0, 0, 0};
 	char const *c = driver_version;
 	uint pos;

@@ -110,7 +110,7 @@ static int igb_porttype(char *page, char **start, off_t off, int count,
 		return snprintf(page, count, "error: no adapter\n");
 
 	return snprintf(page, count, "%d\n",
-			test_bit(__IGB_DOWN, &adapter->state));
+			test_bit(__IGB_DOWN, adapter->state));
 }
 
 static int igb_therm_location(char *page, char **start, off_t off,

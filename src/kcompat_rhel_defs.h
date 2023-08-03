@@ -28,9 +28,6 @@
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(7,3))
 #define NEED_NETDEV_TXQ_BQL_PREFETCH
 #else /* >= 7.3 */
-#undef NEED_DEV_PRINTK_ONCE
-#undef NEED_DEVM_KASPRINTF
-#define HAVE_DEVLINK_PORT_SPLIT
 #endif /* 7.3 */
 
 /*****************************************************************************/
@@ -69,17 +66,6 @@
 #endif /* 7.7 */
 
 /*****************************************************************************/
-#if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(7,9))
-#else /* >= 7.9 */
-/* mul_u64_u64_div_u64 was backported into RHEL 7.9 but not into the early
- * 8.x releases
- */
-#if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(8,0))
-#undef NEED_MUL_U64_U64_DIV_U64
-#endif /* < 8.0 */
-#endif /* 7.9 */
-
-/*****************************************************************************/
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(8,0))
 #else /* >= 8.0 */
 #undef HAVE_TCF_EXTS_TO_LIST
@@ -89,7 +75,6 @@
 #define HAVE_TCF_EXTS_FOR_EACH_ACTION
 /* 7.7 undefs it due to a backport in 7.7+, but 8.0 needs it still */
 #define NEED_NETDEV_TX_SENT_QUEUE
-#define HAVE_DEVLINK_PORT_SPLIT_EXTACK
 #endif /* 8.0 */
 
 /*****************************************************************************/
@@ -112,7 +97,6 @@
 /*****************************************************************************/
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(8,2))
 #else /* >= 8.2 */
-#undef NEED_BUS_FIND_DEVICE_CONST_DATA
 #undef NEED_DEVLINK_FLASH_UPDATE_STATUS_NOTIFY
 #undef NEED_SKB_FRAG_OFF
 #undef NEED_SKB_FRAG_OFF_ADD
@@ -127,7 +111,6 @@
 #else /* >= 8.3 */
 #undef NEED_CPU_LATENCY_QOS_RENAME
 #undef NEED_DEVLINK_REGION_CREATE_OPS
-#undef NEED_MUL_U64_U64_DIV_U64
 #endif /* 8.3 */
 
 /*****************************************************************************/
@@ -156,7 +139,6 @@
 #define HAVE_NETDEV_BPF_XSK_POOL
 #define HAVE_AF_XDP_NETDEV_UMEM
 #define HAVE_DEVLINK_OPS_CREATE_DEL
-#undef NEED_ETHTOOL_SPRINTF
 #endif /* 8.5 */
 
 /*****************************************************************************/
@@ -171,8 +153,6 @@
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(8,7))
 #else /* >= 8.7 */
 #undef NEED_DEVLINK_ALLOC_SETS_DEV
-#define HAVE_DEVLINK_NOTIFY_REGISTER
-#define HAVE_DEVLINK_PORT_SPLIT_PORT_STRUCT
 #define HAVE_DEVLINK_SET_STATE_3_PARAM
 #endif /* 8.7 */
 
@@ -181,7 +161,6 @@
 #else /* >= 9.0 */
 #define HAVE_XDP_BUFF_RXQ
 #define HAVE_NDO_ETH_IOCTL
-#undef HAVE_DEVLINK_PORT_SPLIT_PORT_STRUCT
 #endif /* 9.0 */
 
 /*****************************************************************************/

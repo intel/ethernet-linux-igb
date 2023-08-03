@@ -116,6 +116,18 @@ clean:
 	@-rm -rf *.${MANSECTION}.gz *.ko
 
 # Install the modules and manpage
+mandocs_install: manfile
+	@echo "Copying manpages..."
+	@install -D -m 644 ${DRIVER}.${MANSECTION}.gz ${INSTALL_MOD_PATH}${MANDIR}/man${MANSECTION}/${DRIVER}.${MANSECTION}.gz
+
+# Install kernel module files. This target is called by the RPM specfile
+# when generating binary RPMs, and is not expected to modify files outside
+# of the build root. Thus, it must not update initramfs, or run depmod.
+modules_install: default
+	@echo "Installing modules..."
+	@+$(call devkernelbuild,modules_install)
+
+# Install the modules and manpage
 install: default manfile
 	@echo "Copying manpages..."
 	@install -D -m 644 ${DRIVER}.${MANSECTION}.gz ${INSTALL_MOD_PATH}${MANDIR}/man${MANSECTION}/${DRIVER}.${MANSECTION}.gz

@@ -17,7 +17,7 @@ int igb_vmdq_open(struct net_device *dev)
 	int hw_queue = vadapter->rx_ring->queue_index +
 		       adapter->vfs_allocated_count;
 
-	if (test_bit(__IGB_DOWN, &adapter->state)) {
+	if (test_bit(__IGB_DOWN, adapter->state)) {
 		DPRINTK(DRV, WARNING,
 			"Open %s before opening this device.\n",
 			main_netdev->name);

@@ -40,9 +40,9 @@ struct igb_adapter;
 #include "e1000_manage.h"
 #include "e1000_mbx.h"
 
-#define IGB_ERR(args...) pr_err(KERN_ERR "igb: " args)
-
 #define PFX "igb: "
+#define IGB_ERR(args...) (void)(1 && pr_err(PFX args))
+#define IGB_INF(args...) (void)(1 && pr_info(PFX args))
 #define DPRINTK(nlevel, klevel, fmt, args...) \
 	(void)((NETIF_MSG_##nlevel & adapter->msg_enable) && \
 	printk(KERN_##klevel PFX "%s: %s: " fmt, adapter->netdev->name, \
@@ -88,7 +88,7 @@ struct igb_adapter;
 #define IGB_MAX_ITR_USECS               8191 /* 120  irq/sec */
 
 #define NON_Q_VECTORS                      1
-#define MAX_Q_VECTORS                     10
+#define MAX_Q_VECTORS                     10U
 
 /* Transmit and receive queues */
 #define IGB_MAX_RX_QUEUES                  8
@@ -347,6 +347,17 @@ struct igb_ring_container {
 	u8 itr;				/* current ITR setting for ring */
 };
 
+enum e1000_ring_flags_t {
+#if defined(HAVE_RHEL6_NET_DEVICE_OPS_EXT) || !defined(HAVE_NDO_SET_FEATURES)
+	IGB_RING_FLAG_RX_CSUM,
+#endif
+	IGB_RING_FLAG_RX_SCTP_CSUM,
+	IGB_RING_FLAG_RX_LB_VLAN_BSWAP,
+	IGB_RING_FLAG_TX_CTX_IDX,
+	IGB_RING_FLAG_TX_DETECT_HANG,
+	IGB_RING_FLAG_SIZE
+};
+
 struct igb_ring {
 	struct igb_q_vector *q_vector;  /* backlink to q_vector */
 	struct net_device *netdev;      /* back pointer to net_device */
@@ -356,7 +367,7 @@ struct igb_ring {
 		struct igb_rx_buffer *rx_buffer_info;
 	};
 	void *desc;                     /* descriptor ring memory */
-	unsigned long flags;            /* ring specific flags */
+	DECLARE_BITMAP(flags, IGB_RING_FLAG_SIZE);/* ring specific flags */
 	void __iomem *tail;             /* pointer to ring tail register */
 	dma_addr_t dma;			/* phys address of the ring */
 	unsigned int size;		/* length of desc. ring in bytes */
@@ -415,16 +426,6 @@ struct igb_q_vector {
 
 	/* for dynamic allocation of rings associated with this q_vector */
 	struct igb_ring ring[0] ____cacheline_internodealigned_in_smp;
-};
-
-enum e1000_ring_flags_t {
-#if defined(HAVE_RHEL6_NET_DEVICE_OPS_EXT) || !defined(HAVE_NDO_SET_FEATURES)
-	IGB_RING_FLAG_RX_CSUM,
-#endif
-	IGB_RING_FLAG_RX_SCTP_CSUM,
-	IGB_RING_FLAG_RX_LB_VLAN_BSWAP,
-	IGB_RING_FLAG_TX_CTX_IDX,
-	IGB_RING_FLAG_TX_DETECT_HANG,
 };
 
 struct igb_mac_addr {
@@ -536,6 +537,14 @@ struct igb_nfc_filter {
 	u16 action;
 };
 
+enum e1000_state_t {
+	__IGB_TESTING,
+	__IGB_RESETTING,
+	__IGB_DOWN,
+	__IGB_PTP_TX_IN_PROGRESS,
+	__IGB_STATE_SIZE
+};
+
 /* board specific private data structure */
 struct igb_adapter {
 #ifdef HAVE_VLAN_RX_REGISTER
@@ -546,7 +555,7 @@ struct igb_adapter {
 #endif
 	struct net_device *netdev;
 
-	unsigned long state;
+	DECLARE_BITMAP(state, __IGB_STATE_SIZE);
 	unsigned int flags;
 
 	unsigned int num_q_vectors;
@@ -810,13 +819,6 @@ enum host_cmd_id_status {
 	HCI_CHECKSUM_FAILED,
 	HCI_DATA_ERROR,
 	HCI_INVALID_PARAMETER
-};
-
-enum e1000_state_t {
-	__IGB_TESTING,
-	__IGB_RESETTING,
-	__IGB_DOWN,
-	__IGB_PTP_TX_IN_PROGRESS,
 };
 
 extern char igb_driver_name[];

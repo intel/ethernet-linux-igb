@@ -300,7 +300,7 @@ static int igb_set_link_ksettings(struct net_device *netdev,
 	}
 
 #endif /* ETH_TP_MDI_AUTO */
-	while (test_and_set_bit(__IGB_RESETTING, &adapter->state))
+	while (test_and_set_bit(__IGB_RESETTING, adapter->state))
 		usleep_range(1000, 2000);
 
 	ethtool_convert_link_mode_to_legacy_u32(&advertising,
@@ -339,7 +339,7 @@ static int igb_set_link_ksettings(struct net_device *netdev,
 	} else {
 		if (igb_set_spd_dplx(adapter,
 				     cmd->base.speed + cmd->base.duplex)) {
-			clear_bit(__IGB_RESETTING, &adapter->state);
+			clear_bit(__IGB_RESETTING, adapter->state);
 			return -EINVAL;
 		}
 	}
@@ -365,7 +365,7 @@ static int igb_set_link_ksettings(struct net_device *netdev,
 		igb_reset(adapter);
 	}
 
-	clear_bit(__IGB_RESETTING, &adapter->state);
+	clear_bit(__IGB_RESETTING, adapter->state);
 	return 0;
 }
 #else /* !HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE */
@@ -534,7 +534,7 @@ static int igb_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 	}
 
 #endif /* ETH_TP_MDI_AUTO */
-	while (test_and_set_bit(__IGB_RESETTING, &adapter->state))
+	while (test_and_set_bit(__IGB_RESETTING, adapter->state))
 		usleep_range(1000, 2000);
 
 	if (ecmd->autoneg == AUTONEG_ENABLE) {
@@ -569,7 +569,7 @@ static int igb_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 			hw->fc.requested_mode = e1000_fc_default;
 	} else {
 		if (igb_set_spd_dplx(adapter, ecmd->speed + ecmd->duplex)) {
-			clear_bit(__IGB_RESETTING, &adapter->state);
+			clear_bit(__IGB_RESETTING, adapter->state);
 			return -EINVAL;
 		}
 	}
@@ -594,7 +594,7 @@ static int igb_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 	} else
 		igb_reset(adapter);
 
-	clear_bit(__IGB_RESETTING, &adapter->state);
+	clear_bit(__IGB_RESETTING, adapter->state);
 	return 0;
 }
 
@@ -645,7 +645,7 @@ static int igb_set_pauseparam(struct net_device *netdev,
 
 	adapter->fc_autoneg = pause->autoneg;
 
-	while (test_and_set_bit(__IGB_RESETTING, &adapter->state))
+	while (test_and_set_bit(__IGB_RESETTING, adapter->state))
 		usleep_range(1000, 2000);
 
 	if (adapter->fc_autoneg == AUTONEG_ENABLE) {
@@ -680,7 +680,7 @@ static int igb_set_pauseparam(struct net_device *netdev,
 	}
 
 out:
-	clear_bit(__IGB_RESETTING, &adapter->state);
+	clear_bit(__IGB_RESETTING, adapter->state);
 	return retval;
 }
 
@@ -1177,6 +1177,8 @@ static int igb_set_eeprom(struct net_device *netdev,
 		/* only the first byte of the word is being modified */
 		ret_val = e1000_read_nvm(hw, last_word, 1,
 			  &eeprom_buff[last_word - first_word]);
+		if (ret_val)
+			goto out;
 	}
 
 	/* Device's eeprom is always little-endian, word addressable */
@@ -1195,7 +1197,7 @@ static int igb_set_eeprom(struct net_device *netdev,
 	 * and flush shadow RAM for 82573 controllers */
 	if (ret_val == 0)
 		e1000_update_nvm_checksum(hw);
-
+out:
 	kfree(eeprom_buff);
 	return ret_val;
 }
@@ -1275,7 +1277,7 @@ static int igb_set_ringparam(struct net_device *netdev,
 		return 0;
 	}
 
-	while (test_and_set_bit(__IGB_RESETTING, &adapter->state))
+	while (test_and_set_bit(__IGB_RESETTING, adapter->state))
 		usleep_range(1000, 2000);
 
 	if (!netif_running(adapter->netdev)) {
@@ -1363,7 +1365,7 @@ err_setup:
 	igb_up(adapter);
 	vfree(temp_ring);
 clear_reset:
-	clear_bit(__IGB_RESETTING, &adapter->state);
+	clear_bit(__IGB_RESETTING, adapter->state);
 	return err;
 }
 
@@ -2159,7 +2161,7 @@ static void igb_diag_test(struct net_device *netdev,
 	u8 forced_speed_duplex, autoneg;
 	bool if_running = netif_running(netdev);
 
-	set_bit(__IGB_TESTING, &adapter->state);
+	set_bit(__IGB_TESTING, adapter->state);
 	if (eth_test->flags == ETH_TEST_FL_OFFLINE) {
 		/* Offline tests */
 
@@ -2213,7 +2215,7 @@ static void igb_diag_test(struct net_device *netdev,
 		igb_reset(adapter);
 		adapter->hw.phy.autoneg_wait_to_complete = FALSE;
 
-		clear_bit(__IGB_TESTING, &adapter->state);
+		clear_bit(__IGB_TESTING, adapter->state);
 		if (if_running)
 			igb_open(netdev);
 	} else {
@@ -2231,7 +2233,7 @@ static void igb_diag_test(struct net_device *netdev,
 		data[2] = 0;
 		data[3] = 0;
 
-		clear_bit(__IGB_TESTING, &adapter->state);
+		clear_bit(__IGB_TESTING, adapter->state);
 	}
 	msleep_interruptible(4 * 1000);
 }
