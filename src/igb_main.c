@@ -39,7 +39,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.14.16" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.15.6" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
@@ -9611,14 +9611,26 @@ static pci_ers_result_t igb_io_error_detected(struct pci_dev *pdev,
 skip_bad_vf_detection:
 #endif /* CONFIG_PCI_IOV */
 
-	netif_device_detach(netdev);
+	if (state == pci_channel_io_normal) {
+		dev_warn(&pdev->dev, "Non-correctable non-fatal error reported.\n");
+		return PCI_ERS_RESULT_CAN_RECOVER;
+	}
 
-	if (state == pci_channel_io_perm_failure)
+	if (test_bit(__IGB_DOWN, adapter->state))
 		return PCI_ERS_RESULT_DISCONNECT;
 
+	rtnl_lock();
+
+	netif_device_detach(netdev);
+
+	if (state == pci_channel_io_perm_failure) {
+		rtnl_unlock();
+		return PCI_ERS_RESULT_DISCONNECT;
+	}
 	if (netif_running(netdev))
 		igb_down(adapter);
 	pci_disable_device(pdev);
+	rtnl_unlock();
 
 	/* Request a slot slot reset. */
 	return PCI_ERS_RESULT_NEED_RESET;
@@ -10270,7 +10282,7 @@ static void igb_vmm_control(struct igb_adapter *adapter)
  */
 static u32 igb_get_os_driver_version(void)
 {
-	static const char driver_version[] = "5.14.16";
+	static const char driver_version[] = "5.15.6";
 	u8 driver_version_num[] = {0, 0, 0, 0};
 	char const *c = driver_version;
 	uint pos;

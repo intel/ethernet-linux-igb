@@ -111,6 +111,7 @@
 #else /* >= 8.3 */
 #undef NEED_CPU_LATENCY_QOS_RENAME
 #undef NEED_DEVLINK_REGION_CREATE_OPS
+#define HAVE_RT_IRQ_SCHED_FIX
 #endif /* 8.3 */
 
 /*****************************************************************************/
@@ -142,14 +143,6 @@
 #endif /* 8.5 */
 
 /*****************************************************************************/
-#if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(8,6))
-#else /* >= 8.6 */
-#if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(9,0))
-#define HAVE_ETHTOOL_COALESCE_EXTACK
-#endif /* < 9.0 */
-#endif /* 8.6 */
-
-/*****************************************************************************/
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(8,7))
 #else /* >= 8.7 */
 #undef NEED_DEVLINK_ALLOC_SETS_DEV
@@ -160,14 +153,12 @@
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(9,0))
 #else /* >= 9.0 */
 #define HAVE_XDP_BUFF_RXQ
-#define HAVE_NDO_ETH_IOCTL
 #endif /* 9.0 */
 
 /*****************************************************************************/
 #if (RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(9,1))
 #else /* >= 9.1 */
 #undef HAVE_PASID_SUPPORT
-#define HAVE_ETHTOOL_COALESCE_EXTACK
 #endif /* 9.1 */
 
 /*****************************************************************************/

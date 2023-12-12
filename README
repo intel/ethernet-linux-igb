@@ -3,7 +3,7 @@ igb Linux* Base Driver for Intel(R) Ethernet Network Connection
 
 ================================================================================
 
-July 29, 2021
+September 11, 2023
 
 ================================================================================
 
@@ -57,8 +57,18 @@ with Linux.
 
 The igb driver supports IEEE 1588 time stamping for kernels 2.6.30 and newer.
 
-The igb driver supports 2.5 Gbps operating speed on 2500BASE-KX only for
-I354-based network connections.
+
+Related Documentation
+=====================
+
+See the "Intel(R) Ethernet Adapters and Devices User Guide" for additional
+information on features. It is available on the Intel website at either of the
+following:
+
+- https://cdrdv2.intel.com/v1/dl/getContent/705831
+-
+https://www.intel.com/content/www/us/en/download/19373/adapter-user-guide-for-in
+tel-ethernet-adapters.html
 
 
 Identifying Your Adapter
@@ -836,7 +846,7 @@ St - Fifth Floor, Boston, MA 02110-1301 USA.
 The full GNU General Public License is included in this distribution in the
 file called "COPYING".
 
-Copyright(c) 1999 - 2021 Intel Corporation.
+Copyright(c) 1999 - 2023 Intel Corporation.
 
 
 Trademarks
