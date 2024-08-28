@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: @SPDX@ */
-/* Copyright(c) 2007 - 2023 Intel Corporation. */
+/* Copyright(c) 2007 - 2024 Intel Corporation. */
 
 #ifndef _KCOMPAT_SLES_DEFS_H_
 #define _KCOMPAT_SLES_DEFS_H_
@@ -174,7 +174,6 @@
 #define HAVE_NETDEV_BPF_XSK_POOL
 #undef NEED_XSK_UMEM_GET_RX_FRAME_SIZE
 #undef NEED_XSK_BUFF_POOL_RENAME
-#undef NEED_XSK_BUFF_DMA_SYNC_FOR_CPU
 #define HAVE_MEM_TYPE_XSK_BUFF_POOL
 #endif /* 5.3.18-41 */
 

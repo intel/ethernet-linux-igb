@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: @SPDX@ */
-/* Copyright(c) 2007 - 2023 Intel Corporation. */
+/* Copyright(c) 2007 - 2024 Intel Corporation. */
 
 #ifndef _E1000_DEFINES_H_
 #define _E1000_DEFINES_H_
@@ -1158,7 +1158,7 @@
 
 #ifndef ETH_ADDR_LEN
 #define ETH_ADDR_LEN			6
-#endif
+#endif /* !ETH_ADDR_LEN */
 
 #define PHY_REVISION_MASK		0xFFFFFFF0
 #define MAX_PHY_REG_ADDRESS		0x1F  /* 5 bit address bus (0-0x1F) */
@@ -1409,8 +1409,8 @@
 
 #ifndef E1000_UNUSEDARG
 #define E1000_UNUSEDARG
-#endif /* E1000_UNUSEDARG */
+#endif /* !E1000_UNUSEDARG */
 #ifndef ERROR_REPORT
 #define ERROR_REPORT(fmt)	do { } while (0)
-#endif /* ERROR_REPORT */
+#endif /* !ERROR_REPORT */
 #endif /* _E1000_DEFINES_H_ */

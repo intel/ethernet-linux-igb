@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: @SPDX@ */
-/* Copyright(c) 2007 - 2023 Intel Corporation. */
+/* Copyright(c) 2007 - 2024 Intel Corporation. */
 
 /* Linux PRO/1000 Ethernet Driver main header file */
 

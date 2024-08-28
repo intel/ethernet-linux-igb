@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: @SPDX@ */
-/* Copyright(c) 2007 - 2023 Intel Corporation. */
+/* Copyright(c) 2007 - 2024 Intel Corporation. */
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -39,13 +39,13 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.15.6" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.17.4" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
 char igb_driver_version[] = DRV_VERSION;
 static const char igb_driver_string[] = DRV_SUMMARY;
-static const char igb_copyright[] = "Copyright(c) 2007 - 2023 Intel Corporation.";
+static const char igb_copyright[] = "Copyright(c) 2007 - 2024 Intel Corporation.";
 
 static const struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_I354_BACKPLANE_1GBPS) },
@@ -1769,7 +1769,7 @@ static s32 igb_init_i2c(struct igb_adapter *adapter)
 	adapter->i2c_algo.data = adapter;
 	adapter->i2c_adap.algo_data = &adapter->i2c_algo;
 	adapter->i2c_adap.dev.parent = &adapter->pdev->dev;
-	strlcpy(adapter->i2c_adap.name, "igb BB",
+	strscpy(adapter->i2c_adap.name, "igb BB",
 		sizeof(adapter->i2c_adap.name));
 	status = i2c_bit_add_bus(&adapter->i2c_adap);
 	return status;
@@ -2805,7 +2805,9 @@ static int igb_probe(struct pci_dev *pdev,
 	if (err)
 		goto err_pci_reg;
 
+#ifdef HAVE_PCI_ENABLE_PCIE_ERROR_REPORTING
 	pci_enable_pcie_error_reporting(pdev);
+#endif /* HAVE_PCI_ENABLE_PCIE_ERROR_REPORTING */
 
 	pci_set_master(pdev);
 
@@ -2876,7 +2878,7 @@ static int igb_probe(struct pci_dev *pdev,
 	netdev->watchdog_timeo = 5 * HZ;
 #endif
 
-	strlcpy(netdev->name, pci_name(pdev), sizeof(netdev->name));
+	strscpy(netdev->name, pci_name(pdev), sizeof(netdev->name));
 
 	adapter->bd_number = cards_found;
 
@@ -3230,7 +3232,7 @@ static int igb_probe(struct pci_dev *pdev,
 	 */
 	igb_get_hw_control(adapter);
 
-	strlcpy(netdev->name, "eth%d", IFNAMSIZ);
+	strscpy(netdev->name, "eth%d", IFNAMSIZ);
 	err = register_netdev(netdev);
 	if (err)
 		goto err_register;
@@ -3426,7 +3428,8 @@ static void igb_remove(struct pci_dev *pdev)
 		del_timer_sync(&adapter->dma_err_timer);
 	del_timer_sync(&adapter->phy_info_timer);
 
-	flush_scheduled_work();
+	cancel_work_sync(&adapter->reset_task);
+	cancel_work_sync(&adapter->watchdog_task);
 
 #ifdef IGB_DCA
 	if (adapter->flags & IGB_FLAG_DCA_ENABLED) {
@@ -3472,7 +3475,9 @@ static void igb_remove(struct pci_dev *pdev)
 	kfree(adapter->shadow_vfta);
 	free_netdev(netdev);
 
+#ifdef HAVE_PCI_DISABLE_PCIE_ERROR_REPORTING
 	pci_disable_pcie_error_reporting(pdev);
+#endif /* HAVE_PCI_DISABLE_PCIE_ERROR_REPORTING */
 
 	pci_disable_device(pdev);
 }
@@ -10282,7 +10287,7 @@ static void igb_vmm_control(struct igb_adapter *adapter)
  */
 static u32 igb_get_os_driver_version(void)
 {
-	static const char driver_version[] = "5.15.6";
+	static const char driver_version[] = "5.17.4";
 	u8 driver_version_num[] = {0, 0, 0, 0};
 	char const *c = driver_version;
 	uint pos;

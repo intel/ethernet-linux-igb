@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: @SPDX@ */
-/* Copyright(c) 2007 - 2023 Intel Corporation. */
+/* Copyright(c) 2007 - 2024 Intel Corporation. */
 
 /* ethtool support for igb */
 
@@ -1207,13 +1207,13 @@ static void igb_get_drvinfo(struct net_device *netdev,
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 
-	strlcpy(drvinfo->driver,  igb_driver_name, sizeof(drvinfo->driver));
-	strlcpy(drvinfo->version, igb_driver_version,
+	strscpy(drvinfo->driver,  igb_driver_name, sizeof(drvinfo->driver));
+	strscpy(drvinfo->version, igb_driver_version,
 		sizeof(drvinfo->version));
 
-	strlcpy(drvinfo->fw_version, adapter->fw_version,
+	strscpy(drvinfo->fw_version, adapter->fw_version,
 		sizeof(drvinfo->fw_version));
-	strlcpy(drvinfo->bus_info, pci_name(adapter->pdev),
+	strscpy(drvinfo->bus_info, pci_name(adapter->pdev),
 		sizeof(drvinfo->bus_info));
 	drvinfo->n_stats = IGB_STATS_LEN;
 	drvinfo->testinfo_len = IGB_TEST_LEN;
@@ -2866,7 +2866,7 @@ static void igb_get_dmac(struct net_device *netdev,
 #endif
 
 #ifdef ETHTOOL_GEEE
-static int igb_get_eee(struct net_device *netdev, struct ethtool_eee *edata)
+static int igb_get_keee(struct net_device *netdev, struct ethtool_keee *kedata)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
@@ -2877,16 +2877,18 @@ static int igb_get_eee(struct net_device *netdev, struct ethtool_eee *edata)
 	    (hw->phy.media_type != e1000_media_type_copper))
 		return -EOPNOTSUPP;
 
-	edata->supported = (SUPPORTED_1000baseT_Full |
-			    SUPPORTED_100baseT_Full);
+	linkmode_set_bit(ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
+			 kedata->supported);
+	linkmode_set_bit(ETHTOOL_LINK_MODE_100baseT_Full_BIT,
+			 kedata->supported);
 
 	if (!hw->dev_spec._82575.eee_disable)
-		edata->advertised =
-			mmd_eee_adv_to_ethtool_adv_t(adapter->eee_advert);
+		mii_eee_cap1_mod_linkmode_t(kedata->advertised,
+					    adapter->eee_advert);
 
 	/* The IPCNFG and EEER registers are not supported on I354. */
 	if (hw->mac.type == e1000_i354) {
-		e1000_get_eee_status_i354(hw, (bool *)&edata->eee_active);
+		e1000_get_eee_status_i354(hw, (bool *)&kedata->eee_active);
 	} else {
 		u32 eeer;
 
@@ -2894,10 +2896,10 @@ static int igb_get_eee(struct net_device *netdev, struct ethtool_eee *edata)
 
 		/* EEE status on negotiated link */
 		if (eeer & E1000_EEER_EEE_NEG)
-			edata->eee_active = true;
+			kedata->eee_active = true;
 
 		if (eeer & E1000_EEER_TX_LPI_EN)
-			edata->tx_lpi_enabled = true;
+			kedata->tx_lpi_enabled = true;
 	}
 
 	/* EEE Link Partner Advertised */
@@ -2908,7 +2910,7 @@ static int igb_get_eee(struct net_device *netdev, struct ethtool_eee *edata)
 		if (ret_val)
 			return -ENODATA;
 
-		edata->lp_advertised = mmd_eee_adv_to_ethtool_adv_t(phy_data);
+		mii_eee_cap1_mod_linkmode_t(kedata->lp_advertised, phy_data);
 
 		break;
 	case e1000_i354:
@@ -2920,41 +2922,57 @@ static int igb_get_eee(struct net_device *netdev, struct ethtool_eee *edata)
 		if (ret_val)
 			return -ENODATA;
 
-		edata->lp_advertised = mmd_eee_adv_to_ethtool_adv_t(phy_data);
+		mii_eee_cap1_mod_linkmode_t(kedata->lp_advertised, phy_data);
 
 		break;
 	default:
 		break;
 	}
 
-	edata->eee_enabled = !hw->dev_spec._82575.eee_disable;
+	kedata->eee_enabled = !hw->dev_spec._82575.eee_disable;
 
 	if ((hw->mac.type == e1000_i354) &&
-	    (edata->eee_enabled))
-		edata->tx_lpi_enabled = true;
+	    (kedata->eee_enabled))
+		kedata->tx_lpi_enabled = true;
 
 	/*
 	 * report correct negotiated EEE status for devices that
 	 * wrongly report EEE at half-duplex
 	 */
 	if (adapter->link_duplex == HALF_DUPLEX) {
-		edata->eee_enabled = false;
-		edata->eee_active = false;
-		edata->tx_lpi_enabled = false;
-		edata->advertised &= ~edata->advertised;
+		kedata->eee_enabled = false;
+		kedata->eee_active = false;
+		kedata->tx_lpi_enabled = false;
+		linkmode_zero(kedata->advertised);
 	}
 
 	return 0;
 }
+
+#ifndef HAVE_ETHTOOL_KEEE
+static int igb_get_eee(struct net_device *netdev, struct ethtool_eee *edata)
+{
+	struct ethtool_keee kedata;
+	int ret;
+
+	eee_to_keee(&kedata, edata);
+	ret = igb_get_keee(netdev, &kedata);
+	keee_to_eee(edata, &kedata);
+
+	return ret;
+}
+#endif /* !HAVE_ETHTOOL_KEEE */
 #endif
 
 #ifdef ETHTOOL_SEEE
-static int igb_set_eee(struct net_device *netdev,
-		       struct ethtool_eee *edata)
+static int igb_set_keee(struct net_device *netdev,
+			struct ethtool_keee *kedata)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(supported) = {};
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(tmp) = {};
 	struct e1000_hw *hw = &adapter->hw;
-	struct ethtool_eee eee_curr;
+	struct ethtool_keee keee_curr;
 	bool adv1g_eee = true, adv100m_eee = true;
 	s32 ret_val;
 
@@ -2962,43 +2980,51 @@ static int igb_set_eee(struct net_device *netdev,
 	    (hw->phy.media_type != e1000_media_type_copper))
 		return -EOPNOTSUPP;
 
-	ret_val = igb_get_eee(netdev, &eee_curr);
+	memset(&keee_curr, 0, sizeof(struct ethtool_keee));
+
+	ret_val = igb_get_keee(netdev, &keee_curr);
 	if (ret_val)
 		return ret_val;
 
-	if (eee_curr.eee_enabled) {
-		if (eee_curr.tx_lpi_enabled != edata->tx_lpi_enabled) {
+	if (keee_curr.eee_enabled) {
+		if (keee_curr.tx_lpi_enabled != kedata->tx_lpi_enabled) {
 			dev_err(pci_dev_to_dev(adapter->pdev),
 				"Setting EEE tx-lpi is not supported\n");
 			return -EINVAL;
 		}
 
 		/* Tx LPI time is not implemented currently */
-		if (edata->tx_lpi_timer) {
+		if (kedata->tx_lpi_timer) {
 			dev_err(pci_dev_to_dev(adapter->pdev),
 				"Setting EEE Tx LPI timer is not supported\n");
 			return -EINVAL;
 		}
 
-		if (!edata->advertised || (edata->advertised &
-				 ~(ADVERTISE_100_FULL | ADVERTISE_1000_FULL))) {
+		linkmode_set_bit(ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
+				 supported);
+		linkmode_set_bit(ETHTOOL_LINK_MODE_100baseT_Full_BIT,
+				 supported);
+		if (linkmode_andnot(tmp, kedata->advertised, supported)) {
 			dev_err(pci_dev_to_dev(adapter->pdev),
 				"EEE Advertisement supports 100Base-Tx Full Duplex(0x08) 1000Base-T Full Duplex(0x20) or both(0x28)\n");
 			return -EINVAL;
 		}
-		adv100m_eee = !!(edata->advertised & ADVERTISE_100_FULL);
-		adv1g_eee = !!(edata->advertised & ADVERTISE_1000_FULL);
+		adv100m_eee = linkmode_test_bit(
+			ETHTOOL_LINK_MODE_100baseT_Full_BIT,
+			kedata->advertised);
+		adv1g_eee = linkmode_test_bit(
+			ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
+			kedata->advertised);
 
-	} else if (!edata->eee_enabled) {
+	} else if (!kedata->eee_enabled) {
 		dev_err(pci_dev_to_dev(adapter->pdev),
 			"Setting EEE options is not supported with EEE disabled\n");
 			return -EINVAL;
-		}
+	}
 
-	adapter->eee_advert = ethtool_adv_to_mmd_eee_adv_t(edata->advertised);
-
-	if (hw->dev_spec._82575.eee_disable != !edata->eee_enabled) {
-		hw->dev_spec._82575.eee_disable = !edata->eee_enabled;
+	adapter->eee_advert = linkmode_to_mii_eee_cap1_t(kedata->advertised);
+	if (hw->dev_spec._82575.eee_disable != !kedata->eee_enabled) {
+		hw->dev_spec._82575.eee_disable = !kedata->eee_enabled;
 
 		/* reset link */
 		if (netif_running(netdev))
@@ -3020,6 +3046,20 @@ static int igb_set_eee(struct net_device *netdev,
 
 	return 0;
 }
+
+#ifndef HAVE_ETHTOOL_KEEE
+static int igb_set_eee(struct net_device *netdev, struct ethtool_eee *edata)
+{
+	struct ethtool_keee kedata;
+	int ret;
+
+	eee_to_keee(&kedata, edata);
+	ret = igb_set_keee(netdev, &kedata);
+	keee_to_eee(edata, &kedata);
+
+	return ret;
+}
+#endif /* !HAVE_ETHTOOL_KEEE */
 #endif /* ETHTOOL_SEEE */
 #ifdef ETHTOOL_GRXFH
 #ifdef ETHTOOL_GRXFHINDIR
@@ -3487,8 +3527,13 @@ static u32 igb_get_rxfh_indir_size(struct net_device *netdev)
 
 #if (defined(ETHTOOL_GRSSH) && !defined(HAVE_ETHTOOL_GSRSSH))
 #ifdef HAVE_RXFH_HASHFUNC
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+static int
+igb_get_rxfh(struct net_device *netdev, struct ethtool_rxfh_param *rxfh)
+#else
 static int igb_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key,
 			u8 *hfunc)
+#endif /* HAVE_ETHTOOL_RXFH_PARAM */
 #else
 static int igb_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key)
 #endif /* HAVE_RXFH_HASHFUNC */
@@ -3497,14 +3542,21 @@ static int igb_get_rxfh_indir(struct net_device *netdev, u32 *indir)
 #endif /* HAVE_ETHTOOL_GSRSSH */
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	u32 *indir = rxfh->indir;
+#endif /* HAVE_ETHTOOL_RXFH_PARAM */
 	int i;
 
 #if (defined(ETHTOOL_GRSSH) && !defined(HAVE_ETHTOOL_GSRSSH) \
      && defined(HAVE_RXFH_HASHFUNC))
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	rxfh->hfunc = ETH_RSS_HASH_TOP;
+#else
 	if (hfunc)
 		*hfunc = ETH_RSS_HASH_TOP;
-
+#endif /* HAVE_ETHTOOL_RXFH_PARAM */
 #endif
+
 	if (!indir)
 		return 0;
 
@@ -3568,8 +3620,14 @@ void igb_write_rss_indir_tbl(struct igb_adapter *adapter)
 #ifdef HAVE_ETHTOOL_GRXFHINDIR_SIZE
 #if (defined(ETHTOOL_GRSSH) && !defined(HAVE_ETHTOOL_GSRSSH))
 #ifdef HAVE_RXFH_HASHFUNC
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+static int
+igb_set_rxfh(struct net_device *netdev, struct ethtool_rxfh_param *rxfh,
+	     struct netlink_ext_ack *extack)
+#else
 static int igb_set_rxfh(struct net_device *netdev, const u32 *indir,
 			      const u8 *key, const u8 hfunc)
+#endif /* HAVE_ETHTOOL_RXFH_PARAM */
 #else
 static int igb_set_rxfh(struct net_device *netdev, const u32 *indir,
 			      const u8 *key)
@@ -3580,10 +3638,11 @@ static int igb_set_rxfh_indir(struct net_device *netdev, const u32 *indir)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
+	u32 num_queues = adapter->rss_queues;
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	u32 *indir = rxfh->indir;
+#endif /* HAVE_ETHTOOL_RXFH_PARAM */
 	int i;
-	u32 num_queues;
-
-	num_queues = adapter->rss_queues;
 
 	switch (hw->mac.type) {
 	case e1000_82576:
@@ -3856,10 +3915,18 @@ static const struct ethtool_ops igb_ethtool_ops = {
 #endif /* ETHTOOL_GADV_COAL */
 #ifndef HAVE_RHEL6_ETHTOOL_OPS_EXT_STRUCT
 #ifdef ETHTOOL_GEEE
+#ifdef HAVE_ETHTOOL_KEEE
+	.get_eee		= igb_get_keee,
+#else
 	.get_eee		= igb_get_eee,
+#endif /* HAVE_ETHTOOL_KEEE */
 #endif
 #ifdef ETHTOOL_SEEE
+#ifdef HAVE_ETHTOOL_KEEE
+	.set_eee		= igb_set_keee,
+#else
 	.set_eee		= igb_set_eee,
+#endif /* HAVE_ETHTOOL_KEEE */
 #endif
 #ifdef ETHTOOL_GRXFHINDIR
 #ifdef HAVE_ETHTOOL_GRXFHINDIR_SIZE

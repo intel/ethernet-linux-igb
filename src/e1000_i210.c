@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: @SPDX@ */
-/* Copyright(c) 2007 - 2023 Intel Corporation. */
+/* Copyright(c) 2007 - 2024 Intel Corporation. */
 
 #include "e1000_api.h"
 
@@ -216,7 +216,7 @@ s32 e1000_read_nvm_srrd_i210(struct e1000_hw *hw, u16 offset, u16 words,
 		count = (words - i) / E1000_EERD_EEWR_MAX_COUNT > 0 ?
 			E1000_EERD_EEWR_MAX_COUNT : (words - i);
 		if (hw->nvm.ops.acquire(hw) == E1000_SUCCESS) {
-			status = e1000_read_nvm_eerd(hw, offset, count,
+			status = e1000_read_nvm_eerd(hw, offset + i, count,
 						     data + i);
 			hw->nvm.ops.release(hw);
 		} else {
@@ -261,7 +261,7 @@ s32 e1000_write_nvm_srwr_i210(struct e1000_hw *hw, u16 offset, u16 words,
 		count = (words - i) / E1000_EERD_EEWR_MAX_COUNT > 0 ?
 			E1000_EERD_EEWR_MAX_COUNT : (words - i);
 		if (hw->nvm.ops.acquire(hw) == E1000_SUCCESS) {
-			status = e1000_write_nvm_srwr(hw, offset, count,
+			status = e1000_write_nvm_srwr(hw, offset + i, count,
 						      data + i);
 			hw->nvm.ops.release(hw);
 		} else {
@@ -379,80 +379,87 @@ static s32 e1000_read_invm_word_i210(struct e1000_hw *hw, u8 address, u16 *data)
 
 /** e1000_read_invm_i210 - Read invm wrapper function for I210/I211
  *  @hw: pointer to the HW structure
- *  @address: the word address (aka eeprom offset) to read
+ *  @offset: offset of word to read
+ *  @words: number of words to read
  *  @data: pointer to the data read
  *
  *  Wrapper function to return data formerly found in the NVM.
  **/
 static s32 e1000_read_invm_i210(struct e1000_hw *hw, u16 offset,
-				u16 E1000_UNUSEDARG words, u16 *data)
+				u16 words, u16 *data)
 {
 	s32 ret_val = E1000_SUCCESS;
+	u32 i, word_offset;
 
 	DEBUGFUNC("e1000_read_invm_i210");
 
-	/* Only the MAC addr is required to be present in the iNVM */
-	switch (offset) {
-	case NVM_MAC_ADDR:
-		ret_val = e1000_read_invm_word_i210(hw, (u8)offset, &data[0]);
-		ret_val |= e1000_read_invm_word_i210(hw, (u8)offset + 1,
-						     &data[1]);
-		ret_val |= e1000_read_invm_word_i210(hw, (u8)offset + 2,
-						     &data[2]);
+	for (i = 0; i < words; i++)
+	{
+		word_offset = offset + i;
+
+		/* Only the MAC addr is required to be present in the iNVM */
+		switch (word_offset) {
+		case NVM_MAC_ADDR:
+		case NVM_MAC_ADDR + 1:
+		case NVM_MAC_ADDR + 2:
+			ret_val = e1000_read_invm_word_i210(hw, (u8)word_offset, &data[i]);
+			if (ret_val != E1000_SUCCESS)
+				DEBUGOUT("MAC Addr not found in iNVM\n");
+			break;
+		case NVM_INIT_CTRL_2:
+			ret_val = e1000_read_invm_word_i210(hw, (u8)word_offset, &data[i]);
+			if (ret_val != E1000_SUCCESS) {
+				data[i] = NVM_INIT_CTRL_2_DEFAULT_I211;
+				ret_val = E1000_SUCCESS;
+			}
+			break;
+		case NVM_INIT_CTRL_4:
+			ret_val = e1000_read_invm_word_i210(hw, (u8)word_offset, &data[i]);
+			if (ret_val != E1000_SUCCESS) {
+				data[i] = NVM_INIT_CTRL_4_DEFAULT_I211;
+				ret_val = E1000_SUCCESS;
+			}
+			break;
+		case NVM_LED_1_CFG:
+			ret_val = e1000_read_invm_word_i210(hw, (u8)word_offset, &data[i]);
+			if (ret_val != E1000_SUCCESS) {
+				data[i] = NVM_LED_1_CFG_DEFAULT_I211;
+				ret_val = E1000_SUCCESS;
+			}
+			break;
+		case NVM_LED_0_2_CFG:
+			ret_val = e1000_read_invm_word_i210(hw, (u8)word_offset, &data[i]);
+			if (ret_val != E1000_SUCCESS) {
+				data[i] = NVM_LED_0_2_CFG_DEFAULT_I211;
+				ret_val = E1000_SUCCESS;
+			}
+			break;
+		case NVM_ID_LED_SETTINGS:
+			ret_val = e1000_read_invm_word_i210(hw, (u8)word_offset, &data[i]);
+			if (ret_val != E1000_SUCCESS) {
+				data[i] = ID_LED_RESERVED_FFFF;
+				ret_val = E1000_SUCCESS;
+			}
+			break;
+		case NVM_SUB_DEV_ID:
+			data[i] = hw->subsystem_device_id;
+			break;
+		case NVM_SUB_VEN_ID:
+			data[i] = hw->subsystem_vendor_id;
+			break;
+		case NVM_DEV_ID:
+			data[i] = hw->device_id;
+			break;
+		case NVM_VEN_ID:
+			data[i] = hw->vendor_id;
+			break;
+		default:
+			DEBUGOUT1("NVM word 0x%02x is not mapped.\n", word_offset);
+			data[i] = NVM_RESERVED_WORD;
+			break;
+		}
 		if (ret_val != E1000_SUCCESS)
-			DEBUGOUT("MAC Addr not found in iNVM\n");
-		break;
-	case NVM_INIT_CTRL_2:
-		ret_val = e1000_read_invm_word_i210(hw, (u8)offset, data);
-		if (ret_val != E1000_SUCCESS) {
-			*data = NVM_INIT_CTRL_2_DEFAULT_I211;
-			ret_val = E1000_SUCCESS;
-		}
-		break;
-	case NVM_INIT_CTRL_4:
-		ret_val = e1000_read_invm_word_i210(hw, (u8)offset, data);
-		if (ret_val != E1000_SUCCESS) {
-			*data = NVM_INIT_CTRL_4_DEFAULT_I211;
-			ret_val = E1000_SUCCESS;
-		}
-		break;
-	case NVM_LED_1_CFG:
-		ret_val = e1000_read_invm_word_i210(hw, (u8)offset, data);
-		if (ret_val != E1000_SUCCESS) {
-			*data = NVM_LED_1_CFG_DEFAULT_I211;
-			ret_val = E1000_SUCCESS;
-		}
-		break;
-	case NVM_LED_0_2_CFG:
-		ret_val = e1000_read_invm_word_i210(hw, (u8)offset, data);
-		if (ret_val != E1000_SUCCESS) {
-			*data = NVM_LED_0_2_CFG_DEFAULT_I211;
-			ret_val = E1000_SUCCESS;
-		}
-		break;
-	case NVM_ID_LED_SETTINGS:
-		ret_val = e1000_read_invm_word_i210(hw, (u8)offset, data);
-		if (ret_val != E1000_SUCCESS) {
-			*data = ID_LED_RESERVED_FFFF;
-			ret_val = E1000_SUCCESS;
-		}
-		break;
-	case NVM_SUB_DEV_ID:
-		*data = hw->subsystem_device_id;
-		break;
-	case NVM_SUB_VEN_ID:
-		*data = hw->subsystem_vendor_id;
-		break;
-	case NVM_DEV_ID:
-		*data = hw->device_id;
-		break;
-	case NVM_VEN_ID:
-		*data = hw->vendor_id;
-		break;
-	default:
-		DEBUGOUT1("NVM word 0x%02x is not mapped.\n", offset);
-		*data = NVM_RESERVED_WORD;
-		break;
+			break;
 	}
 	return ret_val;
 }

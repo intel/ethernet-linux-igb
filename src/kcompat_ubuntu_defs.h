@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: @SPDX@ */
-/* Copyright(c) 2007 - 2023 Intel Corporation. */
+/* Copyright(c) 2007 - 2024 Intel Corporation. */
 
 #ifndef _KCOMPAT_UBUNTU_DEFS_H_
 #define _KCOMPAT_UBUNTU_DEFS_H_
