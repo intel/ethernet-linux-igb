@@ -3516,6 +3516,7 @@ static int igb_sw_init(struct igb_adapter *adapter)
 
 	adapter->max_frame_size = netdev->mtu + ETH_HLEN + ETH_FCS_LEN +
 					      VLAN_HLEN;
+	spin_lock_init(&adapter->nfc_lock);
 
 	/* Initialize the hardware-specific values */
 	if (e1000_setup_init_funcs(hw, TRUE)) {
