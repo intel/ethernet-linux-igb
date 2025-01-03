@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: @SPDX@ */
+/* SPDX-License-Identifier: GPL-2.0 */
 /* Copyright(c) 2007 - 2024 Intel Corporation. */
 
 #ifndef _E1000_I210_H_

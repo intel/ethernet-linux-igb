@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: @SPDX@ */
+/* SPDX-License-Identifier: GPL-2.0 */
 /* Copyright(c) 2007 - 2024 Intel Corporation. */
 
 /* ethtool support for igb */
@@ -2602,8 +2602,13 @@ static void igb_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 }
 
 #ifdef HAVE_ETHTOOL_GET_TS_INFO
+#ifdef HAVE_ETHTOOL_KERNEL_TS_INFO
+static int igb_get_ts_info(struct net_device *dev,
+			   struct kernel_ethtool_ts_info *info)
+#else
 static int igb_get_ts_info(struct net_device *dev,
 			   struct ethtool_ts_info *info)
+#endif /* HAVE_ETHTOOL_KERNEL_TS_INFO */
 {
 	struct igb_adapter *adapter = netdev_priv(dev);
 

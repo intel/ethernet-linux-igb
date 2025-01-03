@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: @SPDX@ */
+/* SPDX-License-Identifier: GPL-2.0 */
 /* Copyright(c) 2007 - 2024 Intel Corporation. */
 
 #include <linux/module.h>
@@ -39,7 +39,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.17.5" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.18.7" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
@@ -10287,7 +10287,7 @@ static void igb_vmm_control(struct igb_adapter *adapter)
  */
 static u32 igb_get_os_driver_version(void)
 {
-	static const char driver_version[] = "5.17.5";
+	static const char driver_version[] = "5.18.7";
 	u8 driver_version_num[] = {0, 0, 0, 0};
 	char const *c = driver_version;
 	uint pos;

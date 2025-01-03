@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: @SPDX@
+# SPDX-License-Identifier: GPL-2.0
 # Copyright(c) 2007 - 2024 Intel Corporation.
 
 # updates for the system pci.ids file
@@ -96,9 +96,12 @@
 		8086 0001  Ethernet Server Adapter I340-F4
 		8086 0002  Ethernet Server Adapter I340-F4
 	1533  I210 Gigabit Network Connection
+		1028 0758  I210 PCIe 1Gb 1-Port RJ45 LOM
+		1028 0759  I210 PCIe 1Gb 1-Port RJ45 LOM
 		103c 0003  Ethernet I210-T1 GbE NIC
 		17aa 1059  I210 Gigabit Network Connection
 		17aa 404d  I210 PCIe 1Gb 1-Port RJ45 LOM
+		17aa 407a  I210 PCIe 1Gb 1-Port RJ45 LOM
 		8086 0001  Ethernet Server Adapter I210-T1
 		8086 0002  Ethernet Server Adapter I210-T1
 	1536  I210 Gigabit Fiber Network Connection
