@@ -328,6 +328,7 @@ struct e1000_adv_context_desc {
 
 s32 e1000_reset_init_script_82575(struct e1000_hw *hw);
 s32 e1000_init_nvm_params_82575(struct e1000_hw *hw);
+u16 e1000_swfw_phy_mask_82575(struct e1000_hw *hw);
 
 /* Rx packet buffer size defines */
 #define E1000_RXPBS_SIZE_MASK_82576	0x0000007F

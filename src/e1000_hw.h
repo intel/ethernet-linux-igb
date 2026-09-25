@@ -541,6 +541,7 @@ struct e1000_mac_operations {
 	s32 (*init_thermal_sensor_thresh)(struct e1000_hw *);
 	s32  (*acquire_swfw_sync)(struct e1000_hw *, u16);
 	void (*release_swfw_sync)(struct e1000_hw *, u16);
+	void (*init_swfw_sync)(struct e1000_hw *);
 };
 
 /* When to use various PHY register access functions:
@@ -759,6 +760,10 @@ struct e1000_dev_spec_82575 {
 	bool eee_disable;
 	bool module_plugged;
 	bool clear_semaphore_once;
+	/* SW_FW_SYNC resources already recovered once by this driver instance,
+	 * so the acquire path can never repeatedly steal a live peer's lock.
+	 */
+	u16 swfw_sync_recovered;
 	u32 mtu;
 	struct sfp_e1000_flags eth_flags;
 	u8 media_port;

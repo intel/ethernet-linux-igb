@@ -42,7 +42,7 @@
 #define DRV_HW_PERF
 #define VERSION_SUFFIX
 
-#define DRV_VERSION	"5.20.28" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
+#define DRV_VERSION	"5.20.93" VERSION_SUFFIX DRV_DEBUG DRV_HW_PERF
 #define DRV_SUMMARY	"Intel(R) Gigabit Ethernet Linux Driver"
 
 char igb_driver_name[] = "igb";
@@ -723,14 +723,13 @@ static void igb_free_q_vector(struct igb_adapter *adapter, int v_idx)
 
 	adapter->q_vector[v_idx] = NULL;
 
+#ifndef IGB_NO_LRO
+	__skb_queue_purge(&q_vector->lrolist.active);
+#endif
 	/* igb_get_stats64() might access the rings on this vector,
 	 * we must wait a grace period before freeing it.
 	 */
 	kfree_rcu(q_vector, rcu);
-
-#ifndef IGB_NO_LRO
-	__skb_queue_purge(&q_vector->lrolist.active);
-#endif
 }
 
 /**
@@ -2333,12 +2332,17 @@ static int igb_ndo_bridge_setlink(struct net_device *dev,
 	}
 
 	br_spec = nlmsg_find_attr(nlh, sizeof(struct ifinfomsg), IFLA_AF_SPEC);
+	if (!br_spec)
+		return -EINVAL;
 
 	nla_for_each_nested(attr, br_spec, rem) {
 		__u16 mode;
 
 		if (nla_type(attr) != IFLA_BRIDGE_MODE)
 			continue;
+
+		if (nla_len(attr) < sizeof(u16))
+			return -EINVAL;
 
 		mode = nla_get_u16(attr);
 		if (mode == BRIDGE_MODE_VEPA) {
@@ -3316,8 +3320,6 @@ err_eeprom:
 	if (!e1000_check_reset_block(hw))
 		e1000_phy_hw_reset(hw);
 
-	if (hw->flash_address)
-		iounmap(hw->flash_address);
 err_sw_init:
 	kfree(adapter->shadow_vfta);
 	igb_clear_interrupt_scheme(adapter);
@@ -3383,6 +3385,8 @@ static void igb_remove(struct pci_dev *pdev)
 
 	cancel_work_sync(&adapter->reset_task);
 	cancel_work_sync(&adapter->watchdog_task);
+	if (adapter->flags & IGB_FLAG_DETECT_BAD_DMA)
+		cancel_work_sync(&adapter->dma_err_task);
 
 #ifdef IGB_DCA
 	if (adapter->flags & IGB_FLAG_DCA_ENABLED) {
@@ -3405,6 +3409,12 @@ static void igb_remove(struct pci_dev *pdev)
 	igb_release_hw_control(adapter);
 
 	unregister_netdev(netdev);
+
+	/* Hand back this port's SW_FW_SYNC ownership while the registers are
+	 * still mapped; the bit outlives the driver.
+	 */
+	if (hw->mac.ops.init_swfw_sync)
+		hw->mac.ops.init_swfw_sync(hw);
 
 	igb_clear_interrupt_scheme(adapter);
 
@@ -3478,13 +3488,19 @@ static int igb_sw_init(struct igb_adapter *adapter)
 
 	igb_check_options(adapter);
 
-	adapter->mac_table = kzalloc(sizeof(struct igb_mac_addr) *
-				     hw->mac.rar_entry_count,
-				     GFP_ATOMIC);
+	adapter->mac_table = kcalloc(hw->mac.rar_entry_count,
+				     sizeof(struct igb_mac_addr),
+				     GFP_KERNEL);
+	if (!adapter->mac_table)
+		return -ENOMEM;
 
 	/* Setup and initialize a copy of the hw vlan table array */
-	adapter->shadow_vfta = kzalloc(sizeof(u32) * E1000_VFTA_ENTRIES,
-					GFP_ATOMIC);
+	adapter->shadow_vfta = kcalloc(E1000_VFTA_ENTRIES, sizeof(u32),
+				       GFP_KERNEL);
+	if (!adapter->shadow_vfta) {
+		kfree(adapter->mac_table);
+		return -ENOMEM;
+	}
 
 	/* These calls may decrease the number of queues */
 	if (hw->mac.type < e1000_i210)
@@ -7701,8 +7717,12 @@ static bool igb_add_rx_frag(struct igb_ring *rx_ring,
 #ifdef HAVE_PTP_1588_CLOCK
 	if (unlikely(igb_test_staterr(rx_desc, E1000_RXDADV_STAT_TSIP))) {
 		igb_ptp_rx_pktstamp(rx_ring->q_vector, va, skb);
-		va += IGB_TS_HDR_LEN;
-		size -= IGB_TS_HDR_LEN;
+		if (likely(size >= IGB_TS_HDR_LEN)) {
+			va += IGB_TS_HDR_LEN;
+			size -= IGB_TS_HDR_LEN;
+		} else {
+			size = 0;
+		}
 	}
 #endif /* HAVE_PTP_1588_CLOCK */
 
@@ -8451,7 +8471,13 @@ static bool igb_clean_rx_irq(struct igb_q_vector *q_vector, int budget)
 		prefetch(skb->data);
 
 		/* pull the header of the skb in */
-		__skb_put(skb, le16_to_cpu(rx_desc->wb.upper.length));
+		{
+			u16 len = le16_to_cpu(rx_desc->wb.upper.length);
+
+			if (unlikely(len > rx_ring->rx_buffer_len))
+				len = rx_ring->rx_buffer_len;
+			__skb_put(skb, len);
+		}
 
 		/* clear skb reference in buffer info structure */
 		rx_buffer->skb = NULL;
@@ -9295,6 +9321,13 @@ static int __igb_shutdown(struct pci_dev *pdev, bool *enable_wake,
 	 * would have already happened in close and is redundant.
 	 */
 	igb_release_hw_control(adapter);
+
+	/* SW_FW_SYNC is only cleared by LAN power-good, so a bit left set here
+	 * survives the reboot and blocks the next probe.  The last PHY access
+	 * (igb_power_down_link()) is already done.
+	 */
+	if (hw->mac.ops.init_swfw_sync)
+		hw->mac.ops.init_swfw_sync(hw);
 
 	pci_disable_device(pdev);
 
@@ -10249,7 +10282,7 @@ static void igb_vmm_control(struct igb_adapter *adapter)
  */
 static u32 igb_get_os_driver_version(void)
 {
-	static const char driver_version[] = "5.20.28";
+	static const char driver_version[] = "5.20.93";
 	u8 driver_version_num[] = {0, 0, 0, 0};
 	char const *c = driver_version;
 	uint pos;
@@ -10317,10 +10350,15 @@ static void igb_init_fw(struct igb_adapter *adapter)
 				break;
 			    }
 		}
-	} else
+		hw->mac.ops.release_swfw_sync(hw, mask);
+	} else {
+		/* Never acquired it, so do not release: outside i210 this is
+		 * the device wide PHY0_SM lock, shared by all four functions
+		 * of an I350, which probe concurrently.
+		 */
 		dev_warn(pci_dev_to_dev(adapter->pdev),
 			 "Unable to get semaphore, firmware init failed.\n");
-	hw->mac.ops.release_swfw_sync(hw, mask);
+	}
 }
 
 static void igb_init_dmac(struct igb_adapter *adapter, u32 pba)
@@ -10466,7 +10504,7 @@ s32 igb_read_i2c_byte(struct e1000_hw *hw, u8 byte_offset,
 	if (!this_client)
 		return E1000_ERR_I2C;
 
-	swfw_mask = E1000_SWFW_PHY0_SM;
+	swfw_mask = e1000_swfw_phy_mask_82575(hw);
 
 	if (hw->mac.ops.acquire_swfw_sync(hw, swfw_mask)
 	    != E1000_SUCCESS)
@@ -10498,7 +10536,7 @@ s32 igb_write_i2c_byte(struct e1000_hw *hw, u8 byte_offset,
 	struct igb_adapter *adapter = container_of(hw, struct igb_adapter, hw);
 	struct i2c_client *this_client = adapter->i2c_client;
 	s32 status;
-	u16 swfw_mask = E1000_SWFW_PHY0_SM;
+	u16 swfw_mask = e1000_swfw_phy_mask_82575(hw);
 
 	if (!this_client)
 		return E1000_ERR_I2C;

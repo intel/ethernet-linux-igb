@@ -3468,8 +3468,8 @@ static int igb_add_ethtool_nfc_entry(struct igb_adapter *adapter,
 	spin_lock(&adapter->nfc_lock);
 
 	hlist_for_each_entry(rule, &adapter->nfc_filter_list, nfc_node) {
-		if (memcmp(&input->filter, &rule->filter,
-		    sizeof(input->filter)) != 0) {
+		if (!memcmp(&input->filter, &rule->filter,
+			    sizeof(input->filter))) {
 			err = -EEXIST;
 			dev_err(&adapter->pdev->dev,
 				"ethtool: this filter is already set\n");
@@ -3483,7 +3483,6 @@ static int igb_add_ethtool_nfc_entry(struct igb_adapter *adapter,
 	err = igb_update_ethtool_nfc_entry(adapter, input, input->sw_idx);
 
 	spin_unlock(&adapter->nfc_lock);
-	kfree(input);
 	return err;
 
 err_out_w_lock:
@@ -3529,6 +3528,16 @@ static int igb_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
 }
 
 #endif /* ETHTOOL_GRXFH */
+
+#ifdef HAVE_ETHTOOL_GET_RX_RING_COUNT
+static u32 igb_get_rx_ring_count(struct net_device *netdev)
+{
+	struct igb_adapter *adapter = netdev_priv(netdev);
+
+	return adapter->num_rx_queues;
+}
+#endif /* HAVE_ETHTOOL_GET_RX_RING_COUNT */
+
 #ifdef ETHTOOL_GRXFHINDIR
 #ifdef HAVE_ETHTOOL_GRXFHINDIR_SIZE
 static u32 igb_get_rxfh_indir_size(struct net_device *netdev)
@@ -3956,6 +3965,9 @@ static const struct ethtool_ops igb_ethtool_ops = {
 	.set_rxfh_indir		= igb_set_rxfh_indir,
 #endif /* HAVE_ETHTOOL_GSRSSH */
 #endif /* ETHTOOL_SRXFHINDIR */
+#ifdef HAVE_ETHTOOL_GET_RX_RING_COUNT
+	.get_rx_ring_count	= igb_get_rx_ring_count,
+#endif /* HAVE_ETHTOOL_GET_RX_RING_COUNT */
 #ifdef ETHTOOL_GCHANNELS
 	.get_channels           = igb_get_channels,
 #endif /* ETHTOOL_GCHANNELS */

@@ -218,6 +218,15 @@
 #define E1000_SWFW_PHY2_SM	0x20
 #define E1000_SWFW_PHY3_SM	0x40
 #define E1000_SWFW_SW_MNG_SM	0x400
+/* Bounded attempts to take SWSM while releasing SW_FW_SYNC.  Never hang
+ * while holding an ownership bit: it is only cleared by LAN power-good and
+ * would survive the reboot that follows.
+ */
+#define E1000_SWFW_RELEASE_RETRIES	10
+/* SW ownership is in the low 16 bits of SW_FW_SYNC, FW ownership in the high
+ * 16 bits.
+ */
+#define E1000_SWFW_FW_SHIFT		16
 
 /* Device Control */
 #define E1000_CTRL_FD		0x00000001  /* Full duplex.0=half; 1=full */
