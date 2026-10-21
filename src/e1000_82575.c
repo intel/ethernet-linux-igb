@@ -48,6 +48,7 @@ static s32  e1000_write_phy_reg_sgmii_82575(struct e1000_hw *hw,
 					    u32 offset, u16 data);
 static void e1000_clear_hw_cntrs_82575(struct e1000_hw *hw);
 static s32  e1000_acquire_swfw_sync_82575(struct e1000_hw *hw, u16 mask);
+static void e1000_init_swfw_sync_82575(struct e1000_hw *hw);
 static s32  e1000_get_pcs_speed_and_duplex_82575(struct e1000_hw *hw,
 						 u16 *speed, u16 *duplex);
 static s32  e1000_get_phy_id_82575(struct e1000_hw *hw);
@@ -190,6 +191,12 @@ static s32 e1000_init_phy_params_82575(struct e1000_hw *hw)
 
 	/* Set phy->phy_addr and phy->id. */
 	ret_val = e1000_get_phy_id_82575(hw);
+	/* Without this, phy->id stays 0, the switch below takes the default
+	 * case and a precise error such as -E1000_ERR_SWFW_SYNC is reported
+	 * as the generic -E1000_ERR_PHY.
+	 */
+	if (ret_val)
+		goto out;
 
 	/* Verify phy id and set remaining function pointers */
 	switch (phy->id) {
@@ -401,13 +408,24 @@ static s32 e1000_init_mac_params_82575(struct e1000_hw *hw)
 	mac->ops.acquire_swfw_sync = e1000_acquire_swfw_sync_82575;
 	/* release SW_FW sync */
 	mac->ops.release_swfw_sync = e1000_release_swfw_sync_82575;
+	/* recover stale SW_FW sync ownership left behind by a previous owner */
+	mac->ops.init_swfw_sync = e1000_init_swfw_sync_82575;
 	if (mac->type == e1000_i210 || mac->type == e1000_i211) {
 		mac->ops.acquire_swfw_sync = e1000_acquire_swfw_sync_i210;
 		mac->ops.release_swfw_sync = e1000_release_swfw_sync_i210;
+		/* i210/i211 recover via clear_semaphore_once. */
+		mac->ops.init_swfw_sync = NULL;
 	}
 
 	/* set lan id for port to determine which phy lock to use */
 	hw->mac.ops.set_lan_id(hw);
+
+	/* bus.func is known now, and e1000_init_phy_params_82575() makes the
+	 * first PHY access right after this - the only point where a stale
+	 * ownership bit can still be cleared in time.
+	 */
+	if (hw->mac.ops.init_swfw_sync)
+		hw->mac.ops.init_swfw_sync(hw);
 
 	return E1000_SUCCESS;
 }
@@ -969,6 +987,114 @@ static void e1000_release_nvm_82575(struct e1000_hw *hw)
 }
 
 /**
+ *  e1000_swfw_phy_mask_82575 - SW_FW_SYNC bit owned solely by this function
+ *  @hw: pointer to the HW structure
+ *
+ *  Never returns E1000_SWFW_EEP_SM or E1000_SWFW_CSR_SM: those are shared
+ *  device wide and may legitimately be held by a sibling function.
+ *
+ *  Return: the E1000_SWFW_PHYx_SM bit for this function.
+ **/
+u16 e1000_swfw_phy_mask_82575(struct e1000_hw *hw)
+{
+	if (hw->bus.func == E1000_FUNC_1)
+		return E1000_SWFW_PHY1_SM;
+	else if (hw->bus.func == E1000_FUNC_2)
+		return E1000_SWFW_PHY2_SM;
+	else if (hw->bus.func == E1000_FUNC_3)
+		return E1000_SWFW_PHY3_SM;
+
+	return E1000_SWFW_PHY0_SM;
+}
+
+/**
+ *  e1000_swfw_try_recover_82575 - Clear a stale SW ownership bit
+ *  @hw: pointer to the HW structure
+ *  @mask: resource to examine
+ *
+ *  Takes and releases SWSM internally, so the read-modify-write of
+ *  E1000_SW_FW_SYNC is atomic with respect to firmware.
+ *
+ *  Return: true if a stale SW ownership bit was cleared, false otherwise.
+ **/
+static bool e1000_swfw_try_recover_82575(struct e1000_hw *hw, u16 mask)
+{
+	u32 fwmask = (u32)mask << E1000_SWFW_FW_SHIFT;
+	bool recovered = false;
+	u32 swfw_sync;
+
+	DEBUGFUNC("e1000_swfw_try_recover_82575");
+
+	/* Never touch a shared resource: siblings probe concurrently. */
+	if (mask != e1000_swfw_phy_mask_82575(hw))
+		return false;
+
+	if (e1000_get_hw_semaphore_generic(hw) != E1000_SUCCESS) {
+		DEBUGOUT("SW_FW_SYNC: no SWSM, skipping stale check\n");
+		return false;
+	}
+
+	swfw_sync = E1000_READ_REG(hw, E1000_SW_FW_SYNC);
+
+	/* Device gone; do not act on garbage. */
+	if (swfw_sync == 0xFFFFFFFF) {
+		DEBUGOUT("SW_FW_SYNC: reads all ones, skipping\n");
+		goto out;
+	}
+
+	if (!(swfw_sync & mask))
+		goto out;		/* nothing stale, the normal case */
+
+	if (swfw_sync & fwmask) {
+		/* FW is a live peer; its ownership is authoritative. */
+		DEBUGOUT1("SW_FW_SYNC: FW owns resource 0x%x, not clearing\n",
+			  mask);
+		goto out;
+	}
+
+	DEBUGOUT2("SW_FW_SYNC: stale SW owner 0x%x (reg=0x%08X), releasing\n",
+		  mask, swfw_sync);
+
+	swfw_sync &= ~(u32)mask;
+	E1000_WRITE_REG(hw, E1000_SW_FW_SYNC, swfw_sync);
+	E1000_WRITE_FLUSH(hw);
+
+	hw->dev_spec._82575.swfw_sync_recovered |= mask;
+	recovered = true;
+
+out:
+	e1000_put_hw_semaphore_generic(hw);
+
+	return recovered;
+}
+
+/**
+ *  e1000_init_swfw_sync_82575 - Reset stale SW ownership in SW_FW_SYNC
+ *  @hw: pointer to the HW structure
+ *
+ *  E1000_SW_FW_SYNC is cleared only by LAN power-good, so a SW ownership bit
+ *  left set by an agent that died holding it - pre-OS UNDI, a kexec'd or
+ *  panicked kernel - survives reset and blocks this port's PHY access
+ *  forever.  Force the bit owned by this function into a released state.
+ *
+ *  Modelled on ixgbe_init_swfw_sync_X540(), but narrower: ixgbe clears its
+ *  whole resource mask, which is not safe on a four port I350.
+ **/
+static void e1000_init_swfw_sync_82575(struct e1000_hw *hw)
+{
+	u16 mask = e1000_swfw_phy_mask_82575(hw);
+
+	DEBUGFUNC("e1000_init_swfw_sync_82575");
+
+	/* Re-arm the one shot acquire path recovery; this runs only at init
+	 * and teardown, never during runtime contention.
+	 */
+	hw->dev_spec._82575.swfw_sync_recovered &= ~mask;
+
+	e1000_swfw_try_recover_82575(hw, mask);
+}
+
+/**
  *  e1000_acquire_swfw_sync_82575 - Acquire SW/FW semaphore
  *  @hw: pointer to the HW structure
  *  @mask: specifies which semaphore to acquire
@@ -980,12 +1106,14 @@ static s32 e1000_acquire_swfw_sync_82575(struct e1000_hw *hw, u16 mask)
 {
 	u32 swfw_sync;
 	u32 swmask = mask;
-	u32 fwmask = mask << 16;
+	u32 fwmask = (u32)mask << E1000_SWFW_FW_SHIFT;
 	s32 ret_val = E1000_SUCCESS;
 	s32 i = 0, timeout = 200;
+	bool retried = false;
 
 	DEBUGFUNC("e1000_acquire_swfw_sync_82575");
 
+again:
 	while (i < timeout) {
 		if (e1000_get_hw_semaphore_generic(hw)) {
 			ret_val = -E1000_ERR_SWFW_SYNC;
@@ -1006,13 +1134,27 @@ static s32 e1000_acquire_swfw_sync_82575(struct e1000_hw *hw, u16 mask)
 	}
 
 	if (i == timeout) {
-		DEBUGOUT("Driver can't access resource, SW_FW_SYNC timeout.\n");
+		/* Last resort self heal, one shot per resource.  All safety
+		 * conditions are enforced in e1000_swfw_try_recover_82575().
+		 */
+		if (!retried &&
+		    !(hw->dev_spec._82575.swfw_sync_recovered & mask) &&
+		    e1000_swfw_try_recover_82575(hw, mask)) {
+			retried = true;
+			i = 0;
+			goto again;
+		}
+
+		swfw_sync = E1000_READ_REG(hw, E1000_SW_FW_SYNC);
+		DEBUGOUT3("SW_FW_SYNC timeout: mask=0x%04X reg=0x%08X func=%d\n",
+			  mask, swfw_sync, hw->bus.func);
 		ret_val = -E1000_ERR_SWFW_SYNC;
 		goto out;
 	}
 
 	swfw_sync |= swmask;
 	E1000_WRITE_REG(hw, E1000_SW_FW_SYNC, swfw_sync);
+	E1000_WRITE_FLUSH(hw);
 
 	e1000_put_hw_semaphore_generic(hw);
 
@@ -1031,16 +1173,37 @@ out:
 static void e1000_release_swfw_sync_82575(struct e1000_hw *hw, u16 mask)
 {
 	u32 swfw_sync;
+	s32 i;
 
 	DEBUGFUNC("e1000_release_swfw_sync_82575");
 
-	while (e1000_get_hw_semaphore_generic(hw) != E1000_SUCCESS)
-		; /* Empty */
+	/* Bounded retry.  The old unbounded spin could hang forever with our
+	 * ownership bit still set, which is one way a stale bit is created.
+	 * Clear the bit anyway on failure: losing a race with FW is
+	 * recoverable, hanging while holding it is not.
+	 */
+	for (i = 0; i < E1000_SWFW_RELEASE_RETRIES; i++) {
+		if (e1000_get_hw_semaphore_generic(hw) == E1000_SUCCESS)
+			break;
+	}
+	if (i == E1000_SWFW_RELEASE_RETRIES)
+		DEBUGOUT1("SW_FW_SYNC: no SWSM, clearing 0x%x anyway\n", mask);
 
 	swfw_sync = E1000_READ_REG(hw, E1000_SW_FW_SYNC);
+
+	/* Device gone: writing back ~mask would set every other ownership bit
+	 * and take out all four ports.
+	 */
+	if (swfw_sync == 0xFFFFFFFF) {
+		DEBUGOUT("SW_FW_SYNC: reads all ones, not writing back\n");
+		goto out;
+	}
+
 	swfw_sync &= (u32)~mask;
 	E1000_WRITE_REG(hw, E1000_SW_FW_SYNC, swfw_sync);
+	E1000_WRITE_FLUSH(hw);
 
+out:
 	e1000_put_hw_semaphore_generic(hw);
 }
 
@@ -3097,7 +3260,10 @@ s32 e1000_read_i2c_byte_generic(struct e1000_hw *hw, u8 byte_offset,
 
 	DEBUGFUNC("e1000_read_i2c_byte_generic");
 
-	swfw_mask = E1000_SWFW_PHY0_SM;
+	/* I2C is driven through this function's own E1000_I2CPARAMS, so the
+	 * lock must be the per-port resource, not always PHY0_SM.
+	 */
+	swfw_mask = e1000_swfw_phy_mask_82575(hw);
 
 	do {
 		if (hw->mac.ops.acquire_swfw_sync(hw, swfw_mask)
@@ -3150,10 +3316,15 @@ fail:
 		msec_delay(100);
 		e1000_i2c_bus_clear(hw);
 		retry++;
-		if (retry < max_retry)
+		if (retry < max_retry) {
 			DEBUGOUT("I2C byte read error - Retrying.\n");
-		else
+		} else {
 			DEBUGOUT("I2C byte read error.\n");
+			/* Already released above; skip the trailing release
+			 * that the success path needs.
+			 */
+			goto read_byte_out;
+		}
 
 	} while (retry < max_retry);
 
@@ -3184,7 +3355,7 @@ s32 e1000_write_i2c_byte_generic(struct e1000_hw *hw, u8 byte_offset,
 
 	DEBUGFUNC("e1000_write_i2c_byte_generic");
 
-	swfw_mask = E1000_SWFW_PHY0_SM;
+	swfw_mask = e1000_swfw_phy_mask_82575(hw);
 
 	if (hw->mac.ops.acquire_swfw_sync(hw, swfw_mask) != E1000_SUCCESS) {
 		status = E1000_ERR_SWFW_SYNC;
